@@ -1,10 +1,10 @@
 {{if .Error}}
-<div class="text-danger text-base">{{.Error}}</div>
+<div class="text-error text-sm mt-3">{{.Error}}</div>
 {{else if .Jobs}}
-<div class="tabs mt-3">
-  <button class="active" hx-get="/api/metrics/browse?datasource={{.Datasource}}" hx-target="#metrics-result" hx-indicator="#metrics-spinner" onclick="setActiveJobTab(this)">all jobs</button>
+<div role="tablist" class="tabs tabs-bordered mt-3">
+  <button role="tab" class="tab tab-active" hx-get="/api/metrics/browse?datasource={{.Datasource}}" hx-target="#metrics-result" hx-indicator="#metrics-spinner" onclick="setActiveJobTab(this)">all jobs</button>
   {{range .Jobs}}
-  <button hx-get="/api/metrics/browse?datasource={{$.Datasource}}&job={{.}}" hx-target="#metrics-result" hx-indicator="#metrics-spinner" onclick="setActiveJobTab(this)">{{.}}</button>
+  <button role="tab" class="tab" hx-get="/api/metrics/browse?datasource={{$.Datasource}}&job={{.}}" hx-target="#metrics-result" hx-indicator="#metrics-spinner" onclick="setActiveJobTab(this)">{{.}}</button>
   {{end}}
 </div>
 {{end}}

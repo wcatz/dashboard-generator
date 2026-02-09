@@ -1,48 +1,52 @@
 {{define "content"}}
-<h1>references</h1>
-<p class="subtitle">constants and selectors for DRY config patterns</p>
+<h1 class="text-xl font-bold mb-1">references</h1>
+<p class="text-sm text-base-content/50 mb-6">constants and selectors for DRY config patterns</p>
 
-<div class="card">
-  <h3>constants ({{len .Constants}})</h3>
-  {{if .Constants}}
-  <table class="compact">
-    <thead>
-      <tr><th>name</th><th>value</th><th>usage</th></tr>
-    </thead>
-    <tbody>
-      {{range .Constants}}
-      <tr>
-        <td class="text-mono text-bold">${{ "{" }}{{.Name}}{{ "}" }}</td>
-        <td><code>{{.Value}}</code></td>
-        <td class="text-muted text-sm">{{.Usage}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
-  {{else}}
-  <div class="empty-state"><p>no constants defined</p></div>
-  {{end}}
+<div class="card bg-base-100 border border-base-content/10 mb-4">
+  <div class="card-body p-5">
+    <h3 class="card-title text-sm">constants ({{len .Constants}})</h3>
+    {{if .Constants}}
+    <div class="overflow-x-auto">
+      <table class="table table-xs">
+        <thead><tr><th>name</th><th>value</th><th>usage</th></tr></thead>
+        <tbody>
+          {{range .Constants}}
+          <tr>
+            <td class="font-mono font-bold">${{ "{" }}{{.Name}}{{ "}" }}</td>
+            <td><code class="text-xs">{{.Value}}</code></td>
+            <td class="text-base-content/50 text-xs">{{.Usage}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <div class="text-center py-6 text-base-content/50"><p>no constants defined</p></div>
+    {{end}}
+  </div>
 </div>
 
-<div class="card">
-  <h3>selectors ({{len .Selectors}})</h3>
-  {{if .Selectors}}
-  <table class="compact">
-    <thead>
-      <tr><th>name</th><th>value</th><th>usage</th></tr>
-    </thead>
-    <tbody>
-      {{range .Selectors}}
-      <tr>
-        <td class="text-mono text-bold">${{ "{" }}{{.Name}}{{ "}" }}</td>
-        <td><code>{{.Value}}</code></td>
-        <td class="text-muted text-sm">{{.Usage}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
-  {{else}}
-  <div class="empty-state"><p>no selectors defined</p></div>
-  {{end}}
+<div class="card bg-base-100 border border-base-content/10">
+  <div class="card-body p-5">
+    <h3 class="card-title text-sm">selectors ({{len .Selectors}})</h3>
+    {{if .Selectors}}
+    <div class="overflow-x-auto">
+      <table class="table table-xs">
+        <thead><tr><th>name</th><th>value</th><th>usage</th></tr></thead>
+        <tbody>
+          {{range .Selectors}}
+          <tr>
+            <td class="font-mono font-bold">${{ "{" }}{{.Name}}{{ "}" }}</td>
+            <td><code class="text-xs">{{.Value}}</code></td>
+            <td class="text-base-content/50 text-xs">{{.Usage}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}
+    <div class="text-center py-6 text-base-content/50"><p>no selectors defined</p></div>
+    {{end}}
+  </div>
 </div>
 {{end}}

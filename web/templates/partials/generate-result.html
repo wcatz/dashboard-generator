@@ -1,14 +1,14 @@
 {{if .Error}}
-<div class="card text-danger">
-  <span class="text-danger text-bold">error:</span> {{.Error}}
+<div class="alert alert-error text-sm">
+  <span>error: {{.Error}}</span>
 </div>
 {{else}}
-<div class="card">
-  <span class="text-success text-bold">generated {{.Count}} dashboards</span>
-  <div class="mt-2">
+<div class="bg-base-100 border border-base-content/10 rounded-lg p-4">
+  <span class="text-success font-semibold text-sm">generated {{.Count}} dashboards</span>
+  <div class="mt-2 space-y-1">
     {{range .Results}}
-    <div class="result-item">
-      <span class="icon-ok">&#10003;</span>
+    <div class="flex items-center gap-2 text-sm">
+      <span class="text-success">&#10003;</span>
       {{.Filename}}: {{.Panels}} panels, {{.Size}} bytes
     </div>
     {{end}}

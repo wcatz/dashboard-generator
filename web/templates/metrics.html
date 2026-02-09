@@ -1,65 +1,67 @@
 {{define "content"}}
-<h1>metric browser</h1>
-<p class="subtitle">browse and search metrics from connected datasources</p>
+<h1 class="text-xl font-bold mb-1">metric browser</h1>
+<p class="text-sm text-base-content/50 mb-6">browse and search metrics from connected datasources</p>
 
-<div class="card">
-  <div class="mb-3">
-    <label class="toggle-label">
-      <input type="checkbox" id="compare-toggle">
-      comparison mode
-    </label>
-  </div>
-
-  <form id="browse-form" hx-get="/api/metrics/browse" hx-target="#metrics-result" hx-indicator="#metrics-spinner">
-    <div class="form-row">
-      <label class="flex-1 min-w-150">
-        datasource
-        <select name="datasource" id="ds-select" hx-get="/api/metrics/jobs" hx-target="#job-tabs" hx-trigger="change" hx-include="[name='datasource']">
-          {{range $name, $ds := .Datasources}}
-          {{if $ds.URL}}<option value="{{$name}}">{{$name}}</option>{{end}}
-          {{end}}
-        </select>
+<div class="card bg-base-100 border border-base-content/10 mb-4">
+  <div class="card-body p-5">
+    <div class="mb-3">
+      <label class="flex items-center gap-2 cursor-pointer text-sm">
+        <input type="checkbox" id="compare-toggle" class="toggle toggle-sm toggle-primary">
+        comparison mode
       </label>
-      <label id="ds-b-container" class="flex-1 min-w-150 hidden">
-        compare with
-        <select name="datasource_b" id="ds-b-select">
-          {{range $name, $ds := .Datasources}}
-          {{if $ds.URL}}<option value="{{$name}}">{{$name}}</option>{{end}}
-          {{end}}
-        </select>
-      </label>
-      <label class="flex-2 min-w-200">
-        filter (glob pattern)
-        <input type="text" name="filter" placeholder="node_* or *_total" value="{{.Filter}}" hx-trigger="keyup changed delay:400ms" hx-get="/api/metrics/browse" hx-target="#metrics-result" hx-indicator="#metrics-spinner" hx-include="closest form">
-      </label>
-      <label class="min-w-150">
-        type
-        <select name="type">
-          <option value="">all types</option>
-          <option value="counter">counter</option>
-          <option value="gauge">gauge</option>
-          <option value="histogram">histogram</option>
-          <option value="summary">summary</option>
-        </select>
-      </label>
-      <button type="submit">
-        browse <span id="metrics-spinner" class="htmx-indicator"><span class="spinner"></span></span>
-      </button>
     </div>
-  </form>
+
+    <form id="browse-form" hx-get="/api/metrics/browse" hx-target="#metrics-result" hx-indicator="#metrics-spinner">
+      <div class="flex flex-wrap gap-3 items-end">
+        <label class="form-control flex-1 min-w-[150px]">
+          <div class="label"><span class="label-text text-xs">datasource</span></div>
+          <select name="datasource" id="ds-select" class="select select-bordered select-sm w-full" hx-get="/api/metrics/jobs" hx-target="#job-tabs" hx-trigger="change" hx-include="[name='datasource']">
+            {{range $name, $ds := .Datasources}}
+            {{if $ds.URL}}<option value="{{$name}}">{{$name}}</option>{{end}}
+            {{end}}
+          </select>
+        </label>
+        <label id="ds-b-container" class="form-control flex-1 min-w-[150px] hidden">
+          <div class="label"><span class="label-text text-xs">compare with</span></div>
+          <select name="datasource_b" id="ds-b-select" class="select select-bordered select-sm w-full">
+            {{range $name, $ds := .Datasources}}
+            {{if $ds.URL}}<option value="{{$name}}">{{$name}}</option>{{end}}
+            {{end}}
+          </select>
+        </label>
+        <label class="form-control flex-[2] min-w-[200px]">
+          <div class="label"><span class="label-text text-xs">filter (glob pattern)</span></div>
+          <input type="text" name="filter" placeholder="node_* or *_total" value="{{.Filter}}" class="input input-bordered input-sm w-full" hx-trigger="keyup changed delay:400ms" hx-get="/api/metrics/browse" hx-target="#metrics-result" hx-indicator="#metrics-spinner" hx-include="closest form">
+        </label>
+        <label class="form-control min-w-[150px]">
+          <div class="label"><span class="label-text text-xs">type</span></div>
+          <select name="type" class="select select-bordered select-sm w-full">
+            <option value="">all types</option>
+            <option value="counter">counter</option>
+            <option value="gauge">gauge</option>
+            <option value="histogram">histogram</option>
+            <option value="summary">summary</option>
+          </select>
+        </label>
+        <button type="submit" class="btn btn-sm btn-primary">
+          browse <span id="metrics-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div id="job-tabs"></div>
 
 <div id="metrics-result">
   {{if .HasDatasources}}
-  <div class="empty-state">
+  <div class="text-center py-12 text-base-content/50">
     <p>select a datasource and click browse</p>
   </div>
   {{else}}
-  <div class="empty-state">
+  <div class="text-center py-12 text-base-content/50">
     <p>no datasources with URLs configured</p>
-    <p>set a URL on the <a href="/datasources">datasources page</a> first</p>
+    <p>set a URL on the <a href="/datasources" class="link link-primary">datasources page</a> first</p>
   </div>
   {{end}}
 </div>

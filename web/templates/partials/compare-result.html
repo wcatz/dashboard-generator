@@ -1,99 +1,95 @@
 {{if .Error}}
-<div class="card text-danger">
-  <span class="text-danger text-bold">error:</span> {{.Error}}
+<div class="alert alert-error text-sm">
+  <span>error: {{.Error}}</span>
 </div>
 {{else}}
-<div class="card">
-  <div class="compare-stats">
-    <div class="stat-card accent-green">
-      <div class="label">shared</div>
-      <div class="value green">{{.SharedCount}}</div>
+<div class="card bg-base-100 border border-base-content/10">
+  <div class="card-body p-5">
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <div class="bg-base-200 rounded-lg p-3 text-center border-t-2 border-success">
+        <div class="text-xs text-base-content/50">shared</div>
+        <div class="text-xl font-bold text-success">{{.SharedCount}}</div>
+      </div>
+      <div class="bg-base-200 rounded-lg p-3 text-center border-t-2 border-info">
+        <div class="text-xs text-base-content/50">{{.DatasourceA}} only</div>
+        <div class="text-xl font-bold text-info">{{.OnlyACount}}</div>
+      </div>
+      <div class="bg-base-200 rounded-lg p-3 text-center border-t-2 border-warning">
+        <div class="text-xs text-base-content/50">{{.DatasourceB}} only</div>
+        <div class="text-xl font-bold text-warning">{{.OnlyBCount}}</div>
+      </div>
     </div>
-    <div class="stat-card accent-blue">
-      <div class="label">{{.DatasourceA}} only</div>
-      <div class="value blue">{{.OnlyACount}}</div>
-    </div>
-    <div class="stat-card accent-orange">
-      <div class="label">{{.DatasourceB}} only</div>
-      <div class="value orange">{{.OnlyBCount}}</div>
-    </div>
-  </div>
 
-  <div class="tabs">
-    <button class="active" onclick="showCompareTab('shared', this)">shared ({{.SharedCount}})</button>
-    <button onclick="showCompareTab('only-a', this)">{{.DatasourceA}} only ({{.OnlyACount}})</button>
-    <button onclick="showCompareTab('only-b', this)">{{.DatasourceB}} only ({{.OnlyBCount}})</button>
-  </div>
+    <div role="tablist" class="tabs tabs-bordered mb-4">
+      <button role="tab" class="tab tab-active" onclick="showCompareTab('shared', this)">shared ({{.SharedCount}})</button>
+      <button role="tab" class="tab" onclick="showCompareTab('only-a', this)">{{.DatasourceA}} only ({{.OnlyACount}})</button>
+      <button role="tab" class="tab" onclick="showCompareTab('only-b', this)">{{.DatasourceB}} only ({{.OnlyBCount}})</button>
+    </div>
 
-  <div id="compare-tab-shared" class="compare-tab-content active">
-    {{if .Shared}}
-    <form hx-post="/api/metrics/comparison-snippet" hx-target="#snippet-result">
-      <input type="hidden" name="datasource_a" value="{{.DatasourceA}}">
-      <input type="hidden" name="datasource_b" value="{{.DatasourceB}}">
-      <div class="metric-list">
-        {{range .Shared}}
-        <div class="metric-item">
-          <label>
-            <input type="checkbox" name="metrics" value="{{.Name}}">
-            <div class="flex-1">
-              <div class="name">{{.Name}}</div>
-              {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
+    <div id="compare-tab-shared" class="compare-tab-content" style="display:block">
+      {{if .Shared}}
+      <form hx-post="/api/metrics/comparison-snippet" hx-target="#snippet-result">
+        <input type="hidden" name="datasource_a" value="{{.DatasourceA}}">
+        <input type="hidden" name="datasource_b" value="{{.DatasourceB}}">
+        <div class="space-y-1 max-h-[600px] overflow-y-auto">
+          {{range .Shared}}
+          <label class="flex items-center gap-3 p-2 rounded hover:bg-base-200 cursor-pointer">
+            <input type="checkbox" name="metrics" value="{{.Name}}" class="checkbox checkbox-xs checkbox-primary">
+            <div class="flex-1 min-w-0">
+              <div class="font-mono text-sm truncate">{{.Name}}</div>
+              {{if .Help}}<div class="text-xs text-base-content/40 truncate">{{.Help}}</div>{{end}}
+            </div>
+            <div class="flex gap-1">
+              <span class="badge badge-sm badge-outline">{{.Type}}</span>
+              <span class="badge badge-sm badge-success">both</span>
             </div>
           </label>
-          <div class="meta">
-            <span class="badge {{.Type}}">{{.Type}}</span>
-            <span class="badge success">both</span>
+          {{end}}
+        </div>
+        <button type="submit" class="btn btn-sm btn-primary mt-3">generate comparison snippet</button>
+      </form>
+      {{else}}
+      <div class="text-center py-6 text-base-content/50"><p>no shared metrics</p></div>
+      {{end}}
+    </div>
+
+    <div id="compare-tab-only-a" class="compare-tab-content" style="display:none">
+      {{if .OnlyA}}
+      <div class="space-y-1 max-h-[600px] overflow-y-auto">
+        {{range .OnlyA}}
+        <div class="flex items-center gap-3 p-2 rounded">
+          <div class="flex-1 min-w-0">
+            <div class="font-mono text-sm truncate">{{.Name}}</div>
+            {{if .Help}}<div class="text-xs text-base-content/40 truncate">{{.Help}}</div>{{end}}
           </div>
+          <span class="badge badge-sm badge-outline">{{.Type}}</span>
         </div>
         {{end}}
       </div>
-      <button type="submit" class="sm mt-3">generate comparison snippet</button>
-    </form>
-    {{else}}
-    <div class="empty-state"><p>no shared metrics</p></div>
-    {{end}}
-  </div>
-
-  <div id="compare-tab-only-a" class="compare-tab-content">
-    {{if .OnlyA}}
-    <div class="metric-list">
-      {{range .OnlyA}}
-      <div class="metric-item">
-        <div>
-          <div class="name">{{.Name}}</div>
-          {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
-        </div>
-        <div class="meta">
-          <span class="badge {{.Type}}">{{.Type}}</span>
-        </div>
-      </div>
+      {{else}}
+      <div class="text-center py-6 text-base-content/50"><p>no unique metrics</p></div>
       {{end}}
     </div>
-    {{else}}
-    <div class="empty-state"><p>no unique metrics</p></div>
-    {{end}}
-  </div>
 
-  <div id="compare-tab-only-b" class="compare-tab-content">
-    {{if .OnlyB}}
-    <div class="metric-list">
-      {{range .OnlyB}}
-      <div class="metric-item">
-        <div>
-          <div class="name">{{.Name}}</div>
-          {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
+    <div id="compare-tab-only-b" class="compare-tab-content" style="display:none">
+      {{if .OnlyB}}
+      <div class="space-y-1 max-h-[600px] overflow-y-auto">
+        {{range .OnlyB}}
+        <div class="flex items-center gap-3 p-2 rounded">
+          <div class="flex-1 min-w-0">
+            <div class="font-mono text-sm truncate">{{.Name}}</div>
+            {{if .Help}}<div class="text-xs text-base-content/40 truncate">{{.Help}}</div>{{end}}
+          </div>
+          <span class="badge badge-sm badge-outline">{{.Type}}</span>
         </div>
-        <div class="meta">
-          <span class="badge {{.Type}}">{{.Type}}</span>
-        </div>
+        {{end}}
       </div>
+      {{else}}
+      <div class="text-center py-6 text-base-content/50"><p>no unique metrics</p></div>
       {{end}}
     </div>
-    {{else}}
-    <div class="empty-state"><p>no unique metrics</p></div>
-    {{end}}
-  </div>
 
-  <div id="snippet-result"></div>
+    <div id="snippet-result"></div>
+  </div>
 </div>
 {{end}}
