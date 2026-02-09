@@ -77,6 +77,7 @@ func main() {
 	}
 	serveCmd.Flags().StringVar(&cfgFile, "config", "", "path to YAML config file (required)")
 	serveCmd.Flags().IntVar(&servePort, "port", 8080, "HTTP server port")
+	serveCmd.Flags().StringVar(&grafanaURL, "grafana-url", "", "Grafana URL for push (or set GRAFANA_URL env)")
 	serveCmd.MarkFlagRequired("config")
 
 	rootCmd.AddCommand(genCmd, discoverCmd, pushCmd, serveCmd)
@@ -124,7 +125,11 @@ func runDiscover(cmd *cobra.Command, args []string) error {
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	srv, err := server.New(web.EmbeddedFS, cfgFile)
+	gURL := grafanaURL
+	if gURL == "" {
+		gURL = os.Getenv("GRAFANA_URL")
+	}
+	srv, err := server.New(web.EmbeddedFS, cfgFile, gURL)
 	if err != nil {
 		return err
 	}

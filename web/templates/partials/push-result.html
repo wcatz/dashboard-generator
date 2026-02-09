@@ -1,0 +1,17 @@
+{{if .Error}}
+<div class="card" style="border-color: var(--danger);">
+  <span style="color: var(--danger);">error:</span> {{.Error}}
+</div>
+{{else}}
+<div class="card" style="border-color: var(--success);">
+  <span style="color: var(--success);">pushed {{.Count}} dashboards to Grafana</span>
+  <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+    {{range .Results}}
+    <div>{{.Title}} ({{.UID}}): {{.Status}}</div>
+    {{end}}
+    {{range .Errors}}
+    <div style="color: var(--danger);">{{.}}</div>
+    {{end}}
+  </div>
+</div>
+{{end}}

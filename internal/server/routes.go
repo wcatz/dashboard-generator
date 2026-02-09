@@ -15,6 +15,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/preview", s.handlePreview)
 
 	// API endpoints (HTMX)
+	s.mux.HandleFunc("/api/push", s.handlePush)
 	s.mux.HandleFunc("/api/generate", s.handleGenerate)
 	s.mux.HandleFunc("/api/datasource/test", s.handleDatasourceTest)
 	s.mux.HandleFunc("/api/datasource/url", s.handleDatasourceURL)
