@@ -1,0 +1,859 @@
+# example-config.yaml — reference config for grafana-dashboard-generator.py
+#
+# Demonstrates all features using generic Prometheus metrics.
+# Generates 5 interlinked dashboards with navigation links.
+#
+# Usage:
+#   ./grafana-dashboard-generator.py --config example-config.yaml
+#   ./grafana-dashboard-generator.py --config example-config.yaml --dry-run
+#   ./grafana-dashboard-generator.py --config example-config.yaml --discover-print --prometheus-url http://localhost:9090
+
+# ─── Generator Settings ──────────────────────────────────────────────────────
+
+generator:
+  schema_version: 39
+  output_dir: "."
+  refresh: "30s"
+  time_range:
+    from: "now-30m"
+    to: "now"
+  editable: true
+  graph_tooltip: 1       # 0=default, 1=shared crosshair, 2=shared tooltip
+  live_now: true
+  timezone: ""
+
+# ─── Datasources ─────────────────────────────────────────────────────────────
+# Define any number of datasources. 'url' is only used for metric discovery.
+
+datasources:
+  primary:
+    type: prometheus
+    uid: prometheus
+    url: ""                # set via --prometheus-url or fill in here
+    is_default: true
+
+  # uncomment to enable two-datasource comparison:
+  # secondary:
+  #   type: prometheus
+  #   uid: thanos
+  #   url: "http://thanos-query:9090"
+
+# ─── Color Palettes ──────────────────────────────────────────────────────────
+# Define named palettes. Reference colors with $color_name in panels.
+
+palettes:
+  grafana:
+    green: "#73BF69"
+    yellow: "#FADE2A"
+    orange: "#FF9830"
+    red: "#F2495C"
+    blue: "#5794F2"
+    purple: "#B877D9"
+    cyan: "#8AB8FF"
+    white: "#FFFFFF"
+
+  lcars:
+    blue: "#99CCFF"
+    cyan: "#5599FF"
+    deep: "#3366CC"
+    teal: "#00CC99"
+    green: "#00CC99"
+    orange: "#FF9933"
+    red: "#CC0000"
+    gold: "#FFCC66"
+    purple: "#9977FF"
+    pale: "#CCDDFF"
+
+active_palette: grafana
+
+# ─── Reusable Thresholds ─────────────────────────────────────────────────────
+# Reference with $threshold_name in panel configs.
+
+thresholds:
+  percent_usage:
+    - { color: "$green", value: null }
+    - { color: "$orange", value: 75 }
+    - { color: "$red", value: 90 }
+
+  inverse_percent:
+    - { color: "$red", value: null }
+    - { color: "$orange", value: 20 }
+    - { color: "$green", value: 50 }
+
+  binary_health:
+    - { color: "$red", value: null }
+    - { color: "$green", value: 1 }
+
+  latency_ms:
+    - { color: "$green", value: null }
+    - { color: "$yellow", value: 100 }
+    - { color: "$orange", value: 500 }
+    - { color: "$red", value: 1000 }
+
+# ─── Reusable Label Selectors ────────────────────────────────────────────────
+# Reference with ${selector_name} in queries.
+
+selectors:
+  by_ns: '{namespace=~"$namespace"}'
+  by_inst: '{instance=~"$instance"}'
+  by_ns_inst: '{namespace=~"$namespace", instance=~"$instance"}'
+  by_job: '{job=~"$job"}'
+  host: '{instance=~"$instance"}'
+  disk: '{instance=~"$instance", device!~"loop.*|tmpfs|dm-.*"}'
+
+# ─── Template Variables ──────────────────────────────────────────────────────
+# Variables appear as dropdowns at the top of dashboards.
+
+variables:
+  namespace:
+    type: query
+    datasource: primary
+    query: 'label_values(kube_pod_info, namespace)'
+    multi: true
+    include_all: true
+    refresh: 2
+    sort: 1
+    label: namespace
+
+  job:
+    type: query
+    datasource: primary
+    query: 'label_values(up{namespace=~"$namespace"}, job)'
+    multi: true
+    include_all: true
+    refresh: 2
+    sort: 1
+    label: job
+    chains_from: [namespace]
+
+  instance:
+    type: query
+    datasource: primary
+    query: 'label_values(node_uname_info, instance)'
+    multi: true
+    include_all: true
+    refresh: 2
+    sort: 1
+    label: instance
+
+  device:
+    type: query
+    datasource: primary
+    query: 'label_values(node_network_receive_bytes_total{instance=~"$instance"}, device)'
+    multi: true
+    include_all: true
+    refresh: 2
+    sort: 1
+    label: device
+    chains_from: [instance]
+
+  interval:
+    type: interval
+    values: "1m,5m,15m,30m,1h,6h,12h,1d"
+    auto: true
+    auto_count: 10
+    auto_min: "10s"
+    label: interval
+
+# ─── Constants ────────────────────────────────────────────────────────────────
+# Reference with ${constant_name} in queries.
+
+constants:
+  rate_interval: "5m"
+  scrape_interval: "30s"
+
+# ─── Metric Discovery ────────────────────────────────────────────────────────
+# Enable to auto-discover metrics from Prometheus.
+
+discovery:
+  enabled: false
+  sources: [primary]
+  include_patterns:
+    - "node_*"
+    - "kube_*"
+    - "container_*"
+  exclude_patterns:
+    - "ALERTS*"
+    - "scrape_*"
+    - "*_bucket"
+    - "*_created"
+  auto_panels:
+    counters: timeseries
+    gauges: stat
+    histograms: heatmap
+    summaries: timeseries
+
+# ─── Profiles ─────────────────────────────────────────────────────────────────
+
+profiles:
+  full:
+    dashboards: [overview, compute, memory, network, services]
+  infra:
+    dashboards: [overview, compute, memory, network]
+  apps:
+    dashboards: [overview, services]
+
+# ─── Dashboards ───────────────────────────────────────────────────────────────
+# Each dashboard produces one JSON file. All dashboards get navigation links
+# to every other dashboard automatically.
+
+dashboards:
+
+  # ─── 1. Overview Dashboard ──────────────────────────────────────────────────
+
+  overview:
+    uid: gen-overview
+    title: overview
+    filename: gen-overview.json
+    tags: [overview, generated]
+    icon: apps
+    description: "cluster health at a glance"
+    variables: [namespace, instance]
+    sections:
+
+      - title: cluster health
+        panels:
+          - type: stat
+            title: targets up
+            query: 'count(up == 1)'
+            width: 4
+            height: 4
+            color: "$green"
+            description: "total healthy scrape targets"
+
+          - type: stat
+            title: targets down
+            query: 'count(up == 0)'
+            width: 4
+            height: 4
+            color: "$red"
+            description: "unhealthy scrape targets"
+
+          - type: stat
+            title: namespaces
+            query: 'count(count by (namespace) (kube_pod_info))'
+            width: 4
+            height: 4
+            color: "$blue"
+
+          - type: stat
+            title: running pods
+            query: 'sum(kube_pod_status_phase{phase="Running"}${by_ns})'
+            width: 4
+            height: 4
+            color: "$green"
+
+          - type: stat
+            title: pending pods
+            query: 'sum(kube_pod_status_phase{phase="Pending"}${by_ns})'
+            width: 4
+            height: 4
+            thresholds:
+              - { color: "$green", value: null }
+              - { color: "$orange", value: 1 }
+              - { color: "$red", value: 5 }
+
+          - type: stat
+            title: failed pods
+            query: 'sum(kube_pod_status_phase{phase="Failed"}${by_ns})'
+            width: 4
+            height: 4
+            thresholds:
+              - { color: "$green", value: null }
+              - { color: "$red", value: 1 }
+
+      - title: resource overview
+        panels:
+          - type: gauge
+            title: cluster cpu usage
+            query: '100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[${rate_interval}])) * 100)'
+            width: 6
+            height: 5
+            unit: percent
+            thresholds: $percent_usage
+            description: "average cpu utilization across all nodes"
+
+          - type: gauge
+            title: cluster memory usage
+            query: '(1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)) * 100'
+            width: 6
+            height: 5
+            unit: percent
+            thresholds: $percent_usage
+
+          - type: gauge
+            title: cluster disk usage
+            query: '(1 - sum(node_filesystem_avail_bytes{mountpoint="/"}) / sum(node_filesystem_size_bytes{mountpoint="/"})) * 100'
+            width: 6
+            height: 5
+            unit: percent
+            thresholds: $percent_usage
+
+          - type: gauge
+            title: pod capacity
+            query: 'sum(kube_pod_info) / sum(kube_node_status_allocatable{resource="pods"}) * 100'
+            width: 6
+            height: 5
+            unit: percent
+            thresholds: $percent_usage
+
+      - title: resource trends
+        panels:
+          - type: timeseries
+            title: cpu usage by node
+            query: '100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[${rate_interval}])) * 100)'
+            width: 12
+            height: 7
+            unit: percent
+
+          - type: timeseries
+            title: memory usage by node
+            query: '(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100'
+            legend: "{{instance}}"
+            width: 12
+            height: 7
+            unit: percent
+
+      - title: target status
+        panels:
+          - type: state-timeline
+            title: target health
+            query: 'up${by_ns}'
+            legend: "{{job}} / {{instance}}"
+            width: 24
+            height: 5
+            thresholds: $binary_health
+            value_mappings:
+              - type: value
+                options:
+                  "0": { text: "DOWN", color: "$red" }
+                  "1": { text: "UP", color: "$green" }
+
+  # ─── 2. Compute Dashboard ──────────────────────────────────────────────────
+
+  compute:
+    uid: gen-compute
+    title: compute
+    filename: gen-compute.json
+    tags: [compute, generated]
+    icon: bolt
+    description: "cpu, load, and disk i/o"
+    variables: [instance]
+    sections:
+
+      - title: cpu overview
+        panels:
+          - type: stat
+            title: cpu count
+            query: 'count without (cpu, mode) (node_cpu_seconds_total{mode="idle"${host}})'
+            width: 3
+            height: 4
+            color: "$blue"
+            unit: none
+
+          - type: stat
+            title: load 1m
+            query: 'node_load1${host}'
+            width: 3
+            height: 4
+            color: "$cyan"
+            graph_mode: area
+
+          - type: stat
+            title: load 5m
+            query: 'node_load5${host}'
+            width: 3
+            height: 4
+            color: "$cyan"
+            graph_mode: area
+
+          - type: stat
+            title: load 15m
+            query: 'node_load15${host}'
+            width: 3
+            height: 4
+            color: "$cyan"
+            graph_mode: area
+
+          - type: bargauge
+            title: cpu utilization per node
+            query: '100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"${host}}[${rate_interval}])) * 100)'
+            legend: "{{instance}}"
+            width: 12
+            height: 5
+            unit: percent
+            thresholds: $percent_usage
+
+      - title: cpu breakdown
+        panels:
+          - type: timeseries
+            title: cpu usage by mode
+            width: 12
+            height: 8
+            unit: percent
+            stack: normal
+            targets:
+              - expr: 'avg by (mode) (rate(node_cpu_seconds_total${host}[${rate_interval}])) * 100'
+                legend: "{{mode}}"
+
+          - type: timeseries
+            title: cpu iowait
+            query: 'avg by (instance) (rate(node_cpu_seconds_total{mode="iowait"${host}}[${rate_interval}])) * 100'
+            width: 12
+            height: 8
+            unit: percent
+            description: "high iowait indicates disk bottleneck"
+
+      - title: context switches
+        panels:
+          - type: timeseries
+            title: context switches per second
+            query: 'rate(node_context_switches_total${host}[${rate_interval}])'
+            width: 12
+            height: 7
+            unit: short
+
+          - type: timeseries
+            title: interrupts per second
+            query: 'rate(node_intr_total${host}[${rate_interval}])'
+            width: 12
+            height: 7
+            unit: short
+
+      - title: disk i/o
+        panels:
+          - type: timeseries
+            title: disk read throughput
+            query: 'rate(node_disk_read_bytes_total${disk}[${rate_interval}])'
+            legend: "{{instance}} {{device}}"
+            width: 12
+            height: 7
+            unit: Bps
+
+          - type: timeseries
+            title: disk write throughput
+            query: 'rate(node_disk_written_bytes_total${disk}[${rate_interval}])'
+            legend: "{{instance}} {{device}}"
+            width: 12
+            height: 7
+            unit: Bps
+
+          - type: timeseries
+            title: disk iops
+            width: 12
+            height: 7
+            unit: iops
+            targets:
+              - expr: 'rate(node_disk_reads_completed_total${disk}[${rate_interval}])'
+                legend: "{{instance}} {{device}} reads"
+              - expr: 'rate(node_disk_writes_completed_total${disk}[${rate_interval}])'
+                legend: "{{instance}} {{device}} writes"
+
+          - type: timeseries
+            title: disk i/o latency
+            query: 'rate(node_disk_io_time_seconds_total${disk}[${rate_interval}])'
+            legend: "{{instance}} {{device}}"
+            width: 12
+            height: 7
+            unit: s
+
+      - title: filesystem
+        panels:
+          - type: bargauge
+            title: filesystem usage
+            query: '100 - (node_filesystem_avail_bytes{instance=~"$instance", mountpoint="/", fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{instance=~"$instance", mountpoint="/", fstype!~"tmpfs|overlay"} * 100)'
+            legend: "{{instance}} {{mountpoint}}"
+            width: 12
+            height: 6
+            unit: percent
+            thresholds: $percent_usage
+
+          - type: table
+            title: filesystem details
+            width: 12
+            height: 6
+            unit: bytes
+            targets:
+              - expr: 'node_filesystem_size_bytes{instance=~"$instance", fstype!~"tmpfs|overlay"}'
+                legend: "{{instance}} {{mountpoint}}"
+
+  # ─── 3. Memory Dashboard ───────────────────────────────────────────────────
+
+  memory:
+    uid: gen-memory
+    title: memory
+    filename: gen-memory.json
+    tags: [memory, generated]
+    icon: database
+    description: "memory, swap, and pressure"
+    variables: [instance]
+    sections:
+
+      - title: memory overview
+        panels:
+          - type: stat
+            title: total memory
+            query: 'node_memory_MemTotal_bytes${host}'
+            width: 4
+            height: 4
+            unit: bytes
+            color: "$blue"
+
+          - type: stat
+            title: available memory
+            query: 'node_memory_MemAvailable_bytes${host}'
+            width: 4
+            height: 4
+            unit: bytes
+            color: "$green"
+
+          - type: stat
+            title: used memory
+            query: 'node_memory_MemTotal_bytes${host} - node_memory_MemAvailable_bytes${host}'
+            width: 4
+            height: 4
+            unit: bytes
+            color: "$orange"
+
+          - type: gauge
+            title: memory utilization
+            query: '(1 - node_memory_MemAvailable_bytes${host} / node_memory_MemTotal_bytes${host}) * 100'
+            width: 6
+            height: 5
+            unit: percent
+            thresholds: $percent_usage
+
+          - type: gauge
+            title: swap utilization
+            query: '(1 - node_memory_SwapFree_bytes${host} / node_memory_SwapTotal_bytes${host}) * 100'
+            width: 6
+            height: 5
+            unit: percent
+            thresholds: $percent_usage
+
+      - title: memory composition
+        panels:
+          - type: timeseries
+            title: memory breakdown
+            width: 24
+            height: 8
+            unit: bytes
+            stack: normal
+            targets:
+              - expr: 'node_memory_MemTotal_bytes${host} - node_memory_MemFree_bytes${host} - node_memory_Buffers_bytes${host} - node_memory_Cached_bytes${host} - node_memory_SReclaimable_bytes${host}'
+                legend: "used"
+              - expr: 'node_memory_Buffers_bytes${host}'
+                legend: "buffers"
+              - expr: 'node_memory_Cached_bytes${host}'
+                legend: "cached"
+              - expr: 'node_memory_SReclaimable_bytes${host}'
+                legend: "slab reclaimable"
+              - expr: 'node_memory_MemFree_bytes${host}'
+                legend: "free"
+
+      - title: swap and page i/o
+        panels:
+          - type: timeseries
+            title: swap usage
+            width: 12
+            height: 7
+            unit: bytes
+            targets:
+              - expr: 'node_memory_SwapTotal_bytes${host}'
+                legend: "total"
+              - expr: 'node_memory_SwapTotal_bytes${host} - node_memory_SwapFree_bytes${host}'
+                legend: "used"
+
+          - type: timeseries
+            title: page i/o
+            width: 12
+            height: 7
+            unit: short
+            targets:
+              - expr: 'rate(node_vmstat_pgpgin${host}[${rate_interval}])'
+                legend: "pages in"
+              - expr: 'rate(node_vmstat_pgpgout${host}[${rate_interval}])'
+                legend: "pages out"
+
+      - title: oom events
+        collapsed: true
+        panels:
+          - type: timeseries
+            title: oom kills
+            query: 'increase(node_vmstat_oom_kill${host}[1h])'
+            width: 24
+            height: 7
+            unit: short
+            description: "oom kills in the last hour"
+
+      - title: memory by pod
+        collapsed: true
+        panels:
+          - type: timeseries
+            title: top pods by memory
+            query: 'topk(10, container_memory_working_set_bytes{namespace=~"$instance", container!=""})'
+            legend: "{{namespace}}/{{pod}}"
+            width: 24
+            height: 8
+            unit: bytes
+
+  # ─── 4. Network Dashboard ──────────────────────────────────────────────────
+
+  network:
+    uid: gen-network
+    title: network
+    filename: gen-network.json
+    tags: [network, generated]
+    icon: exchange-alt
+    description: "network interfaces, protocols, and sockets"
+    variables: [instance, device]
+    sections:
+
+      - title: interface bandwidth
+        panels:
+          - type: timeseries
+            title: receive bandwidth
+            query: 'rate(node_network_receive_bytes_total{instance=~"$instance", device=~"$device", device!~"lo|veth.*"}[${rate_interval}])'
+            legend: "{{instance}} {{device}}"
+            width: 12
+            height: 7
+            unit: Bps
+
+          - type: timeseries
+            title: transmit bandwidth
+            query: 'rate(node_network_transmit_bytes_total{instance=~"$instance", device=~"$device", device!~"lo|veth.*"}[${rate_interval}])'
+            legend: "{{instance}} {{device}}"
+            width: 12
+            height: 7
+            unit: Bps
+
+      - title: packets
+        panels:
+          - type: timeseries
+            title: receive packets
+            query: 'rate(node_network_receive_packets_total{instance=~"$instance", device=~"$device", device!~"lo|veth.*"}[${rate_interval}])'
+            legend: "{{instance}} {{device}}"
+            width: 12
+            height: 7
+            unit: pps
+
+          - type: timeseries
+            title: transmit packets
+            query: 'rate(node_network_transmit_packets_total{instance=~"$instance", device=~"$device", device!~"lo|veth.*"}[${rate_interval}])'
+            legend: "{{instance}} {{device}}"
+            width: 12
+            height: 7
+            unit: pps
+
+      - title: errors and drops
+        panels:
+          - type: timeseries
+            title: receive errors
+            query: 'rate(node_network_receive_errs_total{instance=~"$instance", device=~"$device"}[${rate_interval}])'
+            legend: "{{instance}} {{device}}"
+            width: 12
+            height: 7
+            unit: short
+
+          - type: timeseries
+            title: transmit drops
+            query: 'rate(node_network_transmit_drop_total{instance=~"$instance", device=~"$device"}[${rate_interval}])'
+            legend: "{{instance}} {{device}}"
+            width: 12
+            height: 7
+            unit: short
+
+      - title: traffic heatmaps
+        panels:
+          - type: heatmap
+            title: receive traffic heatmap
+            query: 'rate(node_network_receive_bytes_total{instance=~"$instance", device!~"lo|veth.*"}[${rate_interval}])'
+            width: 12
+            height: 8
+            unit: Bps
+            color_scheme: Blues
+
+          - type: heatmap
+            title: transmit traffic heatmap
+            query: 'rate(node_network_transmit_bytes_total{instance=~"$instance", device!~"lo|veth.*"}[${rate_interval}])'
+            width: 12
+            height: 8
+            unit: Bps
+            color_scheme: Greens
+
+      - title: tcp connections
+        collapsed: true
+        panels:
+          - type: timeseries
+            title: tcp connections by state
+            query: 'node_netstat_Tcp_CurrEstab${host}'
+            legend: "{{instance}} established"
+            width: 12
+            height: 7
+            unit: short
+
+          - type: timeseries
+            title: tcp segments
+            width: 12
+            height: 7
+            unit: short
+            targets:
+              - expr: 'rate(node_netstat_Tcp_InSegs${host}[${rate_interval}])'
+                legend: "{{instance}} in"
+              - expr: 'rate(node_netstat_Tcp_OutSegs${host}[${rate_interval}])'
+                legend: "{{instance}} out"
+
+      - title: socket stats
+        collapsed: true
+        panels:
+          - type: timeseries
+            title: sockets in use
+            width: 24
+            height: 7
+            unit: short
+            targets:
+              - expr: 'node_sockstat_TCP_inuse${host}'
+                legend: "{{instance}} tcp"
+              - expr: 'node_sockstat_UDP_inuse${host}'
+                legend: "{{instance}} udp"
+              - expr: 'node_sockstat_sockets_used${host}'
+                legend: "{{instance}} total"
+
+  # ─── 5. Services Dashboard ─────────────────────────────────────────────────
+
+  services:
+    uid: gen-services
+    title: services
+    filename: gen-services.json
+    tags: [services, generated]
+    icon: gf-grid
+    description: "application-level metrics"
+    variables: [namespace, job, interval]
+    sections:
+
+      - title: service health
+        panels:
+          - type: stat
+            title: healthy services
+            query: 'count(up{namespace=~"$namespace", job=~"$job"} == 1)'
+            width: 6
+            height: 4
+            color: "$green"
+
+          - type: stat
+            title: unhealthy services
+            query: 'count(up{namespace=~"$namespace", job=~"$job"} == 0)'
+            width: 6
+            height: 4
+            thresholds: $binary_health
+
+          - type: piechart
+            title: services by namespace
+            query: 'count by (namespace) (up{job=~"$job"})'
+            legend: "{{namespace}}"
+            width: 6
+            height: 6
+            pie_type: donut
+
+          - type: piechart
+            title: pods by phase
+            query: 'sum by (phase) (kube_pod_status_phase${by_ns})'
+            legend: "{{phase}}"
+            width: 6
+            height: 6
+            pie_type: donut
+
+      - title: request metrics
+        panels:
+          - type: timeseries
+            title: request rate by job
+            query: 'sum by (job) (rate(http_requests_total{namespace=~"$namespace", job=~"$job"}[$interval]))'
+            legend: "{{job}}"
+            width: 12
+            height: 7
+            unit: reqps
+
+          - type: timeseries
+            title: error rate
+            query: 'sum by (job) (rate(http_requests_total{namespace=~"$namespace", job=~"$job", code=~"5.."}[$interval])) / sum by (job) (rate(http_requests_total{namespace=~"$namespace", job=~"$job"}[$interval])) * 100'
+            legend: "{{job}}"
+            width: 12
+            height: 7
+            unit: percent
+            thresholds: $percent_usage
+
+      - title: latency
+        panels:
+          - type: timeseries
+            title: p50 latency
+            query: 'histogram_quantile(0.5, sum by (le, job) (rate(http_request_duration_seconds_bucket{namespace=~"$namespace", job=~"$job"}[$interval])))'
+            legend: "{{job}} p50"
+            width: 8
+            height: 7
+            unit: s
+
+          - type: timeseries
+            title: p95 latency
+            query: 'histogram_quantile(0.95, sum by (le, job) (rate(http_request_duration_seconds_bucket{namespace=~"$namespace", job=~"$job"}[$interval])))'
+            legend: "{{job}} p95"
+            width: 8
+            height: 7
+            unit: s
+
+          - type: timeseries
+            title: p99 latency
+            query: 'histogram_quantile(0.99, sum by (le, job) (rate(http_request_duration_seconds_bucket{namespace=~"$namespace", job=~"$job"}[$interval])))'
+            legend: "{{job}} p99"
+            width: 8
+            height: 7
+            unit: s
+
+      - title: container resources
+        panels:
+          - type: timeseries
+            title: cpu usage by container
+            query: 'sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~"$namespace", container!=""}[${rate_interval}]))'
+            legend: "{{namespace}}/{{pod}}"
+            width: 12
+            height: 7
+            unit: short
+
+          - type: timeseries
+            title: memory usage by container
+            query: 'sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~"$namespace", container!=""})'
+            legend: "{{namespace}}/{{pod}}"
+            width: 12
+            height: 7
+            unit: bytes
+
+      - title: pod restarts
+        panels:
+          - type: status-history
+            title: pod restart history
+            query: 'increase(kube_pod_container_status_restarts_total{namespace=~"$namespace"}[1h])'
+            legend: "{{namespace}}/{{pod}}"
+            width: 24
+            height: 6
+            thresholds:
+              - { color: "$green", value: null }
+              - { color: "$orange", value: 1 }
+              - { color: "$red", value: 3 }
+
+      - title: service info
+        panels:
+          - type: text
+            title: about
+            content: |
+              ## services dashboard
+
+              this dashboard shows application-level metrics from prometheus.
+              use the namespace and job dropdowns to filter.
+
+              **panels:**
+              - service health and distribution
+              - http request rate and error rate
+              - latency percentiles (p50, p95, p99)
+              - container resource usage
+              - pod restart history
+            width: 24
+            height: 5
