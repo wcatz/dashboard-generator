@@ -19,41 +19,94 @@ Hand-editing Grafana JSON is painful. Clicking through the UI doesn't scale. Thi
 - **Two-datasource comparison**: compare metrics across Prometheus instances side-by-side
 - **Profiles**: generate subsets of dashboards (e.g. `--profile infra` for infra-only)
 - **Push to Grafana**: deploy dashboards directly via the Grafana API
-- **Zero dependencies beyond PyYAML**: stdlib Python 3.8+
+- **Web UI**: edit config, browse metrics, generate and push dashboards from a browser
 
 ## Quick Start
 
-```bash
-pip install pyyaml
-
-# dry run — see what would be generated
-./grafana-dashboard-generator.py --config example-config.yaml --dry-run
-
-# generate dashboard JSON files
-./grafana-dashboard-generator.py --config example-config.yaml --output-dir ./output
-
-# discover metrics from a live Prometheus
-./grafana-dashboard-generator.py --config example-config.yaml --discover-print --prometheus-url http://localhost:9090
-
-# push directly to Grafana
-./grafana-dashboard-generator.py --config example-config.yaml --push --grafana-url http://localhost:3000 --grafana-token <token>
-```
-
-## Example
-
-The included `example-config.yaml` generates 5 interlinked dashboards from standard Prometheus metrics:
-
-| Dashboard | Panels | Focus |
-|-----------|--------|-------|
-| overview | 14 | cluster health, resource gauges, target status |
-| compute | 18 | cpu, load, disk i/o, filesystem |
-| memory | 12 | memory breakdown, swap, page i/o, oom |
-| network | 14 | bandwidth, packets, errors, tcp, sockets |
-| services | 14 | http metrics, latency percentiles, pod restarts |
+### Binary
 
 ```bash
-./grafana-dashboard-generator.py --config example-config.yaml --dry-run --verbose
+# download from GitHub releases
+# https://github.com/wcatz/dashboard-generator/releases
+
+# generate dashboard JSON
+./dashboard-generator generate --config example-config.yaml --dry-run --verbose
+
+# start web UI
+./dashboard-generator serve --config example-config.yaml --port 8080
+
+# push to Grafana
+./dashboard-generator push --config example-config.yaml --grafana-url http://localhost:3000 --grafana-token $TOKEN
 ```
+
+### Docker
+
+```bash
+# run web UI on localhost:8080, write generated dashboards to ./output
+docker run --rm -p 8080:8080 \
+  -v $(pwd)/example-config.yaml:/data/config.yaml:ro \
+  -v $(pwd)/output:/data/output \
+  wcatz/dashboard-generator:latest
+
+# open http://localhost:8080
+```
+
+### Build from Source
+
+```bash
+make build
+make test
+make docker-build
+make docker-run    # serves on localhost:8080, outputs to ./output
+```
+
+## CLI Reference
+
+| Command | Purpose |
+|---------|---------|
+| `generate` | Generate dashboard JSON from YAML config |
+| `discover` | Query Prometheus and print suggested YAML snippets |
+| `push` | Generate and push dashboards to Grafana API |
+| `serve` | Start the web UI server |
+
+| Flag | Commands | Purpose |
+|------|----------|---------|
+| `--config` | all | Path to YAML config (required) |
+| `--profile` | generate, push | Named profile filter |
+| `--output-dir` | generate, push | Override output directory |
+| `--dry-run` | generate | Generate to memory only |
+| `--verbose` | generate, push | Print panel details |
+| `--prometheus-url` | discover | Prometheus URL for metric discovery |
+| `--grafana-url` | push, serve | Grafana URL for push |
+| `--grafana-user` | push | Basic auth user |
+| `--grafana-pass` | push | Basic auth password |
+| `--grafana-token` | push | Bearer token for Grafana API |
+| `--port` | serve | HTTP port (default 8080) |
+
+## Helm Chart
+
+Published to `oci://ghcr.io/wcatz/helm-charts/dashboard-generator` on every push to master and version tag.
+
+```bash
+# install from OCI registry
+helm install dashboard-generator oci://ghcr.io/wcatz/helm-charts/dashboard-generator --version 0.1.0
+
+# or use in helmfile
+chart: oci://ghcr.io/wcatz/helm-charts/dashboard-generator
+version: 0.1.0
+```
+
+## Docker Image
+
+Published to `wcatz/dashboard-generator` on Docker Hub.
+
+| Tag Pattern | Trigger |
+|-------------|---------|
+| `latest` | push to master or version tag |
+| `master` | push to master |
+| `0.1.0` | git tag `v0.1.0` |
+| `0.1` | git tag `v0.1.x` |
+| `0` | git tag `v0.x.x` |
 
 ## Config Structure
 
@@ -73,23 +126,6 @@ dashboards:         # dashboard definitions with sections and panels
 
 See `example-config.yaml` for a complete working example and `CLAUDE.md` for full schema documentation.
 
-## CLI Reference
-
-| Flag | Purpose |
-|------|---------|
-| `--config` | Path to YAML config (required) |
-| `--profile` | Generate only dashboards in named profile |
-| `--output-dir` | Override output directory |
-| `--prometheus-url` | Prometheus URL for discovery |
-| `--grafana-url` | Grafana URL for push mode |
-| `--grafana-user` | Basic auth user |
-| `--grafana-pass` | Basic auth password |
-| `--grafana-token` | Bearer token for Grafana API |
-| `--discover-print` | Query Prometheus, print YAML snippets |
-| `--dry-run` | Generate to memory only, print sizes |
-| `--verbose` | Print panel details |
-| `--push` | Push dashboards to Grafana API |
-
 ## Panel Types
 
 | Type | Default Size | Best For |
@@ -108,10 +144,15 @@ See `example-config.yaml` for a complete working example and `CLAUDE.md` for ful
 | `logs` | 24x8 | log viewer |
 | `comparison` | 12x8 | multi-datasource metric comparison |
 
-## Requirements
+## Releasing
 
-- Python 3.8+
-- PyYAML (`pip install pyyaml`)
+```bash
+# 1. bump helm-chart/Chart.yaml version + appVersion
+# 2. commit and push
+git tag v0.2.0
+git push origin v0.2.0
+# CI builds: Docker image (Docker Hub), Helm chart (ghcr.io), GitHub release (goreleaser)
+```
 
 ## License
 
