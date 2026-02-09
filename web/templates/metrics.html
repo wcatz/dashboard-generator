@@ -3,11 +3,26 @@
 <p class="subtitle">browse and search metrics from connected datasources</p>
 
 <div class="card">
-  <form hx-get="/api/metrics/browse" hx-target="#metrics-result" hx-indicator="#metrics-spinner">
+  <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+    <label style="font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;">
+      <input type="checkbox" id="compare-toggle" style="width: auto; margin: 0;">
+      comparison mode
+    </label>
+  </div>
+
+  <form id="browse-form" hx-get="/api/metrics/browse" hx-target="#metrics-result" hx-indicator="#metrics-spinner">
     <div style="display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap;">
       <label style="flex: 1; min-width: 150px;">
         datasource
-        <select name="datasource">
+        <select name="datasource" id="ds-select" hx-get="/api/metrics/jobs" hx-target="#job-tabs" hx-trigger="change" hx-include="[name='datasource']">
+          {{range $name, $ds := .Datasources}}
+          {{if $ds.URL}}<option value="{{$name}}">{{$name}}</option>{{end}}
+          {{end}}
+        </select>
+      </label>
+      <label id="ds-b-container" style="flex: 1; min-width: 150px; display: none;">
+        compare with
+        <select name="datasource_b" id="ds-b-select">
           {{range $name, $ds := .Datasources}}
           {{if $ds.URL}}<option value="{{$name}}">{{$name}}</option>{{end}}
           {{end}}
@@ -33,6 +48,8 @@
     </div>
   </form>
 </div>
+
+<div id="job-tabs"></div>
 
 <div id="metrics-result">
   {{if .HasDatasources}}

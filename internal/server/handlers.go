@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/wcatz/dashboard-generator/internal/config"
 	"github.com/wcatz/dashboard-generator/internal/generator"
@@ -313,6 +314,12 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		if filename == "" {
 			filename = name + ".json"
 		}
+		if err := validateFilename(filename); err != nil {
+			s.renderPartial(w, "generate-result.html", map[string]interface{}{
+				"Error": fmt.Sprintf("invalid filename '%s': %v", filename, err),
+			})
+			return
+		}
 		fpath := filepath.Join(outDir, filename)
 
 		size, err := generator.WriteDashboard(dashboard, fpath, false)
@@ -466,32 +473,58 @@ func (s *Server) handleDatasourceURL(w http.ResponseWriter, r *http.Request) {
 	}
 	r.ParseForm()
 	name := r.FormValue("name")
-	url := r.FormValue("url")
+	dsURL := r.FormValue("url")
 
-	if name == "" || url == "" {
+	if name == "" || dsURL == "" {
 		s.renderPartial(w, "ds-url-result.html", map[string]interface{}{"Error": "name and URL required"})
 		return
 	}
 
-	// Read current config, update the datasource URL, write back
+	cfg := s.Config()
+	ds, ok := cfg.Datasources[name]
+	if !ok {
+		s.renderPartial(w, "ds-url-result.html", map[string]interface{}{"Error": "datasource not found: " + name})
+		return
+	}
+
+	// Update the YAML config file with the new URL
 	content, err := s.ReadConfigContent()
 	if err != nil {
 		s.renderPartial(w, "ds-url-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
 
-	// Simple approach: reload config, update in memory, but we need to persist
-	// For now, just inform the user to add it to the YAML manually
-	_ = content
-	s.renderPartial(w, "ds-url-result.html", map[string]interface{}{
-		"Error": "URL editing not yet implemented — edit the YAML config directly",
-	})
+	// If datasource already has a URL, replace it; otherwise insert after uid line
+	oldURL := ds.URL
+	if oldURL != "" {
+		content = strings.Replace(content,
+			"url: "+oldURL,
+			"url: "+dsURL, 1)
+	} else {
+		// Insert url after the uid line for this datasource
+		uidLine := "uid: " + ds.UID
+		content = strings.Replace(content,
+			uidLine,
+			uidLine+"\n      url: "+dsURL, 1)
+	}
+
+	if err := s.WriteConfigContent(content); err != nil {
+		s.renderPartial(w, "ds-url-result.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "ds-url-result.html", map[string]interface{}{"Error": "saved but reload failed: " + err.Error()})
+		return
+	}
+
+	s.renderPartial(w, "ds-url-result.html", map[string]interface{}{"Name": name})
 }
 
 func (s *Server) handleMetricsBrowse(w http.ResponseWriter, r *http.Request) {
 	dsName := r.URL.Query().Get("datasource")
 	filter := r.URL.Query().Get("filter")
 	metricType := r.URL.Query().Get("type")
+	job := r.URL.Query().Get("job")
 
 	if dsName == "" {
 		s.renderPartial(w, "metrics-result.html", map[string]interface{}{"Error": "select a datasource"})
@@ -507,6 +540,18 @@ func (s *Server) handleMetricsBrowse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Filter by job label if specified
+	if job != "" {
+		jobMetrics, err := disc.FetchSeriesMetrics(dsName, "job", job)
+		if err == nil && len(jobMetrics) > 0 {
+			for m := range metrics {
+				if !jobMetrics[m] {
+					delete(metrics, m)
+				}
+			}
+		}
+	}
+
 	// Apply glob filter
 	if filter != "" {
 		metrics = generator.FilterMetrics(metrics, []string{filter}, nil)
@@ -515,11 +560,6 @@ func (s *Server) handleMetricsBrowse(w http.ResponseWriter, r *http.Request) {
 	// Get metadata
 	meta, _ := disc.FetchMetadata(dsName)
 
-	type metricRow struct {
-		Name string
-		Type string
-		Help string
-	}
 	var rows []metricRow
 	names := make([]string, 0, len(metrics))
 	for m := range metrics {
@@ -545,6 +585,7 @@ func (s *Server) handleMetricsBrowse(w http.ResponseWriter, r *http.Request) {
 		"Metrics":    rows,
 		"Total":      len(rows),
 		"Datasource": dsName,
+		"Job":        job,
 	})
 }
 
@@ -680,4 +721,228 @@ func (s *Server) generatePreview(uid string) (jsonStr string, title string, size
 	panelList, _ := dashboard["panels"].([]interface{})
 	pInfos := extractPanelInfo(dashboard)
 	return string(data), dbCfg.Title, len(data), len(panelList), pInfos, nil
+}
+
+// handleMetricsJobs returns job label values for a datasource (tab rendering).
+func (s *Server) handleMetricsJobs(w http.ResponseWriter, r *http.Request) {
+	dsName := r.URL.Query().Get("datasource")
+	if dsName == "" {
+		s.renderPartial(w, "job-tabs.html", map[string]interface{}{"Error": "select a datasource"})
+		return
+	}
+
+	cfg := s.Config()
+	disc := generator.NewMetricDiscovery(cfg)
+	jobs, err := disc.FetchLabelValues(dsName, "job")
+	if err != nil {
+		s.renderPartial(w, "job-tabs.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+	sort.Strings(jobs)
+
+	s.renderPartial(w, "job-tabs.html", map[string]interface{}{
+		"Jobs":       jobs,
+		"Datasource": dsName,
+	})
+}
+
+// handleMetricsCompare compares metrics between two datasources.
+func (s *Server) handleMetricsCompare(w http.ResponseWriter, r *http.Request) {
+	dsA := r.URL.Query().Get("datasource")
+	dsB := r.URL.Query().Get("datasource_b")
+	filter := r.URL.Query().Get("filter")
+	metricType := r.URL.Query().Get("type")
+
+	if dsA == "" || dsB == "" {
+		s.renderPartial(w, "compare-result.html", map[string]interface{}{"Error": "select two datasources"})
+		return
+	}
+	if dsA == dsB {
+		s.renderPartial(w, "compare-result.html", map[string]interface{}{"Error": "datasources must be different"})
+		return
+	}
+
+	cfg := s.Config()
+	disc := generator.NewMetricDiscovery(cfg)
+	cats, err := disc.Categorize(dsA, dsB)
+	if err != nil {
+		s.renderPartial(w, "compare-result.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+
+	// Apply glob filter
+	if filter != "" {
+		for _, cat := range []string{"shared", "only_a", "only_b"} {
+			cats[cat] = filterMetricInfoMap(cats[cat], filter)
+		}
+	}
+
+	// Apply type filter
+	if metricType != "" {
+		for _, cat := range []string{"shared", "only_a", "only_b"} {
+			cats[cat] = filterByType(cats[cat], metricType)
+		}
+	}
+
+	s.renderPartial(w, "compare-result.html", map[string]interface{}{
+		"DatasourceA": dsA,
+		"DatasourceB": dsB,
+		"Shared":      metricInfoToSlice(cats["shared"]),
+		"OnlyA":       metricInfoToSlice(cats["only_a"]),
+		"OnlyB":       metricInfoToSlice(cats["only_b"]),
+		"SharedCount": len(cats["shared"]),
+		"OnlyACount":  len(cats["only_a"]),
+		"OnlyBCount":  len(cats["only_b"]),
+	})
+}
+
+// handleMetricsSnippet generates a YAML config snippet from selected metrics.
+func (s *Server) handleMetricsSnippet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	r.ParseForm()
+	dsName := r.FormValue("datasource")
+	selected := r.Form["metrics"]
+
+	if len(selected) == 0 {
+		s.renderPartial(w, "snippet-result.html", map[string]interface{}{"Error": "select at least one metric"})
+		return
+	}
+
+	cfg := s.Config()
+	disc := generator.NewMetricDiscovery(cfg)
+	meta, _ := disc.FetchMetadata(dsName)
+
+	var lines []string
+	lines = append(lines, "      - title: \"discovered metrics\"")
+	lines = append(lines, "        panels:")
+	for _, m := range selected {
+		info, ok := meta[m]
+		if !ok {
+			info = generator.MetricInfo{Type: "untyped"}
+		}
+		panelType := generator.SuggestPanelType(info.Type)
+		query := generator.SuggestQuery(m, info.Type)
+		lines = append(lines, fmt.Sprintf("          - type: %s", panelType))
+		lines = append(lines, fmt.Sprintf("            title: \"%s\"", m))
+		lines = append(lines, fmt.Sprintf("            query: '%s'", query))
+		if dsName != "" {
+			lines = append(lines, fmt.Sprintf("            datasource: %s", dsName))
+		}
+	}
+
+	snippet := strings.Join(lines, "\n")
+	s.renderPartial(w, "snippet-result.html", map[string]interface{}{
+		"Snippet": snippet,
+		"Count":   len(selected),
+	})
+}
+
+// handleComparisonSnippet generates a YAML snippet for comparison panels from selected shared metrics.
+func (s *Server) handleComparisonSnippet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	r.ParseForm()
+	dsA := r.FormValue("datasource_a")
+	dsB := r.FormValue("datasource_b")
+	selected := r.Form["metrics"]
+
+	if len(selected) == 0 {
+		s.renderPartial(w, "snippet-result.html", map[string]interface{}{"Error": "select at least one metric"})
+		return
+	}
+
+	cfg := s.Config()
+	disc := generator.NewMetricDiscovery(cfg)
+	metaA, _ := disc.FetchMetadata(dsA)
+	metaB, _ := disc.FetchMetadata(dsB)
+
+	var lines []string
+	lines = append(lines, "      - title: \"shared metrics comparison\"")
+	lines = append(lines, "        panels:")
+	for _, m := range selected {
+		info := lookupMetaInfo(m, metaA, metaB)
+		lines = append(lines, "          - type: comparison")
+		lines = append(lines, fmt.Sprintf("            title: \"%s\"", m))
+		lines = append(lines, fmt.Sprintf("            metric: \"%s\"", m))
+		lines = append(lines, fmt.Sprintf("            metric_type: \"%s\"", info.Type))
+		lines = append(lines, fmt.Sprintf("            datasources: [%s, %s]", dsA, dsB))
+	}
+
+	snippet := strings.Join(lines, "\n")
+	s.renderPartial(w, "snippet-result.html", map[string]interface{}{
+		"Snippet": snippet,
+		"Count":   len(selected),
+	})
+}
+
+func lookupMetaInfo(name string, primary, fallback map[string]generator.MetricInfo) generator.MetricInfo {
+	if info, ok := primary[name]; ok {
+		return info
+	}
+	if info, ok := fallback[name]; ok {
+		return info
+	}
+	return generator.MetricInfo{Type: "untyped"}
+}
+
+func filterMetricInfoMap(m map[string]generator.MetricInfo, pattern string) map[string]generator.MetricInfo {
+	keys := make(map[string]bool)
+	for k := range m {
+		keys[k] = true
+	}
+	filtered := generator.FilterMetrics(keys, []string{pattern}, nil)
+	result := make(map[string]generator.MetricInfo)
+	for k := range filtered {
+		result[k] = m[k]
+	}
+	return result
+}
+
+func filterByType(m map[string]generator.MetricInfo, mtype string) map[string]generator.MetricInfo {
+	result := make(map[string]generator.MetricInfo)
+	for name, info := range m {
+		if info.Type == mtype {
+			result[name] = info
+		}
+	}
+	return result
+}
+
+type metricRow struct {
+	Name string
+	Type string
+	Help string
+}
+
+func metricInfoToSlice(m map[string]generator.MetricInfo) []metricRow {
+	names := make([]string, 0, len(m))
+	for name := range m {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	result := make([]metricRow, 0, len(names))
+	for _, name := range names {
+		info := m[name]
+		result = append(result, metricRow{Name: name, Type: info.Type, Help: info.Help})
+	}
+	return result
+}
+
+// validateFilename checks for path traversal in dashboard filenames.
+func validateFilename(filename string) error {
+	if strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		return fmt.Errorf("filename cannot contain path separators")
+	}
+	if filename == "." || filename == ".." || strings.HasPrefix(filename, "..") {
+		return fmt.Errorf("invalid filename")
+	}
+	if strings.Contains(filename, "\x00") {
+		return fmt.Errorf("filename cannot contain null bytes")
+	}
+	return nil
 }

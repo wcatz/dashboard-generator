@@ -57,6 +57,48 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
+// Comparison mode toggle for metrics page
+document.addEventListener('DOMContentLoaded', function() {
+  var toggle = document.getElementById('compare-toggle');
+  if (!toggle) return;
+  toggle.addEventListener('change', function() {
+    var form = document.getElementById('browse-form');
+    var dsB = document.getElementById('ds-b-container');
+    var jobTabs = document.getElementById('job-tabs');
+    if (this.checked) {
+      dsB.style.display = 'block';
+      jobTabs.style.display = 'none';
+      form.setAttribute('hx-get', '/api/metrics/compare');
+      htmx.process(form);
+    } else {
+      dsB.style.display = 'none';
+      jobTabs.style.display = '';
+      form.setAttribute('hx-get', '/api/metrics/browse');
+      htmx.process(form);
+    }
+  });
+});
+
+// Set active job tab
+function setActiveJobTab(btn) {
+  btn.parentElement.querySelectorAll('button').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+}
+
+// Switch between comparison tabs (shared/only-a/only-b)
+function showCompareTab(tabName, btn) {
+  document.querySelectorAll('.compare-tab-content').forEach(function(el) {
+    el.style.display = 'none';
+  });
+  document.getElementById('compare-tab-' + tabName).style.display = 'block';
+  btn.parentElement.querySelectorAll('button').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+}
+
 // Auto-dismiss toasts rendered by server (HTMX responses)
 document.addEventListener('htmx:afterSwap', function() {
   document.querySelectorAll('.toast:not([data-auto])').forEach(function(toast) {

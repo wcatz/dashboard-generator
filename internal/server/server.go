@@ -127,8 +127,11 @@ func (s *Server) WriteConfigContent(content string) error {
 	return os.WriteFile(s.cfgPath, []byte(content), 0644)
 }
 
-// ServeHTTP implements http.Handler.
+// ServeHTTP implements http.Handler with security headers.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	s.mux.ServeHTTP(w, r)
 }
 

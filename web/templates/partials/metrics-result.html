@@ -10,20 +10,28 @@
 <div class="card">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
     <h3 style="margin: 0;">{{.Total}} metrics</h3>
-    <span style="font-size: 0.8rem; color: var(--text-muted);">from {{.Datasource}}</span>
+    <span style="font-size: 0.8rem; color: var(--text-muted);">from {{.Datasource}}{{if .Job}} &middot; job: {{.Job}}{{end}}</span>
   </div>
-  <div class="metric-list">
-    {{range .Metrics}}
-    <div class="metric-item">
-      <div>
-        <div class="name">{{.Name}}</div>
-        {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
+  <form hx-post="/api/metrics/snippet" hx-target="#snippet-result">
+    <input type="hidden" name="datasource" value="{{.Datasource}}">
+    <div class="metric-list">
+      {{range .Metrics}}
+      <div class="metric-item">
+        <label style="display: flex; align-items: center; gap: 0.5rem; flex: 1; cursor: pointer;">
+          <input type="checkbox" name="metrics" value="{{.Name}}" style="width: auto; margin: 0;">
+          <div style="flex: 1;">
+            <div class="name">{{.Name}}</div>
+            {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
+          </div>
+        </label>
+        <div class="meta">
+          <span class="badge {{.Type}}">{{.Type}}</span>
+        </div>
       </div>
-      <div class="meta">
-        <span class="badge {{.Type}}">{{.Type}}</span>
-      </div>
+      {{end}}
     </div>
-    {{end}}
-  </div>
+    <button type="submit" class="sm" style="margin-top: 0.75rem;">generate YAML snippet</button>
+  </form>
+  <div id="snippet-result"></div>
 </div>
 {{end}}

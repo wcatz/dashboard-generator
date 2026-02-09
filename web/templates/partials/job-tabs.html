@@ -1,0 +1,10 @@
+{{if .Error}}
+<div style="color: var(--danger); font-size: 0.85rem;">{{.Error}}</div>
+{{else if .Jobs}}
+<div class="tabs" style="margin-top: 0.75rem;">
+  <button class="active" hx-get="/api/metrics/browse?datasource={{.Datasource}}" hx-target="#metrics-result" hx-indicator="#metrics-spinner" onclick="setActiveJobTab(this)">all jobs</button>
+  {{range .Jobs}}
+  <button hx-get="/api/metrics/browse?datasource={{$.Datasource}}&job={{.}}" hx-target="#metrics-result" hx-indicator="#metrics-spinner" onclick="setActiveJobTab(this)">{{.}}</button>
+  {{end}}
+</div>
+{{end}}
