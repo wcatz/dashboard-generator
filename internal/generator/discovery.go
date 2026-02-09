@@ -156,6 +156,31 @@ func (md *MetricDiscovery) FetchLabelValues(dsName, label string) ([]string, err
 	return values, nil
 }
 
+// FetchSeriesMetrics returns metric names that have a specific label=value pair.
+// Uses /api/v1/series?match[]={label="value"} to find matching series.
+func (md *MetricDiscovery) FetchSeriesMetrics(dsName, label, value string) (map[string]bool, error) {
+	baseURL := md.Config.GetDatasourceURL(dsName)
+	if baseURL == "" {
+		return nil, fmt.Errorf("no URL configured for datasource '%s'", dsName)
+	}
+	path := fmt.Sprintf("/api/v1/series?match[]={%s=%q}", label, value)
+	data, err := md.get(baseURL, path)
+	if err != nil {
+		return nil, err
+	}
+	metrics := make(map[string]bool)
+	if list, ok := data.([]interface{}); ok {
+		for _, item := range list {
+			if series, ok := item.(map[string]interface{}); ok {
+				if name, ok := series["__name__"].(string); ok {
+					metrics[name] = true
+				}
+			}
+		}
+	}
+	return metrics, nil
+}
+
 // Categorize compares metrics between two datasources.
 func (md *MetricDiscovery) Categorize(dsA, dsB string) (map[string]map[string]MetricInfo, error) {
 	metricsA, err := md.FetchMetrics(dsA)

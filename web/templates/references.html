@@ -1,0 +1,48 @@
+{{define "content"}}
+<h1>references</h1>
+<p class="subtitle">constants and selectors for DRY config patterns</p>
+
+<div class="card">
+  <h3>constants ({{len .Constants}})</h3>
+  {{if .Constants}}
+  <table class="compact">
+    <thead>
+      <tr><th>name</th><th>value</th><th>usage</th></tr>
+    </thead>
+    <tbody>
+      {{range .Constants}}
+      <tr>
+        <td class="text-mono text-bold">${{ "{" }}{{.Name}}{{ "}" }}</td>
+        <td><code>{{.Value}}</code></td>
+        <td class="text-muted text-sm">{{.Usage}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <div class="empty-state"><p>no constants defined</p></div>
+  {{end}}
+</div>
+
+<div class="card">
+  <h3>selectors ({{len .Selectors}})</h3>
+  {{if .Selectors}}
+  <table class="compact">
+    <thead>
+      <tr><th>name</th><th>value</th><th>usage</th></tr>
+    </thead>
+    <tbody>
+      {{range .Selectors}}
+      <tr>
+        <td class="text-mono text-bold">${{ "{" }}{{.Name}}{{ "}" }}</td>
+        <td><code>{{.Value}}</code></td>
+        <td class="text-muted text-sm">{{.Usage}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <div class="empty-state"><p>no selectors defined</p></div>
+  {{end}}
+</div>
+{{end}}

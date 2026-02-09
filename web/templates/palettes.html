@@ -5,12 +5,12 @@
 {{range $name, $colors := .Palettes}}
 <div class="card">
   <h3>{{$name}} {{if eq $name $.ActivePalette}}<span class="badge success">active</span>{{end}}</h3>
-  <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+  <div class="color-swatches">
     {{range $color, $hex := $colors}}
-    <div style="text-align: center;">
-      <div style="width: 48px; height: 48px; border-radius: 6px; background: {{$hex}}; border: 1px solid var(--border);"></div>
-      <div style="font-size: 0.7rem; margin-top: 0.25rem; color: var(--text-muted);">{{$color}}</div>
-      <div style="font-size: 0.65rem; font-family: monospace;">{{$hex}}</div>
+    <div class="color-swatch" onclick="copyHex('{{$hex}}')" title="click to copy {{$hex}}">
+      <div class="swatch-box" style="background: {{$hex}};"></div>
+      <div class="swatch-name">{{$color}}</div>
+      <div class="swatch-hex">{{$hex}}</div>
     </div>
     {{end}}
   </div>
@@ -20,11 +20,11 @@
 <div class="card">
   <h3>threshold presets</h3>
   {{range $name, $steps := .Thresholds}}
-  <div style="margin-bottom: 0.75rem;">
-    <strong style="font-size: 0.85rem;">${{$name}}</strong>
-    <div style="display: flex; gap: 2px; margin-top: 0.25rem; height: 24px; border-radius: 4px; overflow: hidden;">
+  <div class="mb-3">
+    <div class="threshold-name">${{$name}}</div>
+    <div class="threshold-bar">
       {{range $steps}}
-      <div style="flex: 1; background: {{.Color}};" title="{{.Color}} @ {{.Value}}"></div>
+      <div class="step" style="background: {{.Color}};" title="{{.Color}} @ {{.Value}}"></div>
       {{end}}
     </div>
   </div>

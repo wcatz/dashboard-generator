@@ -1,0 +1,99 @@
+{{if .Error}}
+<div class="card text-danger">
+  <span class="text-danger text-bold">error:</span> {{.Error}}
+</div>
+{{else}}
+<div class="card">
+  <div class="compare-stats">
+    <div class="stat-card accent-green">
+      <div class="label">shared</div>
+      <div class="value green">{{.SharedCount}}</div>
+    </div>
+    <div class="stat-card accent-blue">
+      <div class="label">{{.DatasourceA}} only</div>
+      <div class="value blue">{{.OnlyACount}}</div>
+    </div>
+    <div class="stat-card accent-orange">
+      <div class="label">{{.DatasourceB}} only</div>
+      <div class="value orange">{{.OnlyBCount}}</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="active" onclick="showCompareTab('shared', this)">shared ({{.SharedCount}})</button>
+    <button onclick="showCompareTab('only-a', this)">{{.DatasourceA}} only ({{.OnlyACount}})</button>
+    <button onclick="showCompareTab('only-b', this)">{{.DatasourceB}} only ({{.OnlyBCount}})</button>
+  </div>
+
+  <div id="compare-tab-shared" class="compare-tab-content active">
+    {{if .Shared}}
+    <form hx-post="/api/metrics/comparison-snippet" hx-target="#snippet-result">
+      <input type="hidden" name="datasource_a" value="{{.DatasourceA}}">
+      <input type="hidden" name="datasource_b" value="{{.DatasourceB}}">
+      <div class="metric-list">
+        {{range .Shared}}
+        <div class="metric-item">
+          <label>
+            <input type="checkbox" name="metrics" value="{{.Name}}">
+            <div class="flex-1">
+              <div class="name">{{.Name}}</div>
+              {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
+            </div>
+          </label>
+          <div class="meta">
+            <span class="badge {{.Type}}">{{.Type}}</span>
+            <span class="badge success">both</span>
+          </div>
+        </div>
+        {{end}}
+      </div>
+      <button type="submit" class="sm mt-3">generate comparison snippet</button>
+    </form>
+    {{else}}
+    <div class="empty-state"><p>no shared metrics</p></div>
+    {{end}}
+  </div>
+
+  <div id="compare-tab-only-a" class="compare-tab-content">
+    {{if .OnlyA}}
+    <div class="metric-list">
+      {{range .OnlyA}}
+      <div class="metric-item">
+        <div>
+          <div class="name">{{.Name}}</div>
+          {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
+        </div>
+        <div class="meta">
+          <span class="badge {{.Type}}">{{.Type}}</span>
+        </div>
+      </div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state"><p>no unique metrics</p></div>
+    {{end}}
+  </div>
+
+  <div id="compare-tab-only-b" class="compare-tab-content">
+    {{if .OnlyB}}
+    <div class="metric-list">
+      {{range .OnlyB}}
+      <div class="metric-item">
+        <div>
+          <div class="name">{{.Name}}</div>
+          {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
+        </div>
+        <div class="meta">
+          <span class="badge {{.Type}}">{{.Type}}</span>
+        </div>
+      </div>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state"><p>no unique metrics</p></div>
+    {{end}}
+  </div>
+
+  <div id="snippet-result"></div>
+</div>
+{{end}}

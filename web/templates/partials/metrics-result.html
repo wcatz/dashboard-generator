@@ -1,6 +1,6 @@
 {{if .Error}}
-<div class="card" style="border-color: var(--danger);">
-  <span style="color: var(--danger);">error:</span> {{.Error}}
+<div class="card text-danger">
+  <span class="text-danger text-bold">error:</span> {{.Error}}
 </div>
 {{else if not .Metrics}}
 <div class="empty-state">
@@ -8,22 +8,30 @@
 </div>
 {{else}}
 <div class="card">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-    <h3 style="margin: 0;">{{.Total}} metrics</h3>
-    <span style="font-size: 0.8rem; color: var(--text-muted);">from {{.Datasource}}</span>
+  <div class="card-header">
+    <h3>{{.Total}} metrics</h3>
+    <span class="text-sm text-muted">from {{.Datasource}}{{if .Job}} &middot; job: {{.Job}}{{end}}</span>
   </div>
-  <div class="metric-list">
-    {{range .Metrics}}
-    <div class="metric-item">
-      <div>
-        <div class="name">{{.Name}}</div>
-        {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
+  <form hx-post="/api/metrics/snippet" hx-target="#snippet-result">
+    <input type="hidden" name="datasource" value="{{.Datasource}}">
+    <div class="metric-list">
+      {{range .Metrics}}
+      <div class="metric-item">
+        <label>
+          <input type="checkbox" name="metrics" value="{{.Name}}">
+          <div class="flex-1">
+            <div class="name">{{.Name}}</div>
+            {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
+          </div>
+        </label>
+        <div class="meta">
+          <span class="badge {{.Type}}">{{.Type}}</span>
+        </div>
       </div>
-      <div class="meta">
-        <span class="badge {{.Type}}">{{.Type}}</span>
-      </div>
+      {{end}}
     </div>
-    {{end}}
-  </div>
+    <button type="submit" class="sm mt-3">generate YAML snippet</button>
+  </form>
+  <div id="snippet-result"></div>
 </div>
 {{end}}

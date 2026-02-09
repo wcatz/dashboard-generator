@@ -19,16 +19,24 @@
     <div class="label">profiles</div>
     <div class="value purple">{{.ProfileCount}}</div>
   </div>
+  <div class="stat-card accent-cyan">
+    <div class="label">constants</div>
+    <div class="value cyan">{{.ConstantCount}}</div>
+  </div>
+  <div class="stat-card accent-red">
+    <div class="label">selectors</div>
+    <div class="value red">{{.SelectorCount}}</div>
+  </div>
 </div>
 
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-  <h2 style="margin: 0; font-size: 1.1rem;">dashboard list</h2>
-  <div style="display: flex; gap: 0.5rem;">
-    <button class="sm" hx-post="/api/generate" hx-target="#generate-result" hx-indicator="#gen-spinner">
+<div class="page-header">
+  <h2>dashboard list</h2>
+  <div class="actions">
+    <button class="sm" hx-post="/api/generate" hx-target="#generate-result" hx-indicator="#gen-spinner" hx-disabled-elt="this">
       generate all <span id="gen-spinner" class="htmx-indicator"><span class="spinner"></span></span>
     </button>
     {{if .GrafanaURL}}
-    <button class="sm outline" hx-post="/api/push" hx-target="#push-result" hx-indicator="#push-spinner" hx-confirm="Push all dashboards to Grafana?">
+    <button class="sm outline" hx-post="/api/push" hx-target="#push-result" hx-indicator="#push-spinner" hx-confirm="Push all dashboards to Grafana?" hx-disabled-elt="this">
       push all to grafana <span id="push-spinner" class="htmx-indicator"><span class="spinner"></span></span>
     </button>
     {{end}}
@@ -46,14 +54,15 @@
       uid: {{.UID}} &middot; {{.Filename}}
       <span class="panel-count">{{len .Sections}} sections</span>
       &middot; {{len .Variables}} variables
+      {{range .Tags}}<span class="badge info">{{.}}</span>{{end}}
     </div>
   </div>
   <div class="actions">
-    <button class="sm outline" hx-post="/api/generate?dashboard={{.UID}}" hx-target="#generate-result" hx-indicator="#gen-spinner">generate</button>
+    <button class="sm outline" hx-post="/api/generate?dashboard={{.UID}}" hx-target="#generate-result" hx-indicator="#gen-spinner" hx-disabled-elt="this">generate</button>
     {{if $.GrafanaURL}}
-    <button class="sm outline" hx-post="/api/push?dashboard={{.UID}}" hx-target="#push-result" hx-indicator="#push-spinner">push</button>
+    <button class="sm outline" hx-post="/api/push?dashboard={{.UID}}" hx-target="#push-result" hx-indicator="#push-spinner" hx-disabled-elt="this">push</button>
     {{end}}
-    <a href="/preview?uid={{.UID}}"><button class="sm outline secondary">preview</button></a>
+    <a href="/preview?uid={{.UID}}"><button class="sm outline">preview</button></a>
   </div>
 </div>
 {{end}}

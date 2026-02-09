@@ -7,16 +7,16 @@
   <div class="card">
     <h3>{{$name}} {{if $ds.IsDefault}}<span class="badge success">default</span>{{end}}</h3>
     <table class="compact">
-      <tr><td style="color: var(--text-muted); width: 60px;">type</td><td>{{$ds.Type}}</td></tr>
-      <tr><td style="color: var(--text-muted);">uid</td><td><code>{{$ds.UID}}</code></td></tr>
-      <tr><td style="color: var(--text-muted);">url</td><td>{{if $ds.URL}}<code>{{$ds.URL}}</code>{{else}}<span style="color: var(--text-muted);">not set</span>{{end}}</td></tr>
+      <tr><td class="label-cell">type</td><td>{{$ds.Type}}</td></tr>
+      <tr><td class="label-cell">uid</td><td><code>{{$ds.UID}}</code></td></tr>
+      <tr><td class="label-cell">url</td><td>{{if $ds.URL}}<code>{{$ds.URL}}</code>{{else}}<span class="text-muted">not set</span>{{end}}</td></tr>
     </table>
     {{if $ds.URL}}
-    <div style="margin-top: 0.75rem;">
-      <button class="sm outline" hx-get="/api/datasource/test?name={{$name}}" hx-target="#ds-status-{{$name}}" hx-indicator="#ds-spin-{{$name}}">
+    <div class="ds-card-actions">
+      <button class="sm outline" hx-get="/api/datasource/test?name={{$name}}" hx-target="#ds-status-{{$name}}" hx-indicator="#ds-spin-{{$name}}" hx-disabled-elt="this">
         test connection <span id="ds-spin-{{$name}}" class="htmx-indicator"><span class="spinner"></span></span>
       </button>
-      <div id="ds-status-{{$name}}" style="margin-top: 0.5rem; font-size: 0.8rem;"></div>
+      <div id="ds-status-{{$name}}" class="ds-status"></div>
     </div>
     {{end}}
   </div>
@@ -29,12 +29,12 @@
 </div>
 {{end}}
 
-<div class="card" style="margin-top: 1.5rem;">
+<div class="card mt-6">
   <h3>add datasource URL</h3>
-  <p style="font-size: 0.8rem; color: var(--text-muted);">set the URL for an existing datasource to enable metric discovery</p>
+  <p class="form-hint mb-3">set the URL for an existing datasource to enable metric discovery</p>
   <form hx-post="/api/datasource/url" hx-target="#ds-url-result" hx-swap="innerHTML">
-    <div style="display: flex; gap: 0.75rem; align-items: end;">
-      <label style="flex: 1;">
+    <div class="form-row">
+      <label class="flex-1">
         datasource name
         <select name="name">
           {{range $name, $ds := .Datasources}}
@@ -42,13 +42,13 @@
           {{end}}
         </select>
       </label>
-      <label style="flex: 2;">
+      <label class="flex-2">
         Prometheus URL
         <input type="url" name="url" placeholder="http://prometheus:9090" required>
       </label>
       <button type="submit" class="sm">set URL</button>
     </div>
   </form>
-  <div id="ds-url-result" style="margin-top: 0.5rem; font-size: 0.85rem;"></div>
+  <div id="ds-url-result" class="mt-2 text-base"></div>
 </div>
 {{end}}

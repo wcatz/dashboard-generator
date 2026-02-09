@@ -1,0 +1,54 @@
+{{define "content"}}
+<h1>variables</h1>
+<p class="subtitle">template variables used across dashboards</p>
+
+{{if .Variables}}
+{{range .Variables}}
+<div class="var-item">
+  <div class="flex-1">
+    <div class="var-name">{{.Name}}</div>
+    <div class="var-meta">
+      <span class="badge {{.Type}}">{{.Type}}</span>
+      {{if .Datasource}}<span>datasource: {{.Datasource}}</span>{{end}}
+      {{if .Multi}}<span class="badge info">multi</span>{{end}}
+      {{if .IncludeAll}}<span class="badge info">all</span>{{end}}
+    </div>
+  </div>
+  <div class="text-sm text-secondary">
+    {{if .Query}}<code>{{.Query}}</code>{{end}}
+    {{if .Values}}{{.Values}}{{end}}
+    {{if .DsType}}type: {{.DsType}}{{end}}
+  </div>
+</div>
+{{if .ChainsFrom}}
+<div class="var-chain">
+  {{range .ChainsFrom}}<span>{{.}}</span> <span class="arrow">&rarr;</span> {{end}}<span class="text-accent">{{.Name}}</span>
+</div>
+{{end}}
+{{end}}
+{{else}}
+<div class="empty-state">
+  <p>no variables defined</p>
+  <p>add variables in the <a href="/editor">config editor</a></p>
+</div>
+{{end}}
+
+{{if .UsedBy}}
+<div class="card mt-6">
+  <h3>variable usage</h3>
+  <table class="compact">
+    <thead>
+      <tr><th>variable</th><th>dashboards</th></tr>
+    </thead>
+    <tbody>
+      {{range .UsedBy}}
+      <tr>
+        <td class="text-mono">{{.Name}}</td>
+        <td>{{range .Dashboards}}<span class="badge info">{{.}}</span> {{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}
+{{end}}

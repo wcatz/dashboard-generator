@@ -1,0 +1,33 @@
+{{define "content"}}
+<h1>profiles</h1>
+<p class="subtitle">named dashboard subsets for selective generation</p>
+
+{{if .Profiles}}
+{{range .Profiles}}
+<div class="card">
+  <h3>{{.Name}}</h3>
+  <div class="flex flex-wrap gap-2">
+    {{range .Dashboards}}
+    <span class="badge info">{{.}}</span>
+    {{end}}
+  </div>
+  <div class="mt-3 flex gap-2">
+    <button class="sm outline" hx-post="/api/generate?profile={{.Name}}" hx-target="#profile-result-{{.Name}}" hx-indicator="#profile-spin-{{.Name}}" hx-disabled-elt="this">
+      generate <span id="profile-spin-{{.Name}}" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+    {{if $.GrafanaURL}}
+    <button class="sm outline" hx-post="/api/push?profile={{.Name}}" hx-target="#profile-result-{{.Name}}" hx-indicator="#profile-spin-{{.Name}}" hx-disabled-elt="this">
+      push to grafana
+    </button>
+    {{end}}
+  </div>
+  <div id="profile-result-{{.Name}}" class="mt-2"></div>
+</div>
+{{end}}
+{{else}}
+<div class="empty-state">
+  <p>no profiles defined</p>
+  <p>add profiles in the <a href="/editor">config editor</a> to create dashboard subsets</p>
+</div>
+{{end}}
+{{end}}
