@@ -5,12 +5,18 @@
 {{else}}
 <div class="card" style="border-color: var(--success);">
   <span style="color: var(--success);">pushed {{.Count}} dashboards to Grafana</span>
-  <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+  <div style="margin-top: 0.5rem;">
     {{range .Results}}
-    <div>{{.Title}} ({{.UID}}): {{.Status}}</div>
+    <div class="result-item">
+      <span class="icon-ok">&#10003;</span>
+      {{.Title}} ({{.UID}}): {{.Status}}
+    </div>
     {{end}}
     {{range .Errors}}
-    <div style="color: var(--danger);">{{.}}</div>
+    <div class="result-item">
+      <span class="icon-err">&#10007;</span>
+      <span style="color: var(--danger);">{{.}}</span>
+    </div>
     {{end}}
   </div>
 </div>

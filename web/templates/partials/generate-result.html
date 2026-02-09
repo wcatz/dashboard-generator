@@ -5,9 +5,12 @@
 {{else}}
 <div class="card" style="border-color: var(--success);">
   <span style="color: var(--success);">generated {{.Count}} dashboards</span>
-  <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+  <div style="margin-top: 0.5rem;">
     {{range .Results}}
-    <div>{{.Filename}}: {{.Panels}} panels, {{.Size}} bytes</div>
+    <div class="result-item">
+      <span class="icon-ok">&#10003;</span>
+      {{.Filename}}: {{.Panels}} panels, {{.Size}} bytes
+    </div>
     {{end}}
   </div>
 </div>

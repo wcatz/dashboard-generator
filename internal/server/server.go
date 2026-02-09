@@ -12,6 +12,10 @@ import (
 	"github.com/wcatz/dashboard-generator/internal/config"
 )
 
+var funcMap = template.FuncMap{
+	"add": func(a, b int) int { return a + b },
+}
+
 // Server holds the HTTP server state and config.
 type Server struct {
 	cfg        *config.Config
@@ -49,7 +53,7 @@ func New(webFS fs.FS, cfgPath string, grafanaURL string) (*Server, error) {
 
 func (s *Server) loadTemplates() error {
 	// Parse partial templates (these are standalone fragments)
-	partials, err := template.New("").ParseFS(s.webFS,
+	partials, err := template.New("").Funcs(funcMap).ParseFS(s.webFS,
 		"templates/partials/*.html",
 	)
 	if err != nil {
@@ -70,7 +74,7 @@ func (s *Server) loadTemplates() error {
 // pageTemplate creates a fresh template set with layout + a specific page.
 // This avoids the problem of multiple {{define "content"}} blocks conflicting.
 func (s *Server) pageTemplate(page string) (*template.Template, error) {
-	return template.New("").ParseFS(s.webFS,
+	return template.New("").Funcs(funcMap).ParseFS(s.webFS,
 		"templates/layout.html",
 		"templates/"+page,
 	)

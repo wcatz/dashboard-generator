@@ -148,7 +148,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 
 	// If a UID was requested via query param, generate the preview
 	if selectedUID != "" {
-		jsonStr, title, size, panels, err := s.generatePreview(selectedUID)
+		jsonStr, title, size, panels, panelInfos, err := s.generatePreview(selectedUID)
 		if err != nil {
 			data["JSON"] = ""
 		} else {
@@ -156,6 +156,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 			data["PreviewTitle"] = title
 			data["PreviewSize"] = size
 			data["PreviewPanels"] = panels
+			data["PanelInfos"] = panelInfos
 		}
 	}
 
@@ -338,6 +339,70 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 
 // DashboardConfig is a type alias for use in handler scope.
 type DashboardConfig = config.DashboardConfig
+
+// PanelInfo holds layout info for a single panel, used by the visual preview.
+type PanelInfo struct {
+	ID      int
+	Title   string
+	Type    string
+	X, Y, W, H int
+	Section string
+}
+
+// extractPanelInfo parses the panels array from a generated dashboard JSON map.
+func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
+	rawPanels, ok := dashboard["panels"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var infos []PanelInfo
+	currentSection := ""
+
+	for _, rp := range rawPanels {
+		p, ok := rp.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		pType, _ := p["type"].(string)
+		title, _ := p["title"].(string)
+		id, _ := p["id"].(float64)
+
+		if pType == "row" {
+			currentSection = title
+		}
+
+		gp, ok := p["gridPos"].(map[string]interface{})
+		if !ok {
+			// Row panels without gridPos
+			infos = append(infos, PanelInfo{
+				ID:      int(id),
+				Title:   title,
+				Type:    pType,
+				Section: currentSection,
+			})
+			continue
+		}
+
+		x, _ := gp["x"].(float64)
+		y, _ := gp["y"].(float64)
+		w, _ := gp["w"].(float64)
+		h, _ := gp["h"].(float64)
+
+		infos = append(infos, PanelInfo{
+			ID:      int(id),
+			Title:   title,
+			Type:    pType,
+			X:       int(x),
+			Y:       int(y),
+			W:       int(w),
+			H:       int(h),
+			Section: currentSection,
+		})
+	}
+	return infos
+}
 
 func (s *Server) handleDatasourceTest(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
@@ -524,25 +589,26 @@ func (s *Server) handlePreviewAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonStr, title, size, panels, err := s.generatePreview(uid)
+	jsonStr, title, size, panels, panelInfos, err := s.generatePreview(uid)
 	if err != nil {
 		s.renderPartial(w, "preview-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
 
 	s.renderPartial(w, "preview-result.html", map[string]interface{}{
-		"Title":  title,
-		"Size":   size,
-		"Panels": panels,
-		"JSON":   jsonStr,
+		"Title":      title,
+		"Size":       size,
+		"Panels":     panels,
+		"JSON":       jsonStr,
+		"PanelInfos": panelInfos,
 	})
 }
 
-func (s *Server) generatePreview(uid string) (jsonStr string, title string, size int, panels int, err error) {
+func (s *Server) generatePreview(uid string) (jsonStr string, title string, size int, panels int, panelInfos []PanelInfo, err error) {
 	cfg := s.Config()
 	dashboards, err := cfg.GetDashboards("")
 	if err != nil {
-		return "", "", 0, 0, err
+		return "", "", 0, 0, nil, err
 	}
 	order, _ := cfg.GetDashboardOrder("")
 
@@ -557,7 +623,7 @@ func (s *Server) generatePreview(uid string) (jsonStr string, title string, size
 		}
 	}
 	if !found {
-		return "", "", 0, 0, fmt.Errorf("dashboard with uid '%s' not found", uid)
+		return "", "", 0, 0, nil, fmt.Errorf("dashboard with uid '%s' not found", uid)
 	}
 
 	idGen := generator.NewIDGenerator()
@@ -568,14 +634,15 @@ func (s *Server) generatePreview(uid string) (jsonStr string, title string, size
 
 	dashboard, err := builder.Build(dbCfg, navLinks, nil)
 	if err != nil {
-		return "", "", 0, 0, err
+		return "", "", 0, 0, nil, err
 	}
 
 	data, err := json.MarshalIndent(dashboard, "", "  ")
 	if err != nil {
-		return "", "", 0, 0, err
+		return "", "", 0, 0, nil, err
 	}
 
 	panelList, _ := dashboard["panels"].([]interface{})
-	return string(data), dbCfg.Title, len(data), len(panelList), nil
+	pInfos := extractPanelInfo(dashboard)
+	return string(data), dbCfg.Title, len(data), len(panelList), pInfos, nil
 }

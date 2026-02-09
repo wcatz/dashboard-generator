@@ -6,8 +6,42 @@
 <div class="card">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
     <h3 style="margin: 0;">{{.Title}}</h3>
-    <span style="font-size: 0.8rem; color: var(--text-muted);">{{.Size}} bytes &middot; {{.Panels}} panels</span>
+    <span style="font-size: 0.8rem; color: var(--text-secondary);">{{.Size}} bytes &middot; {{.Panels}} panels</span>
   </div>
-  <div class="json-preview">{{.JSON}}</div>
+
+  <div class="tabs">
+    <button class="preview-tab-btn active" data-tab="visual" onclick="togglePreviewTab('visual')">visual</button>
+    <button class="preview-tab-btn" data-tab="json" onclick="togglePreviewTab('json')">JSON</button>
+  </div>
+
+  <div class="preview-tab-content active" data-tab="visual">
+    {{if .PanelInfos}}
+    <div class="preview-grid">
+      {{range .PanelInfos}}
+      {{if eq .Type "row"}}
+      <div class="preview-row">{{.Title}}</div>
+      {{else}}
+      <div class="preview-panel type-{{.Type}}" style="grid-column: {{add .X 1}} / span {{.W}}; grid-row: auto / span {{.H}};">
+        <div class="panel-header">
+          <span class="panel-type-badge">{{.Type}}</span>
+          <span class="panel-dims">{{.W}}x{{.H}}</span>
+        </div>
+        <div class="panel-title">{{.Title}}</div>
+      </div>
+      {{end}}
+      {{end}}
+    </div>
+    {{else}}
+    <div class="empty-state"><p>no panels found</p></div>
+    {{end}}
+  </div>
+
+  <div class="preview-tab-content" data-tab="json">
+    <div class="toolbar">
+      <button class="sm ghost" onclick="copyToClipboard('json-output')">copy</button>
+      <button class="sm ghost" onclick="downloadJSON('{{.Title}}.json', 'json-output')">download</button>
+    </div>
+    <div class="json-preview" id="json-output">{{.JSON}}</div>
+  </div>
 </div>
 {{end}}
