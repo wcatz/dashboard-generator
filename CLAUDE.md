@@ -2,43 +2,131 @@
 
 ## What This Is
 
-A fully generic, config-driven Python Grafana dashboard generator. Reads a YAML config, outputs interlinked Grafana-compatible JSON dashboards. Zero hardcoded domains, prefixes, or assumptions about what is being monitored. Works with any Prometheus-monitored infrastructure.
+A config-driven Grafana dashboard generator. Reads a YAML config, outputs interlinked Grafana-compatible JSON dashboards. Zero hardcoded domains or assumptions about what is being monitored. Works with any Prometheus-monitored infrastructure.
+
+**Two implementations** — Python original and Go rewrite (feature parity, structurally identical output).
 
 ## Files
 
-| File | Purpose |
+| Path | Purpose |
 |------|---------|
-| `grafana-dashboard-generator.py` | Main generator (~1600 lines) |
+| `grafana-dashboard-generator.py` | Python generator (~1600 lines, original) |
 | `example-config.yaml` | Reference config with 5 generic dashboards |
+| `cmd/dashboard-generator/main.go` | Go CLI entry point (cobra) |
+| `internal/config/config.go` | Go config loading, $ref resolution, YAML key ordering |
+| `internal/generator/panel.go` | Go panel factory (14 types) |
+| `internal/generator/layout.go` | Go layout engine (24-unit grid) |
+| `internal/generator/dashboard.go` | Go dashboard builder (variables, sections, nav links) |
+| `internal/generator/discovery.go` | Go metric discovery (Prometheus API) |
+| `internal/generator/writer.go` | Go JSON output + Grafana API push |
+| `internal/generator/helpers.go` | Go type extraction helpers |
+| `internal/generator/idgen.go` | Go panel ID generator |
+| `internal/server/server.go` | HTTP server with embedded FS, template rendering |
+| `internal/server/routes.go` | Route registration (pages + API endpoints) |
+| `internal/server/handlers.go` | Page and API handlers (generate, preview, metrics, etc.) |
+| `web/embed.go` | `//go:embed` directive for templates + static assets |
+| `web/templates/layout.html` | Base layout (sidebar nav, dark theme) |
+| `web/templates/*.html` | Page templates (index, datasources, palettes, metrics, editor, preview) |
+| `web/templates/partials/*.html` | HTMX partial response templates |
+| `web/static/` | Pico CSS, HTMX, custom CSS (all embedded in binary) |
+| `Makefile` | Build, test, lint targets |
+| `.goreleaser.yaml` | Cross-platform release config |
 
-## Dependencies
+## Go Dependencies
 
-- **Python 3.8+ stdlib**: `json`, `os`, `argparse`, `urllib.request`, `re`, `fnmatch`, `base64`, `collections.defaultdict`
-- **PyYAML**: Only external dependency. Graceful error if missing.
+- `gopkg.in/yaml.v3` — YAML parsing
+- `github.com/spf13/cobra` — CLI framework
+- stdlib: `encoding/json`, `net/http`, `html/template`, `embed`
+
+## Go CLI
+
+```bash
+# Generate dashboards from YAML config
+./dashboard-generator generate --config example-config.yaml --dry-run --verbose
+
+# Discover metrics from Prometheus
+./dashboard-generator discover --config example-config.yaml --prometheus-url http://localhost:9090
+
+# Generate and push to Grafana
+./dashboard-generator push --config example-config.yaml --grafana-url http://localhost:3000 --grafana-token $TOKEN
+
+# Start web UI
+./dashboard-generator serve --config example-config.yaml --port 8080
+
+# Build
+make build
+
+# Test
+make test
+
+# Lint
+make lint
+```
+
+## Web UI
+
+Single-binary web UI using Go templates + HTMX + Pico CSS. All assets embedded via `embed.FS`. No JavaScript framework, no Node.js, no build step.
+
+### Pages
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/` | Dashboard list | Stats overview, generate buttons, preview links |
+| `/datasources` | Datasource manager | View datasources, test Prometheus connections |
+| `/palettes` | Color palettes | View palette colors and threshold presets |
+| `/metrics` | Metric browser | Browse/filter metrics from connected Prometheus |
+| `/editor` | Config editor | Edit YAML config with save/reload/validate |
+| `/preview` | JSON preview | Generate and view dashboard JSON |
+
+### API Endpoints (HTMX)
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/generate` | POST | Generate dashboards to disk (optional `?dashboard=uid`) |
+| `/api/datasource/test` | GET | Test Prometheus connection (`?name=ds_name`) |
+| `/api/metrics/browse` | GET | Browse metrics (`?datasource=&filter=&type=`) |
+| `/api/config/save` | POST | Save YAML config to disk |
+| `/api/config/reload` | POST | Reload config from disk |
+| `/api/config/validate` | POST | Validate YAML syntax |
+| `/api/preview` | GET | Generate preview JSON (`?uid=dashboard_uid`) |
+
+### Stack
+
+- **Go `html/template`** — server-side rendering
+- **HTMX** v2.0.4 (~50KB) — dynamic interactions
+- **Pico CSS** v2 (~83KB) — classless dark theme
+- **Custom CSS** — sidebar nav, stat cards, metric list, badges
 
 ---
 
-## Architecture
+## Architecture (Go)
 
-### Classes
+| Package | File | Purpose |
+|---------|------|---------|
+| `config` | `config.go` | YAML loading, `$ref` resolution, palette, thresholds, datasources |
+| `generator` | `idgen.go` | Auto-incrementing panel ID counter |
+| `generator` | `layout.go` | 24-unit grid flow layout engine |
+| `generator` | `panel.go` | Panel factory — 14 types, target building, threshold resolution |
+| `generator` | `helpers.go` | Type-safe extraction from `map[string]interface{}` |
+| `generator` | `dashboard.go` | Dashboard builder — variables, sections, nav links, full assembly |
+| `generator` | `discovery.go` | Prometheus API queries, filtering, comparison, YAML snippets |
+| `generator` | `writer.go` | JSON file output, Grafana API push |
+| `server` | `server.go` | HTTP server, template rendering, config management |
+| `server` | `routes.go` | Route registration (6 pages + 8 API endpoints) |
+| `server` | `handlers.go` | Page handlers + HTMX API handlers |
 
-| Class | Line | Purpose |
-|-------|------|---------|
-| `IdGenerator` | ~39 | Auto-incrementing panel ID counter, reset per dashboard |
-| `Config` | ~55 | YAML loading, `$ref` resolution (colors, thresholds, selectors, constants) |
-| `LayoutEngine` | ~183 | Auto-positions panels: flow left-to-right, wrap at 24 grid units |
-| `PanelFactory` | ~226 | Creates panel JSON dicts for all panel types |
-| `MetricDiscovery` | ~895 | Queries Prometheus API for metrics, metadata, labels; two-datasource comparison |
-| `DashboardBuilder` | ~1200 | Assembles complete dashboard JSON with nav links, variables, sections |
+### Python Classes → Go Equivalents
 
-### Standalone Functions
-
-| Function | Purpose |
-|----------|---------|
-| `push_to_grafana()` | POST dashboard JSON to Grafana API (basic auth or bearer token) |
-| `write_dashboard()` | Write JSON to file, print stats, warn if >750KB |
-| `parse_args()` | CLI argument parsing via `argparse` |
-| `main()` | Orchestration: load config → discovery → build dashboards → write/push |
+| Python | Go |
+|--------|-----|
+| `IdGenerator` | `generator.IDGenerator` |
+| `Config` | `config.Config` |
+| `LayoutEngine` | `generator.LayoutEngine` |
+| `PanelFactory` | `generator.PanelFactory` |
+| `MetricDiscovery` | `generator.MetricDiscovery` |
+| `DashboardBuilder` | `generator.DashboardBuilder` |
+| `push_to_grafana()` | `generator.PushToGrafana()` |
+| `write_dashboard()` | `generator.WriteDashboard()` |
 
 ---
 
@@ -270,22 +358,28 @@ When using `--profile`, only dashboards in the profile get links to each other.
 
 ---
 
-## CLI Flags
+## CLI Commands (Go)
 
-| Flag | Default | Purpose |
-|------|---------|---------|
-| `--config` | (required) | Path to YAML config |
-| `--profile` | all dashboards | Generate only dashboards in named profile |
-| `--output-dir` | config `generator.output_dir` or `.` | Override output directory |
-| `--prometheus-url` | none | Prometheus URL for discovery (overrides first datasource URL) |
-| `--grafana-url` | none | Grafana URL for `--push` |
-| `--grafana-user` | none | Basic auth user for `--push` |
-| `--grafana-pass` | none | Basic auth password for `--push` |
-| `--grafana-token` | none | Bearer token for `--push` |
-| `--discover-print` | false | Query Prometheus, print YAML snippets |
-| `--dry-run` | false | Generate to memory only, print sizes |
-| `--verbose` | false | Print panel type and title for each panel |
-| `--push` | false | Push dashboards to Grafana API |
+| Command | Flags | Purpose |
+|---------|-------|---------|
+| `generate` | `--config`, `--profile`, `--output-dir`, `--dry-run`, `--verbose` | Generate dashboard JSON |
+| `discover` | `--config`, `--prometheus-url` | Query Prometheus, print YAML snippets |
+| `push` | `--config`, `--profile`, `--output-dir`, `--grafana-url`, `--grafana-user`, `--grafana-pass`, `--grafana-token`, `--verbose` | Generate and push to Grafana |
+| `serve` | `--config`, `--port` (default 8080) | Start web UI server |
+
+### Python CLI Flags (original)
+
+| Flag | Purpose |
+|------|---------|
+| `--config` | Path to YAML config |
+| `--profile` | Named profile filter |
+| `--output-dir` | Override output directory |
+| `--prometheus-url` | Prometheus URL for discovery |
+| `--grafana-url/user/pass/token` | Grafana push auth |
+| `--discover-print` | Print metric YAML snippets |
+| `--dry-run` | Generate to memory only |
+| `--verbose` | Print panel details |
+| `--push` | Push to Grafana API |
 
 ---
 
@@ -327,55 +421,58 @@ main()
 
 ---
 
-## Extension Points
+## Extension Points (Go)
 
 ### Adding a New Panel Type
 
-1. Add default size to `DEFAULT_SIZES` dict
-2. Add method to `PanelFactory` following the pattern: `def new_type(self, cfg, x, y) -> dict`
-3. Add dispatch entry in `PanelFactory.from_config()` dispatch dict
-4. Document type-specific config keys
+1. Add default size to `DefaultSizes` in `panel.go`
+2. Add method to `PanelFactory` following the pattern: `func (pf *PanelFactory) NewType(cfg map[string]interface{}, x, y int) map[string]interface{}`
+3. Add case in `PanelFactory.FromConfig()` switch
+4. Add test in `panel_test.go`
 
 ### Adding a New Variable Type
 
-1. Add handling in `DashboardBuilder.build_variable()` (check `vtype` cases at ~line 1290)
+1. Add case in `DashboardBuilder.BuildVariable()` switch in `dashboard.go`
 
 ### Adding a New Config Section
 
-1. Add getter to `Config` class
-2. Consume in `main()` or `DashboardBuilder`
+1. Add field to `Config` struct in `config.go`
+2. Consume in `cmd/dashboard-generator/main.go` or `DashboardBuilder`
 
 ### Adding a New Datasource Type
 
 1. Works automatically — `datasources` config just needs `type` and `uid`
 2. Discovery only works with Prometheus API endpoints
-3. For non-Prometheus discovery, extend `MetricDiscovery` with type-specific fetch methods
 
 ---
 
 ## Testing
 
 ```bash
-# dry-run (no files written)
+# Go tests
+make test
+
+# Go dry-run
+make run-dry
+
+# Go generate
+./dashboard-generator generate --config example-config.yaml --dry-run --verbose
+
+# Go discover
+./dashboard-generator discover --config example-config.yaml --prometheus-url http://localhost:9090
+
+# Go push
+./dashboard-generator push --config example-config.yaml --grafana-url http://localhost:3000 --grafana-token $TOKEN
+
+# Go web UI
+./dashboard-generator serve --config example-config.yaml --port 8080
+
+# Python (original)
 ./grafana-dashboard-generator.py --config example-config.yaml --dry-run
-
-# generate to specific directory
-./grafana-dashboard-generator.py --config example-config.yaml --output-dir /tmp/dashboards
-
-# verbose (shows every panel)
-./grafana-dashboard-generator.py --config example-config.yaml --verbose --dry-run
-
-# profile filtering
-./grafana-dashboard-generator.py --config example-config.yaml --profile infra --dry-run
-
-# metric discovery
 ./grafana-dashboard-generator.py --config example-config.yaml --discover-print --prometheus-url http://localhost:9090
 
-# push to grafana
-./grafana-dashboard-generator.py --config example-config.yaml --push --grafana-url http://localhost:3000 --grafana-user admin --grafana-pass secret
-
-# validate output JSON
-python3 -c "import json; json.load(open('output.json'))"
+# Validate JSON
+python3 -c "import json; json.load(open('gen-overview.json'))"
 ```
 
 ---

@@ -1,0 +1,49 @@
+{{define "content"}}
+<h1>metric browser</h1>
+<p class="subtitle">browse and search metrics from connected datasources</p>
+
+<div class="card">
+  <form hx-get="/api/metrics/browse" hx-target="#metrics-result" hx-indicator="#metrics-spinner">
+    <div style="display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap;">
+      <label style="flex: 1; min-width: 150px;">
+        datasource
+        <select name="datasource">
+          {{range $name, $ds := .Datasources}}
+          {{if $ds.URL}}<option value="{{$name}}">{{$name}}</option>{{end}}
+          {{end}}
+        </select>
+      </label>
+      <label style="flex: 2; min-width: 200px;">
+        filter (glob pattern)
+        <input type="text" name="filter" placeholder="node_* or *_total" value="{{.Filter}}">
+      </label>
+      <label style="min-width: 120px;">
+        type
+        <select name="type">
+          <option value="">all types</option>
+          <option value="counter">counter</option>
+          <option value="gauge">gauge</option>
+          <option value="histogram">histogram</option>
+          <option value="summary">summary</option>
+        </select>
+      </label>
+      <button type="submit">
+        browse <span id="metrics-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<div id="metrics-result">
+  {{if .HasDatasources}}
+  <div class="empty-state">
+    <p>select a datasource and click browse</p>
+  </div>
+  {{else}}
+  <div class="empty-state">
+    <p>no datasources with URLs configured</p>
+    <p>set a URL on the <a href="/datasources">datasources page</a> first</p>
+  </div>
+  {{end}}
+</div>
+{{end}}

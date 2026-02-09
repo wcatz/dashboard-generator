@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1>config editor</h1>
+<p class="subtitle">edit your YAML configuration</p>
+
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+    <h3 style="margin: 0;">{{.ConfigPath}}</h3>
+    <div style="display: flex; gap: 0.5rem;">
+      <button class="sm outline" hx-post="/api/config/reload" hx-target="#editor-status">reload</button>
+      <button class="sm" hx-post="/api/config/save" hx-include="#yaml-editor" hx-target="#editor-status">save</button>
+    </div>
+  </div>
+  <div id="editor-status" style="font-size: 0.8rem; margin-bottom: 0.5rem;"></div>
+  <textarea id="yaml-editor" name="content" style="width: 100%; min-height: 600px; font-family: monospace; font-size: 0.8rem; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 6px; padding: 1rem; color: inherit; resize: vertical; tab-size: 2;">{{.Content}}</textarea>
+</div>
+
+<div class="card">
+  <h3>validation</h3>
+  <button class="sm outline" hx-post="/api/config/validate" hx-include="#yaml-editor" hx-target="#validate-result" hx-indicator="#validate-spinner">
+    validate <span id="validate-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+  </button>
+  <div id="validate-result" style="margin-top: 0.75rem; font-size: 0.85rem;"></div>
+</div>
+{{end}}

@@ -1,0 +1,38 @@
+{{define "content"}}
+<h1>JSON preview</h1>
+<p class="subtitle">preview generated dashboard JSON</p>
+
+<div class="card">
+  <form hx-get="/api/preview" hx-target="#preview-result" hx-indicator="#preview-spinner">
+    <div style="display: flex; gap: 0.75rem; align-items: end;">
+      <label style="flex: 1;">
+        dashboard
+        <select name="uid">
+          {{range .Dashboards}}
+          <option value="{{.UID}}" {{if eq .UID $.SelectedUID}}selected{{end}}>{{.Title}}</option>
+          {{end}}
+        </select>
+      </label>
+      <button type="submit">
+        preview <span id="preview-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+    </div>
+  </form>
+</div>
+
+<div id="preview-result">
+  {{if .JSON}}
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+      <h3 style="margin: 0;">{{.PreviewTitle}}</h3>
+      <span style="font-size: 0.8rem; color: var(--text-muted);">{{.PreviewSize}} bytes &middot; {{.PreviewPanels}} panels</span>
+    </div>
+    <div class="json-preview">{{.JSON}}</div>
+  </div>
+  {{else}}
+  <div class="empty-state">
+    <p>select a dashboard and click preview</p>
+  </div>
+  {{end}}
+</div>
+{{end}}

@@ -1,0 +1,6 @@
+{{if .Error}}
+<span class="status-dot err"></span><span style="color: var(--danger);">{{.Error}}</span>
+{{else}}
+<span class="status-dot ok"></span><span style="color: var(--success);">connected</span>
+<span style="color: var(--text-muted); margin-left: 0.5rem;">{{.MetricCount}} metrics</span>
+{{end}}

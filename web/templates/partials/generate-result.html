@@ -1,0 +1,14 @@
+{{if .Error}}
+<div class="card" style="border-color: var(--danger);">
+  <span style="color: var(--danger);">error:</span> {{.Error}}
+</div>
+{{else}}
+<div class="card" style="border-color: var(--success);">
+  <span style="color: var(--success);">generated {{.Count}} dashboards</span>
+  <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+    {{range .Results}}
+    <div>{{.Filename}}: {{.Panels}} panels, {{.Size}} bytes</div>
+    {{end}}
+  </div>
+</div>
+{{end}}
