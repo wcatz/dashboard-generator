@@ -9,10 +9,14 @@ func (s *Server) registerRoutes() {
 	// Pages
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/datasources", s.handleDatasources)
+	s.mux.HandleFunc("/variables", s.handleVariables)
 	s.mux.HandleFunc("/palettes", s.handlePalettes)
-	s.mux.HandleFunc("/metrics", s.handleMetrics)
+	s.mux.HandleFunc("/references", s.handleReferences)
 	s.mux.HandleFunc("/editor", s.handleEditor)
+	s.mux.HandleFunc("/metrics", s.handleMetrics)
 	s.mux.HandleFunc("/preview", s.handlePreview)
+	s.mux.HandleFunc("/profiles", s.handleProfiles)
+	s.mux.HandleFunc("/settings", s.handleSettings)
 
 	// API endpoints (HTMX)
 	s.mux.HandleFunc("/api/push", s.handlePush)

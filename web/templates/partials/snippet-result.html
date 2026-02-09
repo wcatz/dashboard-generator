@@ -1,12 +1,12 @@
 {{if .Error}}
-<div style="color: var(--danger); margin-top: 0.75rem;">{{.Error}}</div>
+<div class="mt-3 text-danger">{{.Error}}</div>
 {{else}}
-<div class="card" style="margin-top: 1rem; border-color: var(--success);">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-    <h3 style="margin: 0;">YAML snippet ({{.Count}} panels)</h3>
+<div class="card mt-4">
+  <div class="card-header">
+    <h3>YAML snippet ({{.Count}} panels)</h3>
     <button class="sm ghost" onclick="copyToClipboard('yaml-snippet')">copy</button>
   </div>
-  <pre id="yaml-snippet" style="background: var(--surface-0); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.8rem; overflow-x: auto; white-space: pre; margin: 0;">{{.Snippet}}</pre>
-  <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">paste into a dashboard sections array in the <a href="/editor">config editor</a></p>
+  <pre id="yaml-snippet" class="code-block">{{.Snippet}}</pre>
+  <p class="form-hint mt-2">paste into a dashboard sections array in the <a href="/editor">config editor</a></p>
 </div>
 {{end}}

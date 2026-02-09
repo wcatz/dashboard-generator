@@ -1,12 +1,12 @@
 {{if .Error}}
-<div class="card" style="border-color: var(--danger);">
-  <span style="color: var(--danger);">error:</span> {{.Error}}
+<div class="card text-danger">
+  <span class="text-danger text-bold">error:</span> {{.Error}}
 </div>
 {{else}}
 <div class="card">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-    <h3 style="margin: 0;">{{.Title}}</h3>
-    <span style="font-size: 0.8rem; color: var(--text-secondary);">{{.Size}} bytes &middot; {{.Panels}} panels</span>
+  <div class="card-header">
+    <h3>{{.Title}}</h3>
+    <span class="text-sm text-secondary">{{.Size}} bytes &middot; {{.Panels}} panels</span>
   </div>
 
   <div class="tabs">

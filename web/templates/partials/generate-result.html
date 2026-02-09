@@ -1,11 +1,11 @@
 {{if .Error}}
-<div class="card" style="border-color: var(--danger);">
-  <span style="color: var(--danger);">error:</span> {{.Error}}
+<div class="card text-danger">
+  <span class="text-danger text-bold">error:</span> {{.Error}}
 </div>
 {{else}}
-<div class="card" style="border-color: var(--success);">
-  <span style="color: var(--success);">generated {{.Count}} dashboards</span>
-  <div style="margin-top: 0.5rem;">
+<div class="card">
+  <span class="text-success text-bold">generated {{.Count}} dashboards</span>
+  <div class="mt-2">
     {{range .Results}}
     <div class="result-item">
       <span class="icon-ok">&#10003;</span>

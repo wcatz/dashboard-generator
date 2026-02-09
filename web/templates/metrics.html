@@ -3,16 +3,16 @@
 <p class="subtitle">browse and search metrics from connected datasources</p>
 
 <div class="card">
-  <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
-    <label style="font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem;">
-      <input type="checkbox" id="compare-toggle" style="width: auto; margin: 0;">
+  <div class="mb-3">
+    <label class="toggle-label">
+      <input type="checkbox" id="compare-toggle">
       comparison mode
     </label>
   </div>
 
   <form id="browse-form" hx-get="/api/metrics/browse" hx-target="#metrics-result" hx-indicator="#metrics-spinner">
-    <div style="display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap;">
-      <label style="flex: 1; min-width: 150px;">
+    <div class="form-row">
+      <label class="flex-1 min-w-150">
         datasource
         <select name="datasource" id="ds-select" hx-get="/api/metrics/jobs" hx-target="#job-tabs" hx-trigger="change" hx-include="[name='datasource']">
           {{range $name, $ds := .Datasources}}
@@ -20,7 +20,7 @@
           {{end}}
         </select>
       </label>
-      <label id="ds-b-container" style="flex: 1; min-width: 150px; display: none;">
+      <label id="ds-b-container" class="flex-1 min-w-150 hidden">
         compare with
         <select name="datasource_b" id="ds-b-select">
           {{range $name, $ds := .Datasources}}
@@ -28,11 +28,11 @@
           {{end}}
         </select>
       </label>
-      <label style="flex: 2; min-width: 200px;">
+      <label class="flex-2 min-w-200">
         filter (glob pattern)
-        <input type="text" name="filter" placeholder="node_* or *_total" value="{{.Filter}}">
+        <input type="text" name="filter" placeholder="node_* or *_total" value="{{.Filter}}" hx-trigger="keyup changed delay:400ms" hx-get="/api/metrics/browse" hx-target="#metrics-result" hx-indicator="#metrics-spinner" hx-include="closest form">
       </label>
-      <label style="min-width: 120px;">
+      <label class="min-w-150">
         type
         <select name="type">
           <option value="">all types</option>

@@ -1,19 +1,19 @@
 {{if .Error}}
-<div class="card" style="border-color: var(--danger);">
-  <span style="color: var(--danger);">error:</span> {{.Error}}
+<div class="card text-danger">
+  <span class="text-danger text-bold">error:</span> {{.Error}}
 </div>
 {{else}}
 <div class="card">
-  <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-    <div class="stat-card accent-green" style="flex: 1;">
+  <div class="compare-stats">
+    <div class="stat-card accent-green">
       <div class="label">shared</div>
       <div class="value green">{{.SharedCount}}</div>
     </div>
-    <div class="stat-card accent-blue" style="flex: 1;">
+    <div class="stat-card accent-blue">
       <div class="label">{{.DatasourceA}} only</div>
       <div class="value blue">{{.OnlyACount}}</div>
     </div>
-    <div class="stat-card accent-orange" style="flex: 1;">
+    <div class="stat-card accent-orange">
       <div class="label">{{.DatasourceB}} only</div>
       <div class="value orange">{{.OnlyBCount}}</div>
     </div>
@@ -25,7 +25,7 @@
     <button onclick="showCompareTab('only-b', this)">{{.DatasourceB}} only ({{.OnlyBCount}})</button>
   </div>
 
-  <div id="compare-tab-shared" class="compare-tab-content" style="display: block;">
+  <div id="compare-tab-shared" class="compare-tab-content active">
     {{if .Shared}}
     <form hx-post="/api/metrics/comparison-snippet" hx-target="#snippet-result">
       <input type="hidden" name="datasource_a" value="{{.DatasourceA}}">
@@ -33,9 +33,9 @@
       <div class="metric-list">
         {{range .Shared}}
         <div class="metric-item">
-          <label style="display: flex; align-items: center; gap: 0.5rem; flex: 1; cursor: pointer;">
+          <label>
             <input type="checkbox" name="metrics" value="{{.Name}}">
-            <div style="flex: 1;">
+            <div class="flex-1">
               <div class="name">{{.Name}}</div>
               {{if .Help}}<div class="help">{{.Help}}</div>{{end}}
             </div>
@@ -47,14 +47,14 @@
         </div>
         {{end}}
       </div>
-      <button type="submit" class="sm" style="margin-top: 0.75rem;">generate comparison snippet</button>
+      <button type="submit" class="sm mt-3">generate comparison snippet</button>
     </form>
     {{else}}
     <div class="empty-state"><p>no shared metrics</p></div>
     {{end}}
   </div>
 
-  <div id="compare-tab-only-a" class="compare-tab-content" style="display: none;">
+  <div id="compare-tab-only-a" class="compare-tab-content">
     {{if .OnlyA}}
     <div class="metric-list">
       {{range .OnlyA}}
@@ -74,7 +74,7 @@
     {{end}}
   </div>
 
-  <div id="compare-tab-only-b" class="compare-tab-content" style="display: none;">
+  <div id="compare-tab-only-b" class="compare-tab-content">
     {{if .OnlyB}}
     <div class="metric-list">
       {{range .OnlyB}}

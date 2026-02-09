@@ -9,6 +9,15 @@ function copyToClipboard(elementId) {
   });
 }
 
+// Copy a hex color string to clipboard (palettes page)
+function copyHex(hex) {
+  navigator.clipboard.writeText(hex).then(function() {
+    showToast('Copied ' + hex, 'success');
+  }).catch(function() {
+    showToast('Failed to copy', 'error');
+  });
+}
+
 // Download text content of an element as a JSON file
 function downloadJSON(filename, elementId) {
   var el = document.getElementById(elementId);
@@ -46,7 +55,7 @@ function showToast(message, type) {
   }, 4000);
 }
 
-// Tab key support for textareas
+// Tab key support for textareas + Ctrl+S save shortcut
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Tab' && e.target.tagName === 'TEXTAREA') {
     e.preventDefault();
@@ -54,6 +63,14 @@ document.addEventListener('keydown', function(e) {
     var end = e.target.selectionEnd;
     e.target.value = e.target.value.substring(0, start) + '  ' + e.target.value.substring(end);
     e.target.selectionStart = e.target.selectionEnd = start + 2;
+  }
+  // Ctrl+S / Cmd+S — trigger save on editor page
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    var saveBtn = document.getElementById('save-btn');
+    if (saveBtn) {
+      e.preventDefault();
+      saveBtn.click();
+    }
   }
 });
 
@@ -66,13 +83,15 @@ document.addEventListener('DOMContentLoaded', function() {
     var dsB = document.getElementById('ds-b-container');
     var jobTabs = document.getElementById('job-tabs');
     if (this.checked) {
-      dsB.style.display = 'block';
-      jobTabs.style.display = 'none';
+      dsB.classList.remove('hidden');
+      dsB.classList.add('block');
+      jobTabs.classList.add('hidden');
       form.setAttribute('hx-get', '/api/metrics/compare');
       htmx.process(form);
     } else {
-      dsB.style.display = 'none';
-      jobTabs.style.display = '';
+      dsB.classList.add('hidden');
+      dsB.classList.remove('block');
+      jobTabs.classList.remove('hidden');
       form.setAttribute('hx-get', '/api/metrics/browse');
       htmx.process(form);
     }
@@ -90,9 +109,9 @@ function setActiveJobTab(btn) {
 // Switch between comparison tabs (shared/only-a/only-b)
 function showCompareTab(tabName, btn) {
   document.querySelectorAll('.compare-tab-content').forEach(function(el) {
-    el.style.display = 'none';
+    el.classList.remove('active');
   });
-  document.getElementById('compare-tab-' + tabName).style.display = 'block';
+  document.getElementById('compare-tab-' + tabName).classList.add('active');
   btn.parentElement.querySelectorAll('button').forEach(function(b) {
     b.classList.remove('active');
   });

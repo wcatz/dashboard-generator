@@ -29,6 +29,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		Filename  string
 		Sections  []config.SectionConfig
 		Variables []string
+		Tags      []string
 	}
 
 	var dashList []dashInfo
@@ -52,6 +53,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 			Filename:  filename,
 			Sections:  db.Sections,
 			Variables: db.Variables,
+			Tags:      db.Tags,
 		})
 	}
 
@@ -64,6 +66,8 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		"DatasourceCount": len(cfg.Datasources),
 		"VariableCount":   len(cfg.Variables),
 		"ProfileCount":    len(cfg.Profiles),
+		"ConstantCount":   len(cfg.Constants),
+		"SelectorCount":   len(cfg.Selectors),
 		"GrafanaURL":      s.GrafanaURL(),
 	})
 }
@@ -73,6 +77,8 @@ func (s *Server) handleDatasources(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, "datasources.html", map[string]interface{}{
 		"Title":       "datasources",
 		"Active":      "datasources",
+		"ConfigPath":  s.ConfigPath(),
+		"GrafanaURL":  s.GrafanaURL(),
 		"Datasources": cfg.Datasources,
 	})
 }
@@ -82,6 +88,8 @@ func (s *Server) handlePalettes(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, "palettes.html", map[string]interface{}{
 		"Title":         "palettes",
 		"Active":        "palettes",
+		"ConfigPath":    s.ConfigPath(),
+		"GrafanaURL":    s.GrafanaURL(),
 		"Palettes":      cfg.Palettes,
 		"ActivePalette": cfg.ActivePalette,
 		"Thresholds":    cfg.Thresholds,
@@ -100,6 +108,8 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, "metrics.html", map[string]interface{}{
 		"Title":          "metrics",
 		"Active":         "metrics",
+		"ConfigPath":     s.ConfigPath(),
+		"GrafanaURL":     s.GrafanaURL(),
 		"Datasources":    cfg.Datasources,
 		"HasDatasources": hasDatasources,
 		"Filter":         "",
@@ -115,6 +125,7 @@ func (s *Server) handleEditor(w http.ResponseWriter, r *http.Request) {
 		"Title":      "editor",
 		"Active":     "editor",
 		"ConfigPath": s.ConfigPath(),
+		"GrafanaURL": s.GrafanaURL(),
 		"Content":    content,
 	})
 }
@@ -142,6 +153,8 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Title":       "preview",
 		"Active":      "preview",
+		"ConfigPath":  s.ConfigPath(),
+		"GrafanaURL":  s.GrafanaURL(),
 		"Dashboards":  opts,
 		"SelectedUID": selectedUID,
 		"JSON":        "",
@@ -162,6 +175,197 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderPage(w, "preview.html", data)
+}
+
+func (s *Server) handleVariables(w http.ResponseWriter, r *http.Request) {
+	cfg := s.Config()
+
+	type varInfo struct {
+		Name       string
+		Type       string
+		Datasource string
+		Query      string
+		Multi      bool
+		IncludeAll bool
+		Values     string
+		DsType     string
+		ChainsFrom []string
+	}
+
+	type varUsage struct {
+		Name       string
+		Dashboards []string
+	}
+
+	// Collect variables in sorted order
+	names := make([]string, 0, len(cfg.Variables))
+	for name := range cfg.Variables {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var vars []varInfo
+	for _, name := range names {
+		v := cfg.Variables[name]
+		vars = append(vars, varInfo{
+			Name:       name,
+			Type:       v.Type,
+			Datasource: v.Datasource,
+			Query:      v.Query,
+			Multi:      v.Multi,
+			IncludeAll: v.IncludeAll,
+			Values:     v.Values,
+			DsType:     v.DsType,
+			ChainsFrom: v.ChainsFrom,
+		})
+	}
+
+	// Build variable usage map (which dashboards use each variable)
+	dashboards, _ := cfg.GetDashboards("")
+	usageMap := make(map[string][]string)
+	for dName, db := range dashboards {
+		for _, vName := range db.Variables {
+			usageMap[vName] = append(usageMap[vName], dName)
+		}
+	}
+	var usedBy []varUsage
+	for _, name := range names {
+		if dashes, ok := usageMap[name]; ok {
+			sort.Strings(dashes)
+			usedBy = append(usedBy, varUsage{Name: name, Dashboards: dashes})
+		}
+	}
+
+	s.renderPage(w, "variables.html", map[string]interface{}{
+		"Title":      "variables",
+		"Active":     "variables",
+		"ConfigPath": s.ConfigPath(),
+		"GrafanaURL": s.GrafanaURL(),
+		"Variables":  vars,
+		"UsedBy":     usedBy,
+	})
+}
+
+func (s *Server) handleReferences(w http.ResponseWriter, r *http.Request) {
+	cfg := s.Config()
+
+	type refItem struct {
+		Name  string
+		Value string
+		Usage string
+	}
+
+	// Constants
+	constNames := make([]string, 0, len(cfg.Constants))
+	for name := range cfg.Constants {
+		constNames = append(constNames, name)
+	}
+	sort.Strings(constNames)
+	var constants []refItem
+	for _, name := range constNames {
+		constants = append(constants, refItem{
+			Name:  name,
+			Value: cfg.Constants[name],
+			Usage: "${" + name + "}",
+		})
+	}
+
+	// Selectors
+	selNames := make([]string, 0, len(cfg.Selectors))
+	for name := range cfg.Selectors {
+		selNames = append(selNames, name)
+	}
+	sort.Strings(selNames)
+	var selectors []refItem
+	for _, name := range selNames {
+		selectors = append(selectors, refItem{
+			Name:  name,
+			Value: cfg.Selectors[name],
+			Usage: "${" + name + "}",
+		})
+	}
+
+	s.renderPage(w, "references.html", map[string]interface{}{
+		"Title":      "references",
+		"Active":     "references",
+		"ConfigPath": s.ConfigPath(),
+		"GrafanaURL": s.GrafanaURL(),
+		"Constants":  constants,
+		"Selectors":  selectors,
+	})
+}
+
+func (s *Server) handleProfiles(w http.ResponseWriter, r *http.Request) {
+	cfg := s.Config()
+
+	type profileInfo struct {
+		Name       string
+		Dashboards []string
+	}
+
+	names := make([]string, 0, len(cfg.Profiles))
+	for name := range cfg.Profiles {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var profiles []profileInfo
+	for _, name := range names {
+		profiles = append(profiles, profileInfo{
+			Name:       name,
+			Dashboards: cfg.Profiles[name].Dashboards,
+		})
+	}
+
+	s.renderPage(w, "profiles.html", map[string]interface{}{
+		"Title":      "profiles",
+		"Active":     "profiles",
+		"ConfigPath": s.ConfigPath(),
+		"GrafanaURL": s.GrafanaURL(),
+		"Profiles":   profiles,
+	})
+}
+
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	cfg := s.Config()
+	gen := cfg.GetGenerator()
+	disc := cfg.GetDiscovery()
+
+	editable := true
+	if gen.Editable != nil {
+		editable = *gen.Editable
+	}
+	liveNow := false
+	if gen.LiveNow != nil {
+		liveNow = *gen.LiveNow
+	}
+
+	timeFrom := ""
+	timeTo := ""
+	if gen.TimeRange != nil {
+		timeFrom = gen.TimeRange["from"]
+		timeTo = gen.TimeRange["to"]
+	}
+
+	s.renderPage(w, "settings.html", map[string]interface{}{
+		"Title":            "settings",
+		"Active":           "settings",
+		"ConfigPath":       s.ConfigPath(),
+		"GrafanaURL":       s.GrafanaURL(),
+		"SchemaVersion":    gen.SchemaVersion,
+		"OutputDir":        gen.OutputDir,
+		"Refresh":          gen.Refresh,
+		"TimeFrom":         timeFrom,
+		"TimeTo":           timeTo,
+		"Editable":         editable,
+		"GraphTooltip":     gen.GraphTooltip,
+		"LiveNow":          liveNow,
+		"Timezone":         gen.Timezone,
+		"DiscoveryEnabled": disc.Enabled,
+		"DiscoverySources": disc.Sources,
+		"IncludePatterns":  disc.IncludePatterns,
+		"ExcludePatterns":  disc.ExcludePatterns,
+	})
 }
 
 // API handlers

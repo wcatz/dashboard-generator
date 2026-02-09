@@ -1,0 +1,100 @@
+{{define "content"}}
+<h1>settings</h1>
+<p class="subtitle">generator configuration and environment</p>
+
+<div class="card">
+  <h3>generator settings</h3>
+  <div class="settings-grid">
+    <div class="settings-field">
+      <label>schema version</label>
+      <code>{{.SchemaVersion}}</code>
+      <div class="field-help">Grafana dashboard schema version</div>
+    </div>
+    <div class="settings-field">
+      <label>output directory</label>
+      <code>{{if .OutputDir}}{{.OutputDir}}{{else}}.{{end}}</code>
+      <div class="field-help">where generated JSON files are written</div>
+    </div>
+    <div class="settings-field">
+      <label>refresh interval</label>
+      <code>{{if .Refresh}}{{.Refresh}}{{else}}not set{{end}}</code>
+      <div class="field-help">auto-refresh interval for dashboards</div>
+    </div>
+    <div class="settings-field">
+      <label>time range</label>
+      <code>{{if .TimeFrom}}{{.TimeFrom}} to {{.TimeTo}}{{else}}default{{end}}</code>
+      <div class="field-help">default time range for dashboards</div>
+    </div>
+    <div class="settings-field">
+      <label>editable</label>
+      <code>{{if .Editable}}yes{{else}}no{{end}}</code>
+      <div class="field-help">whether dashboards can be edited in Grafana UI</div>
+    </div>
+    <div class="settings-field">
+      <label>graph tooltip</label>
+      <code>{{.GraphTooltip}}</code>
+      <div class="field-help">0=default, 1=shared crosshair, 2=shared tooltip</div>
+    </div>
+    <div class="settings-field">
+      <label>live now</label>
+      <code>{{if .LiveNow}}yes{{else}}no{{end}}</code>
+      <div class="field-help">continuously re-draw when viewing live data</div>
+    </div>
+    <div class="settings-field">
+      <label>timezone</label>
+      <code>{{if .Timezone}}{{.Timezone}}{{else}}browser{{end}}</code>
+      <div class="field-help">dashboard timezone setting</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>environment</h3>
+  <div class="settings-grid">
+    <div class="settings-field">
+      <label>config path</label>
+      <code>{{.ConfigPath}}</code>
+    </div>
+    <div class="settings-field">
+      <label>grafana URL</label>
+      {{if .GrafanaURL}}
+      <code>{{.GrafanaURL}}</code>
+      <span class="status-dot ok"></span> <span class="text-success text-sm">configured</span>
+      {{else}}
+      <span class="text-muted">not configured</span>
+      <div class="field-help">set via --grafana-url flag or GRAFANA_URL env var</div>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>discovery</h3>
+  <div class="settings-grid">
+    <div class="settings-field">
+      <label>enabled</label>
+      <code>{{if .DiscoveryEnabled}}yes{{else}}no{{end}}</code>
+    </div>
+    {{if .DiscoverySources}}
+    <div class="settings-field">
+      <label>sources</label>
+      <div class="flex flex-wrap gap-2">
+        {{range .DiscoverySources}}<span class="badge info">{{.}}</span>{{end}}
+      </div>
+    </div>
+    {{end}}
+    {{if .IncludePatterns}}
+    <div class="settings-field">
+      <label>include patterns</label>
+      <div>{{range .IncludePatterns}}<code class="text-sm">{{.}}</code> {{end}}</div>
+    </div>
+    {{end}}
+    {{if .ExcludePatterns}}
+    <div class="settings-field">
+      <label>exclude patterns</label>
+      <div>{{range .ExcludePatterns}}<code class="text-sm">{{.}}</code> {{end}}</div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}
