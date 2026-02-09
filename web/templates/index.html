@@ -3,19 +3,19 @@
 <p class="subtitle">{{.ConfigPath}}</p>
 
 <div class="stat-row">
-  <div class="stat-card">
+  <div class="stat-card accent-blue">
     <div class="label">dashboards</div>
     <div class="value blue">{{.DashboardCount}}</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card accent-green">
     <div class="label">datasources</div>
     <div class="value green">{{.DatasourceCount}}</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card accent-orange">
     <div class="label">variables</div>
     <div class="value orange">{{.VariableCount}}</div>
   </div>
-  <div class="stat-card">
+  <div class="stat-card accent-purple">
     <div class="label">profiles</div>
     <div class="value blue">{{.ProfileCount}}</div>
   </div>
@@ -42,7 +42,11 @@
 <div class="dash-item">
   <div class="info">
     <div class="title">{{.Title}}</div>
-    <div class="meta">uid: {{.UID}} &middot; {{.Filename}} &middot; {{len .Sections}} sections &middot; {{len .Variables}} variables</div>
+    <div class="meta">
+      uid: {{.UID}} &middot; {{.Filename}}
+      <span class="panel-count">{{len .Sections}} sections</span>
+      &middot; {{len .Variables}} variables
+    </div>
   </div>
   <div class="actions">
     <button class="sm outline" hx-post="/api/generate?dashboard={{.UID}}" hx-target="#generate-result" hx-indicator="#gen-spinner">generate</button>
