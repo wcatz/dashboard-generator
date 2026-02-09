@@ -1,0 +1,5 @@
+{{if .Error}}
+<span style="color: var(--danger);">error: {{.Error}}</span>
+{{else}}
+<span style="color: var(--success);">URL set for {{.Name}}</span>
+{{end}}

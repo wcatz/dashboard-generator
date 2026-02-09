@@ -1,0 +1,54 @@
+{{define "content"}}
+<h1>datasources</h1>
+<p class="subtitle">manage Prometheus connections for metric discovery</p>
+
+<div class="card-grid">
+  {{range $name, $ds := .Datasources}}
+  <div class="card">
+    <h3>{{$name}} {{if $ds.IsDefault}}<span class="badge success">default</span>{{end}}</h3>
+    <table class="compact">
+      <tr><td style="color: var(--text-muted); width: 60px;">type</td><td>{{$ds.Type}}</td></tr>
+      <tr><td style="color: var(--text-muted);">uid</td><td><code>{{$ds.UID}}</code></td></tr>
+      <tr><td style="color: var(--text-muted);">url</td><td>{{if $ds.URL}}<code>{{$ds.URL}}</code>{{else}}<span style="color: var(--text-muted);">not set</span>{{end}}</td></tr>
+    </table>
+    {{if $ds.URL}}
+    <div style="margin-top: 0.75rem;">
+      <button class="sm outline" hx-get="/api/datasource/test?name={{$name}}" hx-target="#ds-status-{{$name}}" hx-indicator="#ds-spin-{{$name}}">
+        test connection <span id="ds-spin-{{$name}}" class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+      <div id="ds-status-{{$name}}" style="margin-top: 0.5rem; font-size: 0.8rem;"></div>
+    </div>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+
+{{if not .Datasources}}
+<div class="empty-state">
+  <p>no datasources defined</p>
+</div>
+{{end}}
+
+<div class="card" style="margin-top: 1.5rem;">
+  <h3>add datasource URL</h3>
+  <p style="font-size: 0.8rem; color: var(--text-muted);">set the URL for an existing datasource to enable metric discovery</p>
+  <form hx-post="/api/datasource/url" hx-target="#ds-url-result" hx-swap="innerHTML">
+    <div style="display: flex; gap: 0.75rem; align-items: end;">
+      <label style="flex: 1;">
+        datasource name
+        <select name="name">
+          {{range $name, $ds := .Datasources}}
+          <option value="{{$name}}">{{$name}}</option>
+          {{end}}
+        </select>
+      </label>
+      <label style="flex: 2;">
+        Prometheus URL
+        <input type="url" name="url" placeholder="http://prometheus:9090" required>
+      </label>
+      <button type="submit" class="sm">set URL</button>
+    </div>
+  </form>
+  <div id="ds-url-result" style="margin-top: 0.5rem; font-size: 0.85rem;"></div>
+</div>
+{{end}}

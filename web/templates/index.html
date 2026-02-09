@@ -1,0 +1,52 @@
+{{define "content"}}
+<h1>dashboards</h1>
+<p class="subtitle">{{.ConfigPath}}</p>
+
+<div class="stat-row">
+  <div class="stat-card">
+    <div class="label">dashboards</div>
+    <div class="value blue">{{.DashboardCount}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">datasources</div>
+    <div class="value green">{{.DatasourceCount}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">variables</div>
+    <div class="value orange">{{.VariableCount}}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">profiles</div>
+    <div class="value blue">{{.ProfileCount}}</div>
+  </div>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+  <h2 style="margin: 0; font-size: 1.1rem;">dashboard list</h2>
+  <button class="sm" hx-post="/api/generate" hx-target="#generate-result" hx-indicator="#gen-spinner">
+    generate all <span id="gen-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+  </button>
+</div>
+
+<div id="generate-result"></div>
+
+{{range .Dashboards}}
+<div class="dash-item">
+  <div class="info">
+    <div class="title">{{.Title}}</div>
+    <div class="meta">uid: {{.UID}} &middot; {{.Filename}} &middot; {{len .Sections}} sections &middot; {{len .Variables}} variables</div>
+  </div>
+  <div class="actions">
+    <button class="sm outline" hx-post="/api/generate?dashboard={{.UID}}" hx-target="#generate-result" hx-indicator="#gen-spinner">generate</button>
+    <a href="/preview?uid={{.UID}}"><button class="sm outline secondary">preview</button></a>
+  </div>
+</div>
+{{end}}
+
+{{if not .Dashboards}}
+<div class="empty-state">
+  <p>no dashboards defined in config</p>
+  <p>open the <a href="/editor">config editor</a> to add dashboards</p>
+</div>
+{{end}}
+{{end}}

@@ -1,0 +1,13 @@
+{{if .Error}}
+<div class="card" style="border-color: var(--danger);">
+  <span style="color: var(--danger);">error:</span> {{.Error}}
+</div>
+{{else}}
+<div class="card">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+    <h3 style="margin: 0;">{{.Title}}</h3>
+    <span style="font-size: 0.8rem; color: var(--text-muted);">{{.Size}} bytes &middot; {{.Panels}} panels</span>
+  </div>
+  <div class="json-preview">{{.JSON}}</div>
+</div>
+{{end}}
