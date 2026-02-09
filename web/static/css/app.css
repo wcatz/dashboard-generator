@@ -242,6 +242,7 @@ main.content .subtitle {
 .stat-card .value.green { color: var(--success); }
 .stat-card .value.blue { color: var(--accent); }
 .stat-card .value.orange { color: var(--warning); }
+.stat-card .value.purple { color: var(--purple); }
 .stat-card .value.red { color: var(--danger); }
 
 .stat-card.accent-blue::before { background: var(--accent); }
@@ -639,6 +640,7 @@ button.ghost:hover,
 .preview-grid {
   display: grid;
   grid-template-columns: repeat(24, 1fr);
+  grid-auto-rows: 30px;
   gap: 4px;
   padding: 1rem;
   background: var(--surface-0);

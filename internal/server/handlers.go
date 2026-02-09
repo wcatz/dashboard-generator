@@ -350,6 +350,8 @@ type PanelInfo struct {
 }
 
 // extractPanelInfo parses the panels array from a generated dashboard JSON map.
+// It recurses into collapsed row panels whose nested panels are stored in the
+// row's "panels" field rather than at the top level.
 func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 	rawPanels, ok := dashboard["panels"].([]interface{})
 	if !ok {
@@ -375,31 +377,64 @@ func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 
 		gp, ok := p["gridPos"].(map[string]interface{})
 		if !ok {
-			// Row panels without gridPos
 			infos = append(infos, PanelInfo{
 				ID:      int(id),
 				Title:   title,
 				Type:    pType,
 				Section: currentSection,
 			})
-			continue
+		} else {
+			x, _ := gp["x"].(float64)
+			y, _ := gp["y"].(float64)
+			w, _ := gp["w"].(float64)
+			h, _ := gp["h"].(float64)
+
+			infos = append(infos, PanelInfo{
+				ID:      int(id),
+				Title:   title,
+				Type:    pType,
+				X:       int(x),
+				Y:       int(y),
+				W:       int(w),
+				H:       int(h),
+				Section: currentSection,
+			})
 		}
 
-		x, _ := gp["x"].(float64)
-		y, _ := gp["y"].(float64)
-		w, _ := gp["w"].(float64)
-		h, _ := gp["h"].(float64)
+		// Recurse into collapsed row panels that nest their children.
+		if pType == "row" {
+			if nested, ok := p["panels"].([]interface{}); ok {
+				for _, nr := range nested {
+					np, ok := nr.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					nType, _ := np["type"].(string)
+					nTitle, _ := np["title"].(string)
+					nID, _ := np["id"].(float64)
 
-		infos = append(infos, PanelInfo{
-			ID:      int(id),
-			Title:   title,
-			Type:    pType,
-			X:       int(x),
-			Y:       int(y),
-			W:       int(w),
-			H:       int(h),
-			Section: currentSection,
-		})
+					info := PanelInfo{
+						ID:      int(nID),
+						Title:   nTitle,
+						Type:    nType,
+						Section: currentSection,
+					}
+
+					if ngp, ok := np["gridPos"].(map[string]interface{}); ok {
+						nx, _ := ngp["x"].(float64)
+						ny, _ := ngp["y"].(float64)
+						nw, _ := ngp["w"].(float64)
+						nh, _ := ngp["h"].(float64)
+						info.X = int(nx)
+						info.Y = int(ny)
+						info.W = int(nw)
+						info.H = int(nh)
+					}
+
+					infos = append(infos, info)
+				}
+			}
+		}
 	}
 	return infos
 }

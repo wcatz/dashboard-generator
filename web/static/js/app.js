@@ -4,6 +4,8 @@ function copyToClipboard(elementId) {
   if (!el) return;
   navigator.clipboard.writeText(el.textContent).then(function() {
     showToast('Copied to clipboard', 'success');
+  }).catch(function() {
+    showToast('Failed to copy to clipboard', 'error');
   });
 }
 
