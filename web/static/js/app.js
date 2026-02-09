@@ -18,6 +18,18 @@ function copyHex(hex) {
   });
 }
 
+// Update swatch color from color picker and copy new hex
+function updateSwatch(input, colorName) {
+  var hex = input.value;
+  var swatch = input.previousElementSibling;
+  swatch.style.background = hex;
+  var hexLabel = input.parentElement.nextElementSibling.nextElementSibling;
+  if (hexLabel) hexLabel.textContent = hex;
+  navigator.clipboard.writeText(hex).then(function() {
+    showToast(colorName + ': ' + hex + ' copied', 'success');
+  });
+}
+
 // Download text content of an element as a JSON file
 function downloadJSON(filename, elementId) {
   var el = document.getElementById(elementId);
@@ -36,17 +48,17 @@ function downloadJSON(filename, elementId) {
 // Toggle between visual and JSON preview tabs
 function togglePreviewTab(tab) {
   document.querySelectorAll('.preview-tab-btn').forEach(function(btn) {
-    btn.classList.toggle('active', btn.dataset.tab === tab);
+    btn.classList.toggle('tab-active', btn.dataset.tab === tab);
   });
   document.querySelectorAll('.preview-tab-content').forEach(function(el) {
-    el.classList.toggle('active', el.dataset.tab === tab);
+    el.style.display = (el.dataset.tab === tab) ? 'block' : 'none';
   });
 }
 
-// Show a toast notification
+// Show a toast notification (uses toast-msg class to avoid DaisyUI .toast conflict)
 function showToast(message, type) {
   var toast = document.createElement('div');
-  toast.className = 'toast ' + (type || 'success');
+  toast.className = 'toast-msg ' + (type || 'success');
   toast.textContent = message;
   document.body.appendChild(toast);
   setTimeout(function() {
@@ -84,13 +96,11 @@ document.addEventListener('DOMContentLoaded', function() {
     var jobTabs = document.getElementById('job-tabs');
     if (this.checked) {
       dsB.classList.remove('hidden');
-      dsB.classList.add('block');
       jobTabs.classList.add('hidden');
       form.setAttribute('hx-get', '/api/metrics/compare');
       htmx.process(form);
     } else {
       dsB.classList.add('hidden');
-      dsB.classList.remove('block');
       jobTabs.classList.remove('hidden');
       form.setAttribute('hx-get', '/api/metrics/browse');
       htmx.process(form);
@@ -101,26 +111,26 @@ document.addEventListener('DOMContentLoaded', function() {
 // Set active job tab
 function setActiveJobTab(btn) {
   btn.parentElement.querySelectorAll('button').forEach(function(b) {
-    b.classList.remove('active');
+    b.classList.remove('tab-active');
   });
-  btn.classList.add('active');
+  btn.classList.add('tab-active');
 }
 
 // Switch between comparison tabs (shared/only-a/only-b)
 function showCompareTab(tabName, btn) {
   document.querySelectorAll('.compare-tab-content').forEach(function(el) {
-    el.classList.remove('active');
+    el.style.display = 'none';
   });
-  document.getElementById('compare-tab-' + tabName).classList.add('active');
+  document.getElementById('compare-tab-' + tabName).style.display = 'block';
   btn.parentElement.querySelectorAll('button').forEach(function(b) {
-    b.classList.remove('active');
+    b.classList.remove('tab-active');
   });
-  btn.classList.add('active');
+  btn.classList.add('tab-active');
 }
 
 // Auto-dismiss toasts rendered by server (HTMX responses)
 document.addEventListener('htmx:afterSwap', function() {
-  document.querySelectorAll('.toast:not([data-auto])').forEach(function(toast) {
+  document.querySelectorAll('.toast-msg:not([data-auto])').forEach(function(toast) {
     toast.setAttribute('data-auto', '1');
     setTimeout(function() {
       toast.classList.add('dismissing');

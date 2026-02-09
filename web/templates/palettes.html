@@ -1,33 +1,40 @@
 {{define "content"}}
-<h1>color palettes</h1>
-<p class="subtitle">active palette: <strong>{{.ActivePalette}}</strong></p>
+<h1 class="text-xl font-bold mb-1">color palettes</h1>
+<p class="text-sm text-base-content/50 mb-6">active palette: <strong>{{.ActivePalette}}</strong></p>
 
 {{range $name, $colors := .Palettes}}
-<div class="card">
-  <h3>{{$name}} {{if eq $name $.ActivePalette}}<span class="badge success">active</span>{{end}}</h3>
-  <div class="color-swatches">
-    {{range $color, $hex := $colors}}
-    <div class="color-swatch" onclick="copyHex('{{$hex}}')" title="click to copy {{$hex}}">
-      <div class="swatch-box" style="background: {{$hex}};"></div>
-      <div class="swatch-name">{{$color}}</div>
-      <div class="swatch-hex">{{$hex}}</div>
+<div class="card bg-base-100 border border-base-content/10 mb-4">
+  <div class="card-body p-5">
+    <h3 class="card-title text-sm">{{$name}} {{if eq $name $.ActivePalette}}<span class="badge badge-sm badge-success">active</span>{{end}}</h3>
+    <div class="flex flex-wrap gap-3">
+      {{range $color, $hex := $colors}}
+      <div class="text-center group">
+        <div class="relative w-12 h-12">
+          <div class="w-12 h-12 rounded-md border border-base-content/10 group-hover:scale-110 transition-transform cursor-pointer color-swatch" style="background: {{$hex}};" onclick="this.nextElementSibling.click()" title="click to pick color"></div>
+          <input type="color" value="{{$hex}}" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer" onchange="updateSwatch(this, '{{$color}}')">
+        </div>
+        <div class="text-[0.65rem] mt-1 opacity-50">{{$color}}</div>
+        <div class="text-[0.6rem] font-mono text-base-content/60 cursor-pointer hover:text-primary color-hex" onclick="copyHex(this.textContent)" title="click to copy">{{$hex}}</div>
+      </div>
+      {{end}}
     </div>
-    {{end}}
   </div>
 </div>
 {{end}}
 
-<div class="card">
-  <h3>threshold presets</h3>
-  {{range $name, $steps := .Thresholds}}
-  <div class="mb-3">
-    <div class="threshold-name">${{$name}}</div>
-    <div class="threshold-bar">
-      {{range $steps}}
-      <div class="step" style="background: {{.Color}};" title="{{.Color}} @ {{.Value}}"></div>
-      {{end}}
+<div class="card bg-base-100 border border-base-content/10">
+  <div class="card-body p-5">
+    <h3 class="card-title text-sm">threshold presets</h3>
+    {{range $name, $steps := .Thresholds}}
+    <div class="mb-3">
+      <div class="text-sm font-semibold mb-1">${{$name}}</div>
+      <div class="flex gap-0.5 h-6 rounded overflow-hidden">
+        {{range $steps}}
+        <div class="flex-1 cursor-pointer" style="background: {{.Color}};" title="{{.Color}} @ {{.Value}}" onclick="copyHex('{{.Color}}')"></div>
+        {{end}}
+      </div>
     </div>
+    {{end}}
   </div>
-  {{end}}
 </div>
 {{end}}

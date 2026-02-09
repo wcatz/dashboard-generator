@@ -1,21 +1,21 @@
 {{if .Error}}
-<div class="card text-danger">
-  <span class="text-danger text-bold">error:</span> {{.Error}}
+<div class="alert alert-error text-sm">
+  <span>error: {{.Error}}</span>
 </div>
 {{else}}
-<div class="card">
-  <span class="text-success text-bold">pushed {{.Count}} dashboards to Grafana</span>
-  <div class="mt-2">
+<div class="bg-base-100 border border-base-content/10 rounded-lg p-4">
+  <span class="text-success font-semibold text-sm">pushed {{.Count}} dashboards to Grafana</span>
+  <div class="mt-2 space-y-1">
     {{range .Results}}
-    <div class="result-item">
-      <span class="icon-ok">&#10003;</span>
+    <div class="flex items-center gap-2 text-sm">
+      <span class="text-success">&#10003;</span>
       {{.Title}} ({{.UID}}): {{.Status}}
     </div>
     {{end}}
     {{range .Errors}}
-    <div class="result-item">
-      <span class="icon-err">&#10007;</span>
-      <span class="text-danger">{{.}}</span>
+    <div class="flex items-center gap-2 text-sm">
+      <span class="text-error">&#10007;</span>
+      <span class="text-error">{{.}}</span>
     </div>
     {{end}}
   </div>

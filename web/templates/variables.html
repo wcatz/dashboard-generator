@@ -1,54 +1,56 @@
 {{define "content"}}
-<h1>variables</h1>
-<p class="subtitle">template variables used across dashboards</p>
+<h1 class="text-xl font-bold mb-1">variables</h1>
+<p class="text-sm text-base-content/50 mb-6">template variables used across dashboards</p>
 
 {{if .Variables}}
 {{range .Variables}}
-<div class="var-item">
+<div class="flex items-center justify-between p-3 bg-base-100 border border-base-content/10 rounded-lg mb-2 hover:bg-base-200 transition-colors gap-3">
   <div class="flex-1">
-    <div class="var-name">{{.Name}}</div>
-    <div class="var-meta">
-      <span class="badge {{.Type}}">{{.Type}}</span>
+    <div class="font-mono font-semibold text-sm">{{.Name}}</div>
+    <div class="text-xs text-base-content/50 flex items-center gap-2 flex-wrap mt-1">
+      <span class="badge badge-sm badge-secondary">{{.Type}}</span>
       {{if .Datasource}}<span>datasource: {{.Datasource}}</span>{{end}}
-      {{if .Multi}}<span class="badge info">multi</span>{{end}}
-      {{if .IncludeAll}}<span class="badge info">all</span>{{end}}
+      {{if .Multi}}<span class="badge badge-sm badge-info">multi</span>{{end}}
+      {{if .IncludeAll}}<span class="badge badge-sm badge-info">all</span>{{end}}
     </div>
   </div>
-  <div class="text-sm text-secondary">
-    {{if .Query}}<code>{{.Query}}</code>{{end}}
+  <div class="text-xs text-base-content/50">
+    {{if .Query}}<code class="text-xs">{{.Query}}</code>{{end}}
     {{if .Values}}{{.Values}}{{end}}
     {{if .DsType}}type: {{.DsType}}{{end}}
   </div>
 </div>
 {{if .ChainsFrom}}
-<div class="var-chain">
-  {{range .ChainsFrom}}<span>{{.}}</span> <span class="arrow">&rarr;</span> {{end}}<span class="text-accent">{{.Name}}</span>
+<div class="flex items-center gap-2 font-mono text-xs text-base-content/50 py-1">
+  {{range .ChainsFrom}}<span>{{.}}</span> <span class="opacity-40">&rarr;</span> {{end}}<span class="text-accent">{{.Name}}</span>
 </div>
 {{end}}
 {{end}}
 {{else}}
-<div class="empty-state">
+<div class="text-center py-12 text-base-content/50">
   <p>no variables defined</p>
-  <p>add variables in the <a href="/editor">config editor</a></p>
+  <p>add variables in the <a href="/editor" class="link link-primary">config editor</a></p>
 </div>
 {{end}}
 
 {{if .UsedBy}}
-<div class="card mt-6">
-  <h3>variable usage</h3>
-  <table class="compact">
-    <thead>
-      <tr><th>variable</th><th>dashboards</th></tr>
-    </thead>
-    <tbody>
-      {{range .UsedBy}}
-      <tr>
-        <td class="text-mono">{{.Name}}</td>
-        <td>{{range .Dashboards}}<span class="badge info">{{.}}</span> {{end}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+<div class="card bg-base-100 border border-base-content/10 mt-6">
+  <div class="card-body p-5">
+    <h3 class="card-title text-sm">variable usage</h3>
+    <div class="overflow-x-auto">
+      <table class="table table-xs">
+        <thead><tr><th>variable</th><th>dashboards</th></tr></thead>
+        <tbody>
+          {{range .UsedBy}}
+          <tr>
+            <td class="font-mono">{{.Name}}</td>
+            <td>{{range .Dashboards}}<span class="badge badge-sm badge-info mr-1">{{.}}</span>{{end}}</td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {{end}}
 {{end}}

@@ -1,6 +1,6 @@
 {{if .Error}}
-<span class="status-dot err"></span> <span class="text-danger">{{.Error}}</span>
+<span class="flex items-center gap-1 text-xs text-error"><span class="w-2 h-2 rounded-full bg-error inline-block"></span> {{.Error}}</span>
 {{else}}
-<span class="status-dot ok"></span> <span class="text-success">connected</span>
-<span class="text-muted ml-2">{{.MetricCount}} metrics</span>
+<span class="flex items-center gap-1 text-xs text-success"><span class="w-2 h-2 rounded-full bg-success inline-block"></span> connected</span>
+<span class="text-xs text-base-content/40 ml-2">{{.MetricCount}} metrics</span>
 {{end}}

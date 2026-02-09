@@ -1,47 +1,49 @@
 {{if .Error}}
-<div class="card text-danger">
-  <span class="text-danger text-bold">error:</span> {{.Error}}
+<div class="alert alert-error text-sm">
+  <span>error: {{.Error}}</span>
 </div>
 {{else}}
-<div class="card">
-  <div class="card-header">
-    <h3>{{.Title}}</h3>
-    <span class="text-sm text-secondary">{{.Size}} bytes &middot; {{.Panels}} panels</span>
-  </div>
+<div class="card bg-base-100 border border-base-content/10">
+  <div class="card-body p-5">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="card-title text-sm">{{.Title}}</h3>
+      <span class="text-xs text-base-content/50">{{.Size}} bytes &middot; {{.Panels}} panels</span>
+    </div>
 
-  <div class="tabs">
-    <button class="preview-tab-btn active" data-tab="visual" onclick="togglePreviewTab('visual')">visual</button>
-    <button class="preview-tab-btn" data-tab="json" onclick="togglePreviewTab('json')">JSON</button>
-  </div>
+    <div role="tablist" class="tabs tabs-bordered mb-4">
+      <button role="tab" class="tab tab-active preview-tab-btn" data-tab="visual" onclick="togglePreviewTab('visual')">visual</button>
+      <button role="tab" class="tab preview-tab-btn" data-tab="json" onclick="togglePreviewTab('json')">JSON</button>
+    </div>
 
-  <div class="preview-tab-content active" data-tab="visual">
-    {{if .PanelInfos}}
-    <div class="preview-grid">
-      {{range .PanelInfos}}
-      {{if eq .Type "row"}}
-      <div class="preview-row">{{.Title}}</div>
-      {{else}}
-      <div class="preview-panel type-{{.Type}}" style="grid-column: {{add .X 1}} / span {{.W}}; grid-row: auto / span {{.H}};">
-        <div class="panel-header">
-          <span class="panel-type-badge">{{.Type}}</span>
-          <span class="panel-dims">{{.W}}x{{.H}}</span>
+    <div class="preview-tab-content" data-tab="visual" style="display:block">
+      {{if .PanelInfos}}
+      <div class="preview-grid">
+        {{range .PanelInfos}}
+        {{if eq .Type "row"}}
+        <div class="preview-row" style="grid-row: {{add .Y 1}};">{{.Title}}</div>
+        {{else}}
+        <div class="preview-panel type-{{.Type}}" style="grid-column: {{add .X 1}} / span {{.W}}; grid-row: {{add .Y 1}} / span {{.H}};">
+          <div class="panel-header">
+            <span class="panel-type-badge">{{.Type}}</span>
+            <span class="panel-dims">{{.W}}x{{.H}}</span>
+          </div>
+          <div class="panel-title">{{.Title}}</div>
         </div>
-        <div class="panel-title">{{.Title}}</div>
+        {{end}}
+        {{end}}
       </div>
-      {{end}}
+      {{else}}
+      <div class="text-center py-6 text-base-content/50"><p>no panels found</p></div>
       {{end}}
     </div>
-    {{else}}
-    <div class="empty-state"><p>no panels found</p></div>
-    {{end}}
-  </div>
 
-  <div class="preview-tab-content" data-tab="json">
-    <div class="toolbar">
-      <button class="sm ghost" onclick="copyToClipboard('json-output')">copy</button>
-      <button class="sm ghost" onclick="downloadJSON('{{.Title}}.json', 'json-output')">download</button>
+    <div class="preview-tab-content" data-tab="json" style="display:none">
+      <div class="flex justify-end gap-2 mb-2">
+        <button class="btn btn-xs btn-ghost" onclick="copyToClipboard('json-output')">copy</button>
+        <button class="btn btn-xs btn-ghost" onclick="downloadJSON('{{.Title}}.json', 'json-output')">download</button>
+      </div>
+      <pre id="json-output" class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[600px]">{{.JSON}}</pre>
     </div>
-    <div class="json-preview" id="json-output">{{.JSON}}</div>
   </div>
 </div>
 {{end}}
