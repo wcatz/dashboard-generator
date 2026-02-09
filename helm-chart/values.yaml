@@ -1,0 +1,37 @@
+replicaCount: 1
+
+fullname: dashboard-generator
+name: dashboard-generator
+
+image:
+  repository: wcatz/dashboard-generator
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  mountPath: /data
+
+config:
+  grafanaUrl: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -23,14 +23,70 @@ A config-driven Grafana dashboard generator. Reads a YAML config, outputs interl
 | `internal/generator/idgen.go` | Go panel ID generator |
 | `internal/server/server.go` | HTTP server with embedded FS, template rendering |
 | `internal/server/routes.go` | Route registration (pages + API endpoints) |
-| `internal/server/handlers.go` | Page and API handlers (generate, preview, metrics, etc.) |
+| `internal/server/handlers.go` | Page and API handlers (generate, preview, push, metrics, etc.) |
 | `web/embed.go` | `//go:embed` directive for templates + static assets |
 | `web/templates/layout.html` | Base layout (sidebar nav, dark theme) |
 | `web/templates/*.html` | Page templates (index, datasources, palettes, metrics, editor, preview) |
 | `web/templates/partials/*.html` | HTMX partial response templates |
 | `web/static/` | Pico CSS, HTMX, custom CSS (all embedded in binary) |
-| `Makefile` | Build, test, lint targets |
+| `Dockerfile` | Multi-stage Go build → distroless runtime |
+| `helm-chart/` | Helm chart for k8s deployment (published to OCI) |
+| `.github/workflows/` | CI, Docker Hub, Helm OCI, goreleaser workflows |
+| `Makefile` | Build, test, lint, docker, helm targets |
 | `.goreleaser.yaml` | Cross-platform release config |
+
+## CI/CD
+
+| Workflow | Trigger | Output |
+|----------|---------|--------|
+| `ci.yaml` | push/PR to master | Go vet, test, build, dry-run |
+| `release.yaml` | git tag `v*.*.*` | GitHub release via goreleaser (linux/darwin, amd64/arm64 binaries) |
+| `docker-build-push.yml` | push to master or tag | Docker image → `wcatz/dashboard-generator` on Docker Hub |
+| `helm-publish.yml` | push to master or tag | Helm chart → `oci://ghcr.io/wcatz/helm-charts/dashboard-generator` |
+
+### Versioning
+
+- **Docker tags**: `master`/`latest` on branch push, `0.1.0`/`0.1`/`0`/`latest` on git tag `v0.1.0`
+- **Helm chart version**: independent, set in `helm-chart/Chart.yaml`
+- **appVersion**: should match the Docker image tag being deployed
+
+### Release checklist
+
+1. Bump `helm-chart/Chart.yaml` version + appVersion
+2. Commit and push to master
+3. `git tag v0.2.0 && git push origin v0.2.0`
+4. CI produces: Docker image, Helm chart, GitHub release
+
+## Docker
+
+```bash
+# build locally
+make docker-build
+
+# run web UI on localhost:8080, dashboards written to ./output
+make docker-run
+
+# manual run
+docker run --rm -p 8080:8080 \
+  -v $(pwd)/example-config.yaml:/data/config.yaml:ro \
+  -v $(pwd)/output:/data/output \
+  wcatz/dashboard-generator:latest
+```
+
+- Config mounted at `/data/config.yaml` (read-only)
+- Output dir at `/data/output` (bind-mount to get dashboards on host)
+- Port 8080 exposed for web UI
+- `GRAFANA_URL` env var enables push-to-Grafana from web UI
+
+## Helm Chart
+
+Published to `oci://ghcr.io/wcatz/helm-charts/dashboard-generator`.
+
+Key values:
+- `image.tag` — Docker image tag
+- `config.grafanaUrl` — sets `GRAFANA_URL` env for push feature
+- `persistence.enabled` — PVC for `/data` (config + output)
+- `service.annotations` — for Tailscale exposure (`tailscale.com/expose: "true"`)
 
 ## Go Dependencies
 
@@ -50,8 +106,8 @@ A config-driven Grafana dashboard generator. Reads a YAML config, outputs interl
 # Generate and push to Grafana
 ./dashboard-generator push --config example-config.yaml --grafana-url http://localhost:3000 --grafana-token $TOKEN
 
-# Start web UI
-./dashboard-generator serve --config example-config.yaml --port 8080
+# Start web UI (with optional Grafana push)
+./dashboard-generator serve --config example-config.yaml --port 8080 --grafana-url http://localhost:3000
 
 # Build
 make build
@@ -83,6 +139,7 @@ Single-binary web UI using Go templates + HTMX + Pico CSS. All assets embedded v
 | Route | Method | Description |
 |-------|--------|-------------|
 | `/api/generate` | POST | Generate dashboards to disk (optional `?dashboard=uid`) |
+| `/api/push` | POST | Generate and push to Grafana (optional `?dashboard=uid`, requires `GRAFANA_URL`) |
 | `/api/datasource/test` | GET | Test Prometheus connection (`?name=ds_name`) |
 | `/api/metrics/browse` | GET | Browse metrics (`?datasource=&filter=&type=`) |
 | `/api/config/save` | POST | Save YAML config to disk |
@@ -365,7 +422,7 @@ When using `--profile`, only dashboards in the profile get links to each other.
 | `generate` | `--config`, `--profile`, `--output-dir`, `--dry-run`, `--verbose` | Generate dashboard JSON |
 | `discover` | `--config`, `--prometheus-url` | Query Prometheus, print YAML snippets |
 | `push` | `--config`, `--profile`, `--output-dir`, `--grafana-url`, `--grafana-user`, `--grafana-pass`, `--grafana-token`, `--verbose` | Generate and push to Grafana |
-| `serve` | `--config`, `--port` (default 8080) | Start web UI server |
+| `serve` | `--config`, `--port` (default 8080), `--grafana-url` (or `GRAFANA_URL` env) | Start web UI server |
 
 ### Python CLI Flags (original)
 
@@ -449,30 +506,30 @@ main()
 ## Testing
 
 ```bash
-# Go tests
+# tests
 make test
 
-# Go dry-run
+# dry-run
 make run-dry
 
-# Go generate
+# generate
 ./dashboard-generator generate --config example-config.yaml --dry-run --verbose
 
-# Go discover
+# discover
 ./dashboard-generator discover --config example-config.yaml --prometheus-url http://localhost:9090
 
-# Go push
+# push
 ./dashboard-generator push --config example-config.yaml --grafana-url http://localhost:3000 --grafana-token $TOKEN
 
-# Go web UI
+# web UI
 ./dashboard-generator serve --config example-config.yaml --port 8080
 
-# Python (original)
-./grafana-dashboard-generator.py --config example-config.yaml --dry-run
-./grafana-dashboard-generator.py --config example-config.yaml --discover-print --prometheus-url http://localhost:9090
+# docker
+make docker-build
+make docker-run  # localhost:8080, dashboards to ./output
 
-# Validate JSON
-python3 -c "import json; json.load(open('gen-overview.json'))"
+# helm
+make helm-lint
 ```
 
 ---

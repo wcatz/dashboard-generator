@@ -1,0 +1,13 @@
+.git
+.github
+dist/
+output/
+gen-*.json
+*.gen.json
+dashboard-generator
+*.py
+__pycache__/
+.goreleaser.yaml
+Makefile
+CLAUDE.md
+LICENSE
