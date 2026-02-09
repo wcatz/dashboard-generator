@@ -23,12 +23,20 @@
 
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
   <h2 style="margin: 0; font-size: 1.1rem;">dashboard list</h2>
-  <button class="sm" hx-post="/api/generate" hx-target="#generate-result" hx-indicator="#gen-spinner">
-    generate all <span id="gen-spinner" class="htmx-indicator"><span class="spinner"></span></span>
-  </button>
+  <div style="display: flex; gap: 0.5rem;">
+    <button class="sm" hx-post="/api/generate" hx-target="#generate-result" hx-indicator="#gen-spinner">
+      generate all <span id="gen-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+    {{if .GrafanaURL}}
+    <button class="sm outline" hx-post="/api/push" hx-target="#push-result" hx-indicator="#push-spinner" hx-confirm="Push all dashboards to Grafana?">
+      push all to grafana <span id="push-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+    {{end}}
+  </div>
 </div>
 
 <div id="generate-result"></div>
+<div id="push-result"></div>
 
 {{range .Dashboards}}
 <div class="dash-item">
@@ -38,6 +46,9 @@
   </div>
   <div class="actions">
     <button class="sm outline" hx-post="/api/generate?dashboard={{.UID}}" hx-target="#generate-result" hx-indicator="#gen-spinner">generate</button>
+    {{if $.GrafanaURL}}
+    <button class="sm outline" hx-post="/api/push?dashboard={{.UID}}" hx-target="#push-result" hx-indicator="#push-spinner">push</button>
+    {{end}}
     <a href="/preview?uid={{.UID}}"><button class="sm outline secondary">preview</button></a>
   </div>
 </div>

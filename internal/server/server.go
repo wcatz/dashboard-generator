@@ -14,27 +14,29 @@ import (
 
 // Server holds the HTTP server state and config.
 type Server struct {
-	cfg      *config.Config
-	cfgPath  string
-	mu       sync.RWMutex
-	webFS    fs.FS
-	partials *template.Template
-	staticFS http.FileSystem
-	mux      *http.ServeMux
+	cfg        *config.Config
+	cfgPath    string
+	grafanaURL string
+	mu         sync.RWMutex
+	webFS      fs.FS
+	partials   *template.Template
+	staticFS   http.FileSystem
+	mux        *http.ServeMux
 }
 
-// New creates a new Server with the given embedded filesystem and config path.
-func New(webFS fs.FS, cfgPath string) (*Server, error) {
+// New creates a new Server with the given embedded filesystem, config path, and optional Grafana URL.
+func New(webFS fs.FS, cfgPath string, grafanaURL string) (*Server, error) {
 	cfg, err := config.Load(cfgPath, nil)
 	if err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
 	}
 
 	s := &Server{
-		cfg:     cfg,
-		cfgPath: cfgPath,
-		webFS:   webFS,
-		mux:     http.NewServeMux(),
+		cfg:        cfg,
+		cfgPath:    cfgPath,
+		grafanaURL: grafanaURL,
+		webFS:      webFS,
+		mux:        http.NewServeMux(),
 	}
 
 	if err := s.loadTemplates(); err != nil {
@@ -91,6 +93,11 @@ func (s *Server) Config() *config.Config {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.cfg
+}
+
+// GrafanaURL returns the configured Grafana URL (empty if not set).
+func (s *Server) GrafanaURL() string {
+	return s.grafanaURL
 }
 
 // ConfigPath returns the absolute path to the config file.
