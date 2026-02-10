@@ -319,6 +319,28 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closePanelDetail();
 });
 
+// ── Preview zoom controls ──
+
+function setPreviewZoom(value) {
+  var grid = document.getElementById('preview-grid');
+  if (grid) grid.style.setProperty('--preview-scale', value);
+  var label = document.getElementById('zoom-label');
+  if (label) label.textContent = parseFloat(value).toFixed(1) + 'x';
+  var slider = document.getElementById('zoom-slider');
+  if (slider) slider.value = value;
+  localStorage.setItem('preview-zoom', value);
+}
+
+// ── Row collapse/expand ──
+
+function toggleRowCollapse(rowEl) {
+  var sectionY = rowEl.dataset.sectionY;
+  var isCollapsed = rowEl.classList.toggle('collapsed');
+  document.querySelectorAll('.preview-panel[data-section-y="' + sectionY + '"]').forEach(function(el) {
+    el.style.display = isCollapsed ? 'none' : '';
+  });
+}
+
 // ── Preview search and filter (combined to avoid conflicts) ──
 
 var _activeTypeFilters = {};

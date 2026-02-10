@@ -594,6 +594,7 @@ type PanelInfo struct {
 	Type        string
 	X, Y, W, H int
 	Section     string
+	SectionY    int
 	Datasource  string
 	Unit        string
 	Description string
@@ -626,6 +627,7 @@ func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 
 	var infos []PanelInfo
 	currentSection := ""
+	currentSectionY := 0
 
 	for _, rp := range rawPanels {
 		p, ok := rp.(map[string]interface{})
@@ -637,9 +639,14 @@ func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 		if pType == "row" {
 			title, _ := p["title"].(string)
 			currentSection = title
+			if gp, ok := p["gridPos"].(map[string]interface{}); ok {
+				if y, ok := gp["y"].(float64); ok {
+					currentSectionY = int(y)
+				}
+			}
 		}
 
-		info := parsePanelJSON(p, currentSection)
+		info := parsePanelJSON(p, currentSection, currentSectionY)
 		infos = append(infos, info)
 
 		// Recurse into collapsed row panels that nest their children.
@@ -650,7 +657,7 @@ func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 					if !ok {
 						continue
 					}
-					infos = append(infos, parsePanelJSON(np, currentSection))
+					infos = append(infos, parsePanelJSON(np, currentSection, currentSectionY))
 				}
 			}
 		}
@@ -659,7 +666,7 @@ func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 }
 
 // parsePanelJSON extracts PanelInfo from a single panel JSON map.
-func parsePanelJSON(p map[string]interface{}, section string) PanelInfo {
+func parsePanelJSON(p map[string]interface{}, section string, sectionY int) PanelInfo {
 	pType, _ := p["type"].(string)
 	title, _ := p["title"].(string)
 	id, _ := p["id"].(float64)
@@ -670,6 +677,7 @@ func parsePanelJSON(p map[string]interface{}, section string) PanelInfo {
 		Title:       title,
 		Type:        pType,
 		Section:     section,
+		SectionY:    sectionY,
 		Description: desc,
 	}
 
