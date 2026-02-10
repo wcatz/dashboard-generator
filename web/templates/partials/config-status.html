@@ -1,5 +1,5 @@
 {{if .Error}}
-<span class="text-error text-xs">{{.Error}}</span>
+<span class="text-error text-xs"{{if .ErrorLine}} data-error-line="{{.ErrorLine}}"{{end}}>{{.Error}}</span>
 {{else}}
 <span class="text-success text-xs">{{.Message}}</span>
 {{end}}

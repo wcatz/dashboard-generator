@@ -37,6 +37,5 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/metrics/comparison-snippet", s.handleComparisonSnippet)
 	s.mux.HandleFunc("/api/config/reload", s.handleConfigReload)
 	s.mux.HandleFunc("/api/config/save", s.handleConfigSave)
-	s.mux.HandleFunc("/api/config/validate", s.handleConfigValidate)
 	s.mux.HandleFunc("/api/preview", s.handlePreviewAPI)
 }

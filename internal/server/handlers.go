@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -844,7 +845,12 @@ func (s *Server) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 
 	// Validate first
 	if _, err := config.LoadFromBytes([]byte(content)); err != nil {
-		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "invalid YAML: " + err.Error()})
+		data := map[string]interface{}{"Error": "invalid YAML: " + err.Error()}
+		// Extract line number from yaml.v3 errors (e.g. "yaml: line 42: ...")
+		if m := regexp.MustCompile(`line (\d+)`).FindStringSubmatch(err.Error()); m != nil {
+			data["ErrorLine"] = m[1]
+		}
+		s.renderPartial(w, "config-status.html", data)
 		return
 	}
 
@@ -862,30 +868,6 @@ func (s *Server) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 	s.renderPartial(w, "config-status.html", map[string]interface{}{"Message": "config saved and reloaded"})
 }
 
-func (s *Server) handleConfigValidate(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", 405)
-		return
-	}
-	r.ParseForm()
-	content := r.FormValue("content")
-	if content == "" {
-		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "empty content"})
-		return
-	}
-
-	cfg, err := config.LoadFromBytes([]byte(content))
-	if err != nil {
-		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": err.Error()})
-		return
-	}
-
-	dashboards, _ := cfg.GetDashboards("")
-	s.renderPartial(w, "config-status.html", map[string]interface{}{
-		"Message": fmt.Sprintf("valid — %d datasources, %d dashboards, %d variables",
-			len(cfg.Datasources), len(dashboards), len(cfg.Variables)),
-	})
-}
 
 func (s *Server) handlePreviewAPI(w http.ResponseWriter, r *http.Request) {
 	uid := r.URL.Query().Get("uid")
