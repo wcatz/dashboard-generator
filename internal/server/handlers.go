@@ -74,12 +74,19 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDatasources(w http.ResponseWriter, r *http.Request) {
 	cfg := s.Config()
+	dsWithURL := 0
+	for _, ds := range cfg.Datasources {
+		if ds.URL != "" {
+			dsWithURL++
+		}
+	}
 	s.renderPage(w, "datasources.html", map[string]interface{}{
 		"Title":       "datasources",
 		"Active":      "datasources",
 		"ConfigPath":  s.ConfigPath(),
 		"GrafanaURL":  s.GrafanaURL(),
 		"Datasources": cfg.Datasources,
+		"DsWithURL":   dsWithURL,
 	})
 }
 
@@ -1018,14 +1025,13 @@ func (s *Server) handleMetricsSnippet(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleComparisonSnippet generates a YAML snippet for comparison panels from selected shared metrics.
+// Accepts either datasource_a+datasource_b (2 DS) or datasources[] (N DS).
 func (s *Server) handleComparisonSnippet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
 	r.ParseForm()
-	dsA := r.FormValue("datasource_a")
-	dsB := r.FormValue("datasource_b")
 	selected := r.Form["metrics"]
 
 	if len(selected) == 0 {
@@ -1033,21 +1039,39 @@ func (s *Server) handleComparisonSnippet(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Support both datasources[] array and datasource_a/datasource_b pair
+	dsList := r.Form["datasources"]
+	if len(dsList) == 0 {
+		dsA := r.FormValue("datasource_a")
+		dsB := r.FormValue("datasource_b")
+		if dsA != "" && dsB != "" {
+			dsList = []string{dsA, dsB}
+		}
+	}
+	if len(dsList) < 2 {
+		s.renderPartial(w, "snippet-result.html", map[string]interface{}{"Error": "need at least 2 datasources"})
+		return
+	}
+
 	cfg := s.Config()
 	disc := generator.NewMetricDiscovery(cfg)
-	metaA, _ := disc.FetchMetadata(dsA)
-	metaB, _ := disc.FetchMetadata(dsB)
+	// Fetch metadata from first datasource for type info
+	meta, _ := disc.FetchMetadata(dsList[0])
 
+	dsListStr := strings.Join(dsList, ", ")
 	var lines []string
 	lines = append(lines, "      - title: \"shared metrics comparison\"")
 	lines = append(lines, "        panels:")
 	for _, m := range selected {
-		info := lookupMetaInfo(m, metaA, metaB)
+		info, ok := meta[m]
+		if !ok {
+			info = generator.MetricInfo{Type: "untyped"}
+		}
 		lines = append(lines, "          - type: comparison")
 		lines = append(lines, fmt.Sprintf("            title: \"%s\"", m))
 		lines = append(lines, fmt.Sprintf("            metric: \"%s\"", m))
 		lines = append(lines, fmt.Sprintf("            metric_type: \"%s\"", info.Type))
-		lines = append(lines, fmt.Sprintf("            datasources: [%s, %s]", dsA, dsB))
+		lines = append(lines, fmt.Sprintf("            datasources: [%s]", dsListStr))
 	}
 
 	snippet := strings.Join(lines, "\n")
@@ -1108,6 +1132,46 @@ func metricInfoToSlice(m map[string]generator.MetricInfo) []metricRow {
 		result = append(result, metricRow{Name: name, Type: info.Type, Help: info.Help})
 	}
 	return result
+}
+
+func (s *Server) handleDatasourcesCompareAll(w http.ResponseWriter, r *http.Request) {
+	cfg := s.Config()
+
+	var dsNames []string
+	for name, ds := range cfg.Datasources {
+		if ds.URL != "" {
+			dsNames = append(dsNames, name)
+		}
+	}
+	sort.Strings(dsNames)
+
+	if len(dsNames) < 2 {
+		s.renderPartial(w, "ds-compare-all.html", map[string]interface{}{
+			"Error": "need at least 2 datasources with URLs configured",
+		})
+		return
+	}
+
+	disc := generator.NewMetricDiscovery(cfg)
+	shared, exclusive, err := disc.CompareAll(dsNames)
+	if err != nil {
+		s.renderPartial(w, "ds-compare-all.html", map[string]interface{}{
+			"Error": err.Error(),
+		})
+		return
+	}
+
+	exclusiveRows := make(map[string][]metricRow)
+	for ds, metrics := range exclusive {
+		exclusiveRows[ds] = metricInfoToSlice(metrics)
+	}
+
+	s.renderPartial(w, "ds-compare-all.html", map[string]interface{}{
+		"Datasources": dsNames,
+		"Shared":      metricInfoToSlice(shared),
+		"Exclusive":   exclusiveRows,
+		"SharedCount": len(shared),
+	})
 }
 
 func (s *Server) handleDatasourceAdd(w http.ResponseWriter, r *http.Request) {

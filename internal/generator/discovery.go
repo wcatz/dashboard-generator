@@ -355,6 +355,85 @@ func (md *MetricDiscovery) Categorize(dsA, dsB string) (map[string]map[string]Me
 	}, nil
 }
 
+// CompareAll compares metrics across N datasources, returning metrics shared
+// by all and metrics exclusive to each individual datasource.
+func (md *MetricDiscovery) CompareAll(dsNames []string) (shared map[string]MetricInfo, exclusive map[string]map[string]MetricInfo, err error) {
+	if len(dsNames) < 2 {
+		return nil, nil, fmt.Errorf("need at least 2 datasources")
+	}
+
+	allMetrics := make(map[string]map[string]bool)
+	allMeta := make(map[string]map[string]MetricInfo)
+
+	for _, ds := range dsNames {
+		metrics, ferr := md.FetchMetrics(ds)
+		if ferr != nil {
+			return nil, nil, fmt.Errorf("fetching metrics from %s: %v", ds, ferr)
+		}
+		allMetrics[ds] = metrics
+
+		meta, _ := md.FetchMetadata(ds)
+		if meta == nil {
+			meta = make(map[string]MetricInfo)
+		}
+		allMeta[ds] = meta
+	}
+
+	// Shared = intersection of all metric sets
+	shared = make(map[string]MetricInfo)
+	for m := range allMetrics[dsNames[0]] {
+		onAll := true
+		for _, ds := range dsNames[1:] {
+			if !allMetrics[ds][m] {
+				onAll = false
+				break
+			}
+		}
+		if onAll {
+			// Use metadata from first DS that has it
+			info := MetricInfo{Type: "untyped"}
+			for _, ds := range dsNames {
+				if i, ok := allMeta[ds][m]; ok && i.Type != "" {
+					info = i
+					break
+				}
+			}
+			shared[m] = info
+		}
+	}
+
+	// Exclusive = metrics unique to each DS (not on any other)
+	exclusive = make(map[string]map[string]MetricInfo)
+	for _, ds := range dsNames {
+		unique := make(map[string]MetricInfo)
+		for m := range allMetrics[ds] {
+			if _, isShared := shared[m]; isShared {
+				continue
+			}
+			onOther := false
+			for _, other := range dsNames {
+				if other == ds {
+					continue
+				}
+				if allMetrics[other][m] {
+					onOther = true
+					break
+				}
+			}
+			if !onOther {
+				info := MetricInfo{Type: "untyped"}
+				if i, ok := allMeta[ds][m]; ok && i.Type != "" {
+					info = i
+				}
+				unique[m] = info
+			}
+		}
+		exclusive[ds] = unique
+	}
+
+	return shared, exclusive, nil
+}
+
 func lookupMeta(name string, primary, fallback map[string]MetricInfo) MetricInfo {
 	if info, ok := primary[name]; ok {
 		return info
