@@ -1,0 +1,7 @@
+{{if .Error}}
+<div class="alert alert-error text-sm">
+  <span>{{.Error}}</span>
+</div>
+{{else}}
+<span class="text-success text-xs">datasource '{{.Name}}' added</span>
+{{end}}

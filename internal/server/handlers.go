@@ -684,35 +684,8 @@ func (s *Server) handleDatasourceURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cfg := s.Config()
-	ds, ok := cfg.Datasources[name]
-	if !ok {
-		s.renderPartial(w, "ds-url-result.html", map[string]interface{}{"Error": "datasource not found: " + name})
-		return
-	}
-
-	// Update the YAML config file with the new URL
-	content, err := s.ReadConfigContent()
-	if err != nil {
-		s.renderPartial(w, "ds-url-result.html", map[string]interface{}{"Error": err.Error()})
-		return
-	}
-
-	// If datasource already has a URL, replace it; otherwise insert after uid line
-	oldURL := ds.URL
-	if oldURL != "" {
-		content = strings.Replace(content,
-			"url: "+oldURL,
-			"url: "+dsURL, 1)
-	} else {
-		// Insert url after the uid line for this datasource
-		uidLine := "uid: " + ds.UID
-		content = strings.Replace(content,
-			uidLine,
-			uidLine+"\n      url: "+dsURL, 1)
-	}
-
-	if err := s.WriteConfigContent(content); err != nil {
+	editor := config.NewYAMLEditor(s.cfgPath)
+	if err := editor.UpdateDatasourceURL(name, dsURL); err != nil {
 		s.renderPartial(w, "ds-url-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
@@ -1135,6 +1108,161 @@ func metricInfoToSlice(m map[string]generator.MetricInfo) []metricRow {
 		result = append(result, metricRow{Name: name, Type: info.Type, Help: info.Help})
 	}
 	return result
+}
+
+func (s *Server) handleDatasourceAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	r.ParseForm()
+	name := r.FormValue("name")
+	dsURL := r.FormValue("url")
+
+	if name == "" {
+		s.renderPartial(w, "ds-add-result.html", map[string]interface{}{"Error": "datasource name is required"})
+		return
+	}
+	if dsURL == "" {
+		s.renderPartial(w, "ds-add-result.html", map[string]interface{}{"Error": "URL is required"})
+		return
+	}
+
+	// Sanitize name: lowercase, replace spaces with hyphens
+	name = strings.ToLower(strings.TrimSpace(name))
+	name = strings.ReplaceAll(name, " ", "-")
+
+	// Generate UID from name (replace hyphens with underscores for Grafana compatibility)
+	uid := strings.ReplaceAll(name, "-", "_")
+
+	ds := config.DatasourceDef{
+		Type: "prometheus",
+		UID:  uid,
+		URL:  dsURL,
+	}
+
+	editor := config.NewYAMLEditor(s.cfgPath)
+	if err := editor.AddDatasource(name, ds); err != nil {
+		s.renderPartial(w, "ds-add-result.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "ds-add-result.html", map[string]interface{}{"Error": "saved but reload failed: " + err.Error()})
+		return
+	}
+
+	w.Header().Set("HX-Refresh", "true")
+	s.renderPartial(w, "ds-add-result.html", map[string]interface{}{"Name": name})
+}
+
+func (s *Server) handleDatasourceDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	r.ParseForm()
+	name := r.FormValue("name")
+	if name == "" {
+		http.Error(w, "name required", 400)
+		return
+	}
+
+	editor := config.NewYAMLEditor(s.cfgPath)
+	if err := editor.DeleteDatasource(name); err != nil {
+		s.renderPartial(w, "ds-add-result.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "ds-add-result.html", map[string]interface{}{"Error": "deleted but reload failed: " + err.Error()})
+		return
+	}
+
+	w.Header().Set("HX-Refresh", "true")
+	w.WriteHeader(200)
+}
+
+func (s *Server) handleDatasourceTargets(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		s.renderPartial(w, "ds-targets.html", map[string]interface{}{"Error": "no datasource name"})
+		return
+	}
+
+	cfg := s.Config()
+	disc := generator.NewMetricDiscovery(cfg)
+
+	targets, err := disc.FetchTargets(name)
+	if err != nil {
+		s.renderPartial(w, "ds-targets.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+
+	jobs := generator.GroupTargetsByJob(targets)
+
+	s.renderPartial(w, "ds-targets.html", map[string]interface{}{
+		"Datasource":  name,
+		"Jobs":        jobs,
+		"TargetCount": len(targets),
+	})
+}
+
+func (s *Server) handleDatasourceTargetMetrics(w http.ResponseWriter, r *http.Request) {
+	dsName := r.URL.Query().Get("name")
+	job := r.URL.Query().Get("job")
+	if dsName == "" || job == "" {
+		s.renderPartial(w, "ds-target-metrics.html", map[string]interface{}{"Error": "datasource and job required"})
+		return
+	}
+
+	cfg := s.Config()
+	disc := generator.NewMetricDiscovery(cfg)
+
+	// Get metrics for this job
+	allMetrics, err := disc.FetchMetrics(dsName)
+	if err != nil {
+		s.renderPartial(w, "ds-target-metrics.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+
+	jobMetrics, err := disc.FetchSeriesMetrics(dsName, "job", job)
+	if err != nil {
+		s.renderPartial(w, "ds-target-metrics.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+
+	// Intersect: only metrics that exist in both sets
+	for m := range allMetrics {
+		if !jobMetrics[m] {
+			delete(allMetrics, m)
+		}
+	}
+
+	meta, _ := disc.FetchMetadata(dsName)
+
+	names := make([]string, 0, len(allMetrics))
+	for m := range allMetrics {
+		names = append(names, m)
+	}
+	sort.Strings(names)
+
+	var rows []metricRow
+	for _, m := range names {
+		info, ok := meta[m]
+		mType := "untyped"
+		help := ""
+		if ok {
+			mType = info.Type
+			help = info.Help
+		}
+		rows = append(rows, metricRow{Name: m, Type: mType, Help: help})
+	}
+
+	s.renderPartial(w, "ds-target-metrics.html", map[string]interface{}{
+		"Datasource": dsName,
+		"Job":        job,
+		"Metrics":    rows,
+		"Total":      len(rows),
+	})
 }
 
 // validateFilename checks for path traversal in dashboard filenames.
