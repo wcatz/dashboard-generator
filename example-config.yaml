@@ -29,14 +29,13 @@ datasources:
   primary:
     type: prometheus
     uid: prometheus
-    url: ""                # set via --prometheus-url or fill in here
+    url: "http://kube-prometheus-stack-prometheus.monitoring:9090"
     is_default: true
 
-  # uncomment to enable two-datasource comparison:
-  # secondary:
-  #   type: prometheus
-  #   uid: thanos
-  #   url: "http://thanos-query:9090"
+  secondary:
+    type: prometheus
+    uid: prometheus
+    url: "http://rv:9090"
 
 # ─── Color Palettes ──────────────────────────────────────────────────────────
 # Define named palettes. Reference colors with $color_name in panels.
@@ -155,6 +154,27 @@ variables:
     auto_min: "10s"
     label: interval
 
+  network:
+    type: query
+    datasource: primary
+    query: 'label_values(cardano_node_metrics_blockNum_int, network)'
+    multi: false
+    include_all: true
+    refresh: 2
+    sort: 1
+    label: network
+
+  alias:
+    type: query
+    datasource: primary
+    query: 'label_values(cardano_node_metrics_blockNum_int{network=~"$network"}, alias)'
+    multi: true
+    include_all: true
+    refresh: 2
+    sort: 1
+    label: node
+    chains_from: [network]
+
 # ─── Constants ────────────────────────────────────────────────────────────────
 # Reference with ${constant_name} in queries.
 
@@ -187,11 +207,13 @@ discovery:
 
 profiles:
   full:
-    dashboards: [overview, compute, memory, network, services]
+    dashboards: [overview, compute, memory, network, services, cardano]
   infra:
     dashboards: [overview, compute, memory, network]
   apps:
     dashboards: [overview, services]
+  cardano:
+    dashboards: [cardano]
 
 # ─── Dashboards ───────────────────────────────────────────────────────────────
 # Each dashboard produces one JSON file. All dashboards get navigation links
@@ -857,3 +879,85 @@ dashboards:
               - pod restart history
             width: 24
             height: 5
+
+  # ─── 6. Cardano Dashboard ──────────────────────────────────────────────────
+
+  cardano:
+    uid: gen-cardano
+    title: cardano nodes
+    filename: gen-cardano.json
+    tags: [cardano, generated]
+    icon: bolt
+    description: "cardano node block height and health"
+    variables: [network, alias]
+    sections:
+
+      - title: node status
+        panels:
+          - type: stat
+            title: block height
+            query: 'max(cardano_node_metrics_blockNum_int{network=~"$network", alias=~"$alias"})'
+            color: "$blue"
+            width: 6
+            height: 4
+
+          - type: stat
+            title: epoch
+            query: 'max(cardano_node_metrics_epoch_int{network=~"$network", alias=~"$alias"})'
+            color: "$green"
+            width: 6
+            height: 4
+
+          - type: stat
+            title: slot in epoch
+            query: 'max(cardano_node_metrics_slotInEpoch_int{network=~"$network", alias=~"$alias"})'
+            width: 6
+            height: 4
+
+          - type: stat
+            title: connected peers
+            query: 'sum(cardano_node_metrics_peers_connectedPeers_int{network=~"$network", alias=~"$alias"})'
+            color: "$green"
+            width: 6
+            height: 4
+
+      - title: block height
+        panels:
+          - type: timeseries
+            title: block height over time
+            query: 'cardano_node_metrics_blockNum_int{network=~"$network", alias=~"$alias"}'
+            legend: "{{alias}}"
+            width: 24
+            height: 8
+
+      - title: node health
+        panels:
+          - type: timeseries
+            title: connected peers
+            query: 'cardano_node_metrics_peers_connectedPeers_int{network=~"$network", alias=~"$alias"}'
+            legend: "{{alias}}"
+            width: 12
+            height: 7
+
+          - type: timeseries
+            title: mempool transactions
+            query: 'cardano_node_metrics_txsInMempool_int{network=~"$network", alias=~"$alias"}'
+            legend: "{{alias}}"
+            width: 12
+            height: 7
+
+          - type: timeseries
+            title: memory resident
+            query: 'cardano_node_metrics_Mem_resident_int{network=~"$network", alias=~"$alias"}'
+            legend: "{{alias}}"
+            width: 12
+            height: 7
+            unit: bytes
+
+          - type: timeseries
+            title: gc live bytes
+            query: 'cardano_node_metrics_RTS_gcLiveBytes_int{network=~"$network", alias=~"$alias"}'
+            legend: "{{alias}}"
+            width: 12
+            height: 7
+            unit: bytes
