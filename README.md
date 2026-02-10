@@ -19,7 +19,7 @@ Hand-editing Grafana JSON is painful. Clicking through the UI doesn't scale. Thi
 - **Two-datasource comparison**: compare metrics across Prometheus instances side-by-side
 - **Profiles**: generate subsets of dashboards (e.g. `--profile infra` for infra-only)
 - **Push to Grafana**: deploy dashboards directly via the Grafana API
-- **Web UI**: edit config, browse metrics, generate and push dashboards from a browser
+- **Web UI**: edit config, browse metrics, visual dashboard preview with panel detail drawer, interactive palette editor, generate and push from a browser
 
 ## Quick Start
 

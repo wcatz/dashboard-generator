@@ -14,6 +14,7 @@ A config-driven Grafana dashboard generator. Reads a YAML config, outputs interl
 | `example-config.yaml` | Reference config with 5 generic dashboards |
 | `cmd/dashboard-generator/main.go` | Go CLI entry point (cobra) |
 | `internal/config/config.go` | Go config loading, $ref resolution, YAML key ordering |
+| `internal/config/yaml_editor.go` | YAML editing with comment/format preservation (datasource + palette CRUD) |
 | `internal/generator/panel.go` | Go panel factory (14 types) |
 | `internal/generator/layout.go` | Go layout engine (24-unit grid) |
 | `internal/generator/dashboard.go` | Go dashboard builder (variables, sections, nav links) |
@@ -28,7 +29,7 @@ A config-driven Grafana dashboard generator. Reads a YAML config, outputs interl
 | `web/templates/layout.html` | Base layout (sidebar nav, dark theme) |
 | `web/templates/*.html` | Page templates (index, datasources, palettes, metrics, editor, preview) |
 | `web/templates/partials/*.html` | HTMX partial response templates |
-| `web/static/` | Pico CSS, HTMX, custom CSS (all embedded in binary) |
+| `web/static/` | Tailwind CSS, DaisyUI, HTMX, highlight.js, CodeMirror, custom CSS (all embedded) |
 | `Dockerfile` | Multi-stage Go build → distroless runtime |
 | `helm-chart/` | Helm chart for k8s deployment (published to OCI) |
 | `.github/workflows/` | CI, Docker Hub, Helm OCI, goreleaser workflows |
@@ -121,18 +122,22 @@ make lint
 
 ## Web UI
 
-Single-binary web UI using Go templates + HTMX + Pico CSS. All assets embedded via `embed.FS`. No JavaScript framework, no Node.js, no build step.
+Single-binary web UI using Go templates + HTMX + Tailwind CSS + DaisyUI. All assets embedded via `embed.FS`. No JavaScript framework, no Node.js, no build step.
 
 ### Pages
 
 | Route | Page | Description |
 |-------|------|-------------|
 | `/` | Dashboard list | Stats overview, generate buttons, preview links |
-| `/datasources` | Datasource manager | View datasources, test Prometheus connections |
-| `/palettes` | Color palettes | View palette colors and threshold presets |
-| `/metrics` | Metric browser | Browse/filter metrics from connected Prometheus |
-| `/editor` | Config editor | Edit YAML config with save/reload/validate |
-| `/preview` | JSON preview | Generate and view dashboard JSON |
+| `/datasources` | Datasource manager | Add/delete datasources, test Prometheus connections |
+| `/variables` | Variables | View template variable definitions |
+| `/palettes` | Color palettes | CRUD palette colors, activate palettes, threshold presets |
+| `/references` | References | View selectors and constants |
+| `/editor` | Config editor | Edit YAML config with CodeMirror, save/reload |
+| `/metrics` | Metric browser | Browse/filter/compare metrics from Prometheus |
+| `/preview` | Visual preview | Interactive panel grid with detail drawer, search, filter, zoom |
+| `/profiles` | Profiles | View named dashboard subsets |
+| `/settings` | Settings | View generator and runtime settings |
 
 ### API Endpoints (HTMX)
 
@@ -140,19 +145,38 @@ Single-binary web UI using Go templates + HTMX + Pico CSS. All assets embedded v
 |-------|--------|-------------|
 | `/api/generate` | POST | Generate dashboards to disk (optional `?dashboard=uid`) |
 | `/api/push` | POST | Generate and push to Grafana (optional `?dashboard=uid`, requires `GRAFANA_URL`) |
+| `/api/preview` | GET | Generate preview JSON with enriched panel data (`?uid=dashboard_uid`) |
 | `/api/datasource/test` | GET | Test Prometheus connection (`?name=ds_name`) |
+| `/api/datasource/add` | POST | Add datasource to config |
+| `/api/datasource/delete` | POST | Remove datasource from config |
+| `/api/datasource/url` | POST | Set datasource URL |
+| `/api/datasource/targets` | GET | Browse scrape targets for a datasource |
+| `/api/datasource/targets/metrics` | GET | Browse metrics for a specific target |
+| `/api/datasources/compare-all` | GET | Compare metrics across all datasources |
+| `/api/datasources/compare-labels` | GET | Compare labels across datasources |
+| `/api/datasources/variable-snippet` | GET | Generate variable YAML snippet |
 | `/api/metrics/browse` | GET | Browse metrics (`?datasource=&filter=&type=`) |
+| `/api/metrics/jobs` | GET | Get job label values for tab rendering |
+| `/api/metrics/compare` | GET | Compare metrics between two datasources |
+| `/api/metrics/snippet` | GET | Generate panel YAML snippet for a metric |
+| `/api/metrics/comparison-snippet` | GET | Generate comparison panel snippet |
+| `/api/palette/color/set` | POST | Set/update a color in a palette |
+| `/api/palette/color/delete` | POST | Remove a color from a palette |
+| `/api/palette/color/rename` | POST | Rename a color in a palette |
+| `/api/palette/create` | POST | Create a new empty palette |
+| `/api/palette/delete` | POST | Delete a palette |
+| `/api/palette/activate` | POST | Set the active palette |
 | `/api/config/save` | POST | Save YAML config to disk |
 | `/api/config/reload` | POST | Reload config from disk |
-| `/api/config/validate` | POST | Validate YAML syntax |
-| `/api/preview` | GET | Generate preview JSON (`?uid=dashboard_uid`) |
 
 ### Stack
 
 - **Go `html/template`** — server-side rendering
-- **HTMX** v2.0.4 (~50KB) — dynamic interactions
-- **Pico CSS** v2 (~83KB) — classless dark theme
-- **Custom CSS** — sidebar nav, stat cards, metric list, badges
+- **HTMX** v2.0.4 — dynamic interactions (partial swaps, AJAX)
+- **Tailwind CSS** + **DaisyUI** v4 — utility-first styling with dark theme components
+- **highlight.js** — syntax highlighting for JSON/YAML code blocks
+- **CodeMirror** — YAML editor on `/editor` page
+- **Custom CSS** (`app.css`) — preview grid, panel type badges, zoom, section nav, scrollbars
 
 ---
 
@@ -161,6 +185,7 @@ Single-binary web UI using Go templates + HTMX + Pico CSS. All assets embedded v
 | Package | File | Purpose |
 |---------|------|---------|
 | `config` | `config.go` | YAML loading, `$ref` resolution, palette, thresholds, datasources |
+| `config` | `yaml_editor.go` | YAML editing preserving comments/formatting (datasource + palette CRUD) |
 | `generator` | `idgen.go` | Auto-incrementing panel ID counter |
 | `generator` | `layout.go` | 24-unit grid flow layout engine |
 | `generator` | `panel.go` | Panel factory — 14 types, target building, threshold resolution |
@@ -169,7 +194,7 @@ Single-binary web UI using Go templates + HTMX + Pico CSS. All assets embedded v
 | `generator` | `discovery.go` | Prometheus API queries, filtering, comparison, YAML snippets |
 | `generator` | `writer.go` | JSON file output, Grafana API push |
 | `server` | `server.go` | HTTP server, template rendering, config management |
-| `server` | `routes.go` | Route registration (6 pages + 8 API endpoints) |
+| `server` | `routes.go` | Route registration (10 pages + 24 API endpoints) |
 | `server` | `handlers.go` | Page handlers + HTMX API handlers |
 
 ### Python Classes → Go Equivalents
