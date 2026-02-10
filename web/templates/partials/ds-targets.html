@@ -20,10 +20,12 @@
       <div class="collapse-title py-2 px-3 min-h-0 flex items-center gap-3 text-sm">
         <span class="font-mono font-semibold flex-1">{{.Name}}</span>
         <span class="text-xs text-base-content/40">{{.TargetCount}} targets</span>
+        <span class="text-xs text-base-content/40">{{.LabelCount}} labels</span>
         {{if .UpCount}}<span class="badge badge-xs badge-success">{{.UpCount}} up</span>{{end}}
         {{if .DownCount}}<span class="badge badge-xs badge-error">{{.DownCount}} down</span>{{end}}
       </div>
       <div class="collapse-content px-3 pb-3">
+        <!-- targets -->
         <div class="space-y-1 mt-1">
           {{range .Targets}}
           <div class="flex items-center gap-2 text-xs py-1 px-2 rounded hover:bg-base-200">
@@ -38,15 +40,57 @@
           </div>
           {{end}}
         </div>
-        <button class="btn btn-xs btn-outline mt-3"
-                hx-get="/api/datasource/targets/metrics?name={{$.Datasource}}&job={{.Name}}"
-                hx-target="#ds-metrics-{{$.Datasource}}-{{.Name}}"
-                hx-indicator="#ds-metrics-spin-{{$.Datasource}}-{{.Name}}"
-                hx-disabled-elt="this"
-                hx-swap="innerHTML">
-          view metrics <span id="ds-metrics-spin-{{$.Datasource}}-{{.Name}}" class="htmx-indicator"><span class="spinner"></span></span>
-        </button>
-        <div id="ds-metrics-{{$.Datasource}}-{{.Name}}" class="mt-2"></div>
+
+        <!-- labels section -->
+        {{if .Labels}}
+        <div class="collapse collapse-arrow bg-base-200/50 border border-base-content/5 rounded mt-3">
+          <input type="checkbox">
+          <div class="collapse-title py-1.5 px-3 min-h-0 text-xs font-semibold text-base-content/60">
+            labels ({{.LabelCount}}{{if .ConstCount}}, {{.ConstCount}} constant{{end}})
+          </div>
+          <div class="collapse-content px-3 pb-3">
+            <form hx-post="/api/datasources/variable-snippet" hx-target="#job-var-snippet-{{$.Datasource}}-{{.Name}}" hx-swap="innerHTML">
+              <input type="hidden" name="datasource" value="{{$.Datasource}}">
+              <div class="space-y-0.5 max-h-[300px] overflow-y-auto mb-2">
+                {{range .Labels}}
+                <label class="flex items-center gap-2 py-1 px-2 rounded hover:bg-base-100 cursor-pointer text-xs">
+                  <input type="checkbox" name="labels" value="{{.Name}}" class="checkbox checkbox-xs checkbox-primary">
+                  <span class="font-mono font-semibold w-28 shrink-0 truncate" title="{{.Name}}">{{.Name}}</span>
+                  {{if .Constant}}
+                  <span class="text-base-content/40 flex-1 truncate">{{index .Values 0}}</span>
+                  <span class="badge badge-xs badge-ghost">constant</span>
+                  {{else if .AllTargets}}
+                  <span class="text-base-content/40 flex-1 truncate">{{len .Values}} values</span>
+                  <span class="badge badge-xs badge-warning badge-outline">varies</span>
+                  {{else}}
+                  <span class="text-base-content/40 flex-1 truncate">{{len .Values}} values (partial)</span>
+                  <span class="badge badge-xs badge-error badge-outline">partial</span>
+                  {{end}}
+                </label>
+                {{end}}
+              </div>
+              <button type="submit" class="btn btn-xs btn-primary">generate variable snippet</button>
+            </form>
+            <div id="job-var-snippet-{{$.Datasource}}-{{.Name}}" class="mt-2"></div>
+          </div>
+        </div>
+        {{end}}
+
+        <!-- metrics section (lazy loaded) -->
+        <div class="collapse collapse-arrow bg-base-200/50 border border-base-content/5 rounded mt-2">
+          <input type="checkbox"
+                 hx-get="/api/datasource/targets/metrics?name={{$.Datasource}}&job={{.Name}}"
+                 hx-target="#ds-metrics-{{$.Datasource}}-{{.Name}}"
+                 hx-trigger="click once"
+                 hx-indicator="#ds-metrics-spin-{{$.Datasource}}-{{.Name}}"
+                 hx-swap="innerHTML">
+          <div class="collapse-title py-1.5 px-3 min-h-0 text-xs font-semibold text-base-content/60">
+            metrics <span id="ds-metrics-spin-{{$.Datasource}}-{{.Name}}" class="htmx-indicator"><span class="spinner"></span></span>
+          </div>
+          <div class="collapse-content px-3 pb-3">
+            <div id="ds-metrics-{{$.Datasource}}-{{.Name}}"></div>
+          </div>
+        </div>
       </div>
     </div>
     {{end}}

@@ -28,6 +28,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/datasource/targets", s.handleDatasourceTargets)
 	s.mux.HandleFunc("/api/datasource/targets/metrics", s.handleDatasourceTargetMetrics)
 	s.mux.HandleFunc("/api/datasources/compare-all", s.handleDatasourcesCompareAll)
+	s.mux.HandleFunc("/api/datasources/compare-labels", s.handleDatasourcesCompareLabels)
+	s.mux.HandleFunc("/api/datasources/variable-snippet", s.handleVariableSnippet)
 	s.mux.HandleFunc("/api/metrics/browse", s.handleMetricsBrowse)
 	s.mux.HandleFunc("/api/metrics/jobs", s.handleMetricsJobs)
 	s.mux.HandleFunc("/api/metrics/compare", s.handleMetricsCompare)

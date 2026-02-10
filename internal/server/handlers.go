@@ -1120,6 +1120,61 @@ type metricRow struct {
 	Help string
 }
 
+type labelSummary struct {
+	Name       string
+	Values     []string
+	Constant   bool // same value on all targets
+	AllTargets bool // present on every target
+}
+
+type enrichedJob struct {
+	generator.JobSummary
+	Labels       []labelSummary
+	LabelCount   int
+	ConstCount   int
+}
+
+func buildJobLabels(job generator.JobSummary) []labelSummary {
+	// Collect all label keys and their values across targets
+	labelValues := make(map[string]map[string]bool) // label → set of values
+	labelCount := make(map[string]int)               // label → targets that have it
+	for _, t := range job.Targets {
+		for k, v := range t.Labels {
+			if k == "__name__" {
+				continue
+			}
+			if labelValues[k] == nil {
+				labelValues[k] = make(map[string]bool)
+			}
+			labelValues[k][v] = true
+			labelCount[k]++
+		}
+	}
+
+	names := make([]string, 0, len(labelValues))
+	for k := range labelValues {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+
+	result := make([]labelSummary, 0, len(names))
+	for _, name := range names {
+		vals := make([]string, 0, len(labelValues[name]))
+		for v := range labelValues[name] {
+			vals = append(vals, v)
+		}
+		sort.Strings(vals)
+		allTargets := labelCount[name] == job.TargetCount
+		result = append(result, labelSummary{
+			Name:       name,
+			Values:     vals,
+			Constant:   allTargets && len(vals) == 1,
+			AllTargets: allTargets,
+		})
+	}
+	return result
+}
+
 func metricInfoToSlice(m map[string]generator.MetricInfo) []metricRow {
 	names := make([]string, 0, len(m))
 	for name := range m {
@@ -1132,6 +1187,134 @@ func metricInfoToSlice(m map[string]generator.MetricInfo) []metricRow {
 		result = append(result, metricRow{Name: name, Type: info.Type, Help: info.Help})
 	}
 	return result
+}
+
+func (s *Server) handleVariableSnippet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	r.ParseForm()
+	dsName := r.FormValue("datasource")
+	selected := r.Form["labels"]
+
+	if len(selected) == 0 {
+		s.renderPartial(w, "snippet-result.html", map[string]interface{}{"Error": "select at least one label"})
+		return
+	}
+
+	var lines []string
+	lines = append(lines, "variables:")
+	for _, label := range selected {
+		lines = append(lines, fmt.Sprintf("  %s:", label))
+		lines = append(lines, "    type: query")
+		if dsName != "" {
+			lines = append(lines, fmt.Sprintf("    datasource: %s", dsName))
+		}
+		lines = append(lines, fmt.Sprintf("    query: 'label_values(%s)'", label))
+		lines = append(lines, "    multi: true")
+		lines = append(lines, "    include_all: true")
+		lines = append(lines, "    refresh: 2")
+		lines = append(lines, "    sort: 1")
+	}
+
+	s.renderPartial(w, "snippet-result.html", map[string]interface{}{
+		"Snippet": strings.Join(lines, "\n"),
+		"Count":   len(selected),
+	})
+}
+
+func (s *Server) handleDatasourcesCompareLabels(w http.ResponseWriter, r *http.Request) {
+	cfg := s.Config()
+
+	var dsNames []string
+	for name, ds := range cfg.Datasources {
+		if ds.URL != "" {
+			dsNames = append(dsNames, name)
+		}
+	}
+	sort.Strings(dsNames)
+
+	if len(dsNames) < 2 {
+		s.renderPartial(w, "ds-compare-labels.html", map[string]interface{}{
+			"Error": "need at least 2 datasources with URLs configured",
+		})
+		return
+	}
+
+	disc := generator.NewMetricDiscovery(cfg)
+
+	// Fetch labels for each datasource
+	allLabels := make(map[string]map[string]bool)
+	for _, ds := range dsNames {
+		labels, err := disc.FetchLabels(ds)
+		if err != nil {
+			s.renderPartial(w, "ds-compare-labels.html", map[string]interface{}{
+				"Error": fmt.Sprintf("fetching labels from %s: %v", ds, err),
+			})
+			return
+		}
+		labelSet := make(map[string]bool)
+		for _, l := range labels {
+			if l != "__name__" {
+				labelSet[l] = true
+			}
+		}
+		allLabels[ds] = labelSet
+	}
+
+	// Shared = intersection of all label sets
+	var shared []string
+	for label := range allLabels[dsNames[0]] {
+		onAll := true
+		for _, ds := range dsNames[1:] {
+			if !allLabels[ds][label] {
+				onAll = false
+				break
+			}
+		}
+		if onAll {
+			shared = append(shared, label)
+		}
+	}
+	sort.Strings(shared)
+
+	// Exclusive = labels unique to each DS
+	sharedSet := make(map[string]bool)
+	for _, l := range shared {
+		sharedSet[l] = true
+	}
+	exclusive := make(map[string][]string)
+	for _, ds := range dsNames {
+		var unique []string
+		for label := range allLabels[ds] {
+			if sharedSet[label] {
+				continue
+			}
+			onOther := false
+			for _, other := range dsNames {
+				if other == ds {
+					continue
+				}
+				if allLabels[other][label] {
+					onOther = true
+					break
+				}
+			}
+			if !onOther {
+				unique = append(unique, label)
+			}
+		}
+		sort.Strings(unique)
+		exclusive[ds] = unique
+	}
+
+	s.renderPartial(w, "ds-compare-labels.html", map[string]interface{}{
+		"Datasources": dsNames,
+		"Shared":      shared,
+		"Exclusive":   exclusive,
+		"SharedCount": len(shared),
+	})
 }
 
 func (s *Server) handleDatasourcesCompareAll(w http.ResponseWriter, r *http.Request) {
@@ -1263,9 +1446,27 @@ func (s *Server) handleDatasourceTargets(w http.ResponseWriter, r *http.Request)
 
 	jobs := generator.GroupTargetsByJob(targets)
 
+	// Enrich jobs with label analysis
+	enriched := make([]enrichedJob, len(jobs))
+	for i, job := range jobs {
+		labels := buildJobLabels(job)
+		constCount := 0
+		for _, l := range labels {
+			if l.Constant {
+				constCount++
+			}
+		}
+		enriched[i] = enrichedJob{
+			JobSummary: job,
+			Labels:     labels,
+			LabelCount: len(labels),
+			ConstCount: constCount,
+		}
+	}
+
 	s.renderPartial(w, "ds-targets.html", map[string]interface{}{
 		"Datasource":  name,
-		"Jobs":        jobs,
+		"Jobs":        enriched,
 		"TargetCount": len(targets),
 	})
 }
