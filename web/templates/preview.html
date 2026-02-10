@@ -63,7 +63,7 @@
           <button class="btn btn-xs btn-ghost" onclick="copyToClipboard('json-output')">copy</button>
           <button class="btn btn-xs btn-ghost" onclick="downloadJSON('{{.PreviewTitle}}.json', 'json-output')">download</button>
         </div>
-        <pre id="json-output" class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[600px]">{{.JSON}}</pre>
+        <pre class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[600px]"><code id="json-output" class="language-json hljs-auto">{{.JSON}}</code></pre>
       </div>
     </div>
   </div>

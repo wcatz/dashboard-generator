@@ -8,6 +8,10 @@
     <div class="text-2xl font-bold text-info mt-1">{{.DashboardCount}}</div>
   </div>
   <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
+    <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">panels</div>
+    <div class="text-2xl font-bold text-primary mt-1">{{.PanelCount}}</div>
+  </div>
+  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
     <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">datasources</div>
     <div class="text-2xl font-bold text-success mt-1">{{.DatasourceCount}}</div>
   </div>
@@ -47,22 +51,72 @@
 <div id="push-result"></div>
 
 {{range .Dashboards}}
-<div class="flex items-center justify-between p-3 bg-base-100 border border-base-content/10 rounded-lg mb-2 hover:bg-base-200 transition-colors gap-4">
-  <div class="flex flex-col gap-1 min-w-0">
-    <div class="font-semibold text-sm">{{.Title}}</div>
-    <div class="text-xs text-base-content/50 flex items-center gap-2 flex-wrap">
-      uid: {{.UID}} &middot; {{.Filename}}
-      <span class="badge badge-sm badge-info">{{len .Sections}} sections</span>
-      &middot; {{len .Variables}} variables
-      {{range .Tags}}<span class="badge badge-sm badge-outline">{{.}}</span>{{end}}
+<div class="card bg-base-100 border border-base-content/10 mb-3">
+  <div class="card-body p-4">
+    <!-- header row -->
+    <div class="flex justify-between items-start gap-4">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="font-semibold text-sm">{{.Title}}</span>
+          {{range .Tags}}<span class="badge badge-xs badge-outline">{{.}}</span>{{end}}
+        </div>
+        <div class="text-xs text-base-content/50 mt-1">
+          <code>{{.UID}}</code> &middot; {{.Filename}}
+          {{if .Description}}&middot; <span class="italic">{{.Description}}</span>{{end}}
+        </div>
+      </div>
+      <div class="flex gap-2 shrink-0">
+        <button class="btn btn-xs btn-outline" hx-post="/api/generate?dashboard={{.UID}}" hx-target="#generate-result" hx-indicator="#gen-spinner" hx-disabled-elt="this">generate</button>
+        {{if $.GrafanaURL}}
+        <button class="btn btn-xs btn-outline" hx-post="/api/push?dashboard={{.UID}}" hx-target="#push-result" hx-indicator="#push-spinner" hx-disabled-elt="this">push</button>
+        {{end}}
+        <a href="/preview?uid={{.UID}}"><button class="btn btn-xs btn-ghost">preview</button></a>
+      </div>
     </div>
-  </div>
-  <div class="flex gap-2 shrink-0">
-    <button class="btn btn-xs btn-outline" hx-post="/api/generate?dashboard={{.UID}}" hx-target="#generate-result" hx-indicator="#gen-spinner" hx-disabled-elt="this">generate</button>
-    {{if $.GrafanaURL}}
-    <button class="btn btn-xs btn-outline" hx-post="/api/push?dashboard={{.UID}}" hx-target="#push-result" hx-indicator="#push-spinner" hx-disabled-elt="this">push</button>
+
+    <!-- stats badges -->
+    <div class="flex flex-wrap gap-2 mt-2">
+      <span class="badge badge-sm badge-info gap-1">{{len .Sections}} sections</span>
+      <span class="badge badge-sm badge-primary gap-1">{{.PanelCount}} panels</span>
+      {{if .Variables}}<span class="badge badge-sm badge-warning gap-1">{{len .Variables}} variables</span>{{end}}
+      {{range $type, $count := .TypeCounts}}
+      <span class="badge badge-sm badge-ghost gap-1">{{$count}} {{$type}}</span>
+      {{end}}
+    </div>
+
+    <!-- expandable sections breakdown -->
+    {{if .Sections}}
+    <div class="collapse collapse-arrow bg-base-200/30 mt-3 -mx-1 rounded-lg">
+      <input type="checkbox">
+      <div class="collapse-title text-xs font-semibold py-2 min-h-0">
+        sections &amp; panels
+      </div>
+      <div class="collapse-content px-3 pb-3">
+        <div class="space-y-2">
+          {{range .Sections}}
+          <div>
+            <div class="flex items-center gap-2 text-xs font-semibold">
+              <span>{{.Title}}</span>
+              {{if .Collapsed}}<span class="badge badge-xs badge-ghost">collapsed</span>{{end}}
+              {{if .Repeat}}<span class="badge badge-xs badge-ghost">repeat: {{.Repeat}}</span>{{end}}
+              <span class="text-base-content/40 ml-auto">{{len .Panels}} panels</span>
+            </div>
+            {{if .Panels}}
+            <div class="ml-4 mt-1 space-y-0.5">
+              {{range .Panels}}
+              <div class="flex items-center gap-2 text-xs text-base-content/60">
+                <span class="badge badge-xs">{{.Type}}</span>
+                <span>{{.Title}}</span>
+              </div>
+              {{end}}
+            </div>
+            {{end}}
+          </div>
+          {{end}}
+        </div>
+      </div>
+    </div>
     {{end}}
-    <a href="/preview?uid={{.UID}}"><button class="btn btn-xs btn-ghost">preview</button></a>
   </div>
 </div>
 {{end}}
