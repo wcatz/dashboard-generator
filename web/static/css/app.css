@@ -159,6 +159,16 @@
 /* ── Syntax highlighting overrides ── */
 pre code.hljs { background: transparent; padding: 0; }
 
+/* ── CodeMirror editor overrides ── */
+.CodeMirror {
+  border: 1px solid oklch(var(--bc) / 0.1);
+  border-radius: 0.5rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+.cm-error-line { background: oklch(var(--er) / 0.12) !important; }
+
 /* ── Scrollbars ── */
 * { scrollbar-width: thin; scrollbar-color: oklch(var(--bc) / 0.15) transparent; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }

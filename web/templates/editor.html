@@ -2,27 +2,84 @@
 <h1 class="text-xl font-bold mb-1">config editor</h1>
 <p class="text-sm text-base-content/50 mb-6">edit your YAML configuration</p>
 
-<div class="card bg-base-100 border border-base-content/10 mb-4">
+<div class="card bg-base-100 border border-base-content/10">
   <div class="card-body p-5">
     <div class="flex justify-between items-center mb-3">
       <h3 class="card-title text-sm">{{.ConfigPath}}</h3>
       <div class="flex gap-2">
-        <button class="btn btn-xs btn-outline" hx-post="/api/config/reload" hx-target="#editor-status" hx-disabled-elt="this">reload</button>
-        <button class="btn btn-xs btn-primary" id="save-btn" hx-post="/api/config/save" hx-include="#yaml-editor" hx-target="#editor-status" hx-disabled-elt="this">save</button>
+        <button class="btn btn-xs btn-outline" id="reload-btn" hx-post="/api/config/reload" hx-target="#editor-status" hx-disabled-elt="this">reload</button>
+        <button class="btn btn-xs btn-primary" id="save-btn" hx-post="/api/config/save" hx-target="#editor-status" hx-disabled-elt="this">save</button>
       </div>
     </div>
     <div id="editor-status" class="text-xs mb-2"></div>
-    <textarea id="yaml-editor" name="content" class="textarea textarea-bordered w-full min-h-[600px] font-mono text-xs leading-relaxed bg-base-200 resize-y" style="tab-size: 2;">{{.Content}}</textarea>
+    <textarea id="yaml-editor" name="content">{{.Content}}</textarea>
   </div>
 </div>
 
-<div class="card bg-base-100 border border-base-content/10">
-  <div class="card-body p-5">
-    <h3 class="card-title text-sm">validation</h3>
-    <button class="btn btn-xs btn-outline" hx-post="/api/config/validate" hx-include="#yaml-editor" hx-target="#validate-result" hx-indicator="#validate-spinner" hx-disabled-elt="this">
-      validate <span id="validate-spinner" class="htmx-indicator"><span class="spinner"></span></span>
-    </button>
-    <div id="validate-result" class="mt-3 text-sm"></div>
-  </div>
-</div>
+<script>
+(function() {
+  var ta = document.getElementById('yaml-editor');
+  var cm = CodeMirror.fromTextArea(ta, {
+    mode: 'yaml',
+    theme: 'material-darker',
+    lineNumbers: true,
+    tabSize: 2,
+    indentWithTabs: false,
+    lineWrapping: false,
+    viewportMargin: Infinity,
+    extraKeys: {
+      'Ctrl-S': function() { document.getElementById('save-btn').click(); },
+      'Cmd-S': function() { document.getElementById('save-btn').click(); },
+      Tab: function(cm) {
+        cm.replaceSelection('  ', 'end');
+      }
+    }
+  });
+  cm.setSize(null, 700);
+  window._yamlEditor = cm;
+
+  // Sync CodeMirror content to hidden textarea before HTMX sends
+  document.body.addEventListener('htmx:configRequest', function(evt) {
+    if (evt.detail.elt.id === 'save-btn') {
+      cm.save();
+      evt.detail.parameters['content'] = cm.getValue();
+    }
+  });
+
+  // After reload, refresh editor content from server
+  document.body.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.elt.id === 'reload-btn' && evt.detail.successful) {
+      fetch(window.location.href)
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+          var m = html.match(/<textarea id="yaml-editor"[^>]*>([\s\S]*?)<\/textarea>/);
+          if (m) {
+            var decoded = m[1].replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&#34;/g,'"').replace(/&#39;/g,"'");
+            cm.setValue(decoded);
+            cm.clearHistory();
+          }
+        });
+    }
+  });
+
+  // Handle error line highlighting from save/validate responses
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id !== 'editor-status') return;
+    // Clear previous error markers
+    cm.getAllMarks().forEach(function(m) { m.clear(); });
+    for (var i = 0; i < cm.lineCount(); i++) {
+      cm.removeLineClass(i, 'background');
+    }
+    // Look for error-line data attribute
+    var el = evt.detail.target.querySelector('[data-error-line]');
+    if (el) {
+      var line = parseInt(el.getAttribute('data-error-line'), 10) - 1;
+      if (line >= 0 && line < cm.lineCount()) {
+        cm.addLineClass(line, 'background', 'cm-error-line');
+        cm.scrollIntoView({line: line, ch: 0}, 100);
+      }
+    }
+  });
+})();
+</script>
 {{end}}
