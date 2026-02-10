@@ -140,6 +140,80 @@ function showCompareAllTab(tabName, btn) {
   btn.classList.add('tab-active');
 }
 
+// ── Panel detail drawer (preview page) ──
+
+function openPanelDetail(el) {
+  // Highlight the selected panel
+  document.querySelectorAll('.preview-panel.selected').forEach(function(p) {
+    p.classList.remove('selected');
+  });
+  el.classList.add('selected');
+  // Show the drawer
+  var drawer = document.getElementById('panel-detail-drawer');
+  if (drawer) drawer.style.display = 'block';
+}
+
+function closePanelDetail() {
+  var drawer = document.getElementById('panel-detail-drawer');
+  if (drawer) drawer.style.display = 'none';
+  document.querySelectorAll('.preview-panel.selected').forEach(function(p) {
+    p.classList.remove('selected');
+  });
+}
+
+// Close panel detail on Escape key
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closePanelDetail();
+});
+
+// ── Preview search and filter ──
+
+function searchPreviewPanels(query) {
+  var q = query.toLowerCase().trim();
+  document.querySelectorAll('.preview-panel[data-panel-title]').forEach(function(el) {
+    var title = (el.dataset.panelTitle || '').toLowerCase();
+    var hint = el.querySelector('.panel-query-hint');
+    var queryText = hint ? hint.textContent.toLowerCase() : '';
+    if (q === '' || title.indexOf(q) !== -1 || queryText.indexOf(q) !== -1) {
+      el.classList.remove('panel-hidden');
+    } else {
+      el.classList.add('panel-hidden');
+    }
+  });
+}
+
+var _activeTypeFilters = {};
+
+function toggleTypeFilter(type, btn) {
+  if (_activeTypeFilters[type]) {
+    delete _activeTypeFilters[type];
+    btn.classList.remove('active');
+  } else {
+    _activeTypeFilters[type] = true;
+    btn.classList.add('active');
+  }
+
+  var hasFilters = Object.keys(_activeTypeFilters).length > 0;
+
+  // Update button dim states
+  document.querySelectorAll('.type-filter-btn').forEach(function(b) {
+    if (hasFilters && !_activeTypeFilters[b.dataset.type]) {
+      b.classList.add('dimmed');
+    } else {
+      b.classList.remove('dimmed');
+    }
+  });
+
+  // Filter panels
+  document.querySelectorAll('.preview-panel[data-panel-type]').forEach(function(el) {
+    if (!hasFilters || _activeTypeFilters[el.dataset.panelType]) {
+      el.classList.remove('panel-hidden');
+    } else {
+      el.classList.add('panel-hidden');
+    }
+  });
+}
+
 // Syntax highlighting — highlight code blocks with hljs-auto class
 function highlightCodeBlocks(root) {
   (root || document).querySelectorAll('code.hljs-auto:not(.hljs)').forEach(function(block) {

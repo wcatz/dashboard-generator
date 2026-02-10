@@ -38,4 +38,5 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/config/reload", s.handleConfigReload)
 	s.mux.HandleFunc("/api/config/save", s.handleConfigSave)
 	s.mux.HandleFunc("/api/preview", s.handlePreviewAPI)
+	s.mux.HandleFunc("/api/preview/panel", s.handlePanelDetail)
 }
