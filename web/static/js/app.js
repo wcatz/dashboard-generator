@@ -140,8 +140,18 @@ function showCompareAllTab(tabName, btn) {
   btn.classList.add('tab-active');
 }
 
-// Auto-dismiss toasts rendered by server (HTMX responses)
-document.addEventListener('htmx:afterSwap', function() {
+// Syntax highlighting — highlight code blocks with hljs-auto class
+function highlightCodeBlocks(root) {
+  (root || document).querySelectorAll('code.hljs-auto:not(.hljs)').forEach(function(block) {
+    hljs.highlightElement(block);
+  });
+}
+
+// Run on page load
+document.addEventListener('DOMContentLoaded', function() { highlightCodeBlocks(); });
+
+// Auto-dismiss toasts and highlight code blocks after HTMX swaps
+document.addEventListener('htmx:afterSwap', function(evt) {
   document.querySelectorAll('.toast-msg:not([data-auto])').forEach(function(toast) {
     toast.setAttribute('data-auto', '1');
     setTimeout(function() {
@@ -149,4 +159,5 @@ document.addEventListener('htmx:afterSwap', function() {
       setTimeout(function() { toast.remove(); }, 300);
     }, 4000);
   });
+  highlightCodeBlocks(evt.detail.target);
 });

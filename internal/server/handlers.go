@@ -23,16 +23,32 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	dashboards, _ := cfg.GetDashboards("")
 	order, _ := cfg.GetDashboardOrder("")
 
-	type dashInfo struct {
+	type panelBrief struct {
+		Title string
+		Type  string
+	}
+
+	type sectionInfo struct {
 		Title     string
-		UID       string
-		Filename  string
-		Sections  []config.SectionConfig
-		Variables []string
-		Tags      []string
+		Collapsed bool
+		Repeat    string
+		Panels    []panelBrief
+	}
+
+	type dashInfo struct {
+		Title      string
+		UID        string
+		Filename   string
+		Sections   []sectionInfo
+		Variables  []string
+		Tags       []string
+		PanelCount int
+		TypeCounts map[string]int
+		Description string
 	}
 
 	var dashList []dashInfo
+	totalPanels := 0
 	seen := make(map[string]bool)
 	for _, name := range order {
 		if seen[name] {
@@ -47,13 +63,41 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		if filename == "" {
 			filename = name + ".json"
 		}
+
+		panelCount := 0
+		typeCounts := make(map[string]int)
+		var sections []sectionInfo
+		for _, sec := range db.Sections {
+			var panels []panelBrief
+			for _, p := range sec.Panels {
+				pType, _ := p["type"].(string)
+				pTitle, _ := p["title"].(string)
+				if pType == "" {
+					pType = "unknown"
+				}
+				panels = append(panels, panelBrief{Title: pTitle, Type: pType})
+				typeCounts[pType]++
+				panelCount++
+			}
+			sections = append(sections, sectionInfo{
+				Title:     sec.Title,
+				Collapsed: sec.Collapsed,
+				Repeat:    sec.Repeat,
+				Panels:    panels,
+			})
+		}
+		totalPanels += panelCount
+
 		dashList = append(dashList, dashInfo{
-			Title:     db.Title,
-			UID:       db.UID,
-			Filename:  filename,
-			Sections:  db.Sections,
-			Variables: db.Variables,
-			Tags:      db.Tags,
+			Title:       db.Title,
+			UID:         db.UID,
+			Filename:    filename,
+			Sections:    sections,
+			Variables:   db.Variables,
+			Tags:        db.Tags,
+			PanelCount:  panelCount,
+			TypeCounts:  typeCounts,
+			Description: db.Description,
 		})
 	}
 
@@ -68,6 +112,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		"ProfileCount":    len(cfg.Profiles),
 		"ConstantCount":   len(cfg.Constants),
 		"SelectorCount":   len(cfg.Selectors),
+		"PanelCount":      totalPanels,
 		"GrafanaURL":      s.GrafanaURL(),
 	})
 }
