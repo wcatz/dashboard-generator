@@ -22,11 +22,12 @@
           {{if .PanelInfos}}
           <!-- Filter bar -->
           <div class="flex flex-wrap gap-2 mb-3 items-center">
-            <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-48" oninput="searchPreviewPanels(this.value)">
-            <div class="flex flex-wrap gap-1" id="type-filters">
-              {{range .PanelInfos}}{{end}}
-            </div>
+            <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-48" id="panel-search" oninput="applyPreviewFilters()">
+            <div class="flex flex-wrap gap-1" id="type-filters"></div>
           </div>
+
+          <!-- Panel data for client-side drawer -->
+          <script id="panel-data" type="application/json">{{.PanelInfosJSON}}</script>
 
           <div class="preview-grid" data-uid="{{$.UID}}">
             {{range .PanelInfos}}
@@ -35,8 +36,7 @@
             {{else}}
             <div class="preview-panel type-{{.Type}}" style="grid-column: {{add .X 1}} / span {{.W}}; grid-row: {{add .Y 1}} / span {{.H}};"
                  data-panel-id="{{.ID}}" data-panel-title="{{.Title}}" data-panel-type="{{.Type}}"
-                 hx-get="/api/preview/panel?uid={{$.UID}}&id={{.ID}}" hx-target="#panel-detail-content" hx-swap="innerHTML"
-                 onclick="openPanelDetail(this)">
+                 onclick="openPanelDetail({{.ID}})">
               <div class="panel-header">
                 <span class="panel-type-badge">{{.Type}}</span>
                 <span class="panel-dims">{{.W}}x{{.H}}</span>
@@ -63,7 +63,7 @@
     </div>
   </div>
 
-  <!-- Panel detail drawer (right side) -->
+  <!-- Panel detail drawer (right side, client-rendered) -->
   <div id="panel-detail-drawer" class="panel-detail-drawer" style="display:none">
     <div id="panel-detail-content"></div>
   </div>
@@ -86,6 +86,12 @@
       btn.onclick = function() { toggleTypeFilter(t, this); };
       container.appendChild(btn);
     });
+  }
+
+  // Parse and store panel data for client-side drawer
+  var dataEl = document.getElementById('panel-data');
+  if (dataEl) {
+    try { window._panelData = JSON.parse(dataEl.textContent); } catch(e) { window._panelData = []; }
   }
 })();
 </script>

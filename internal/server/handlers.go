@@ -926,47 +926,20 @@ func (s *Server) handlePreviewAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Serialize panel infos as JSON for client-side drawer rendering
+	panelJSON, _ := json.Marshal(panelInfos)
+
 	s.renderPartial(w, "preview-result.html", map[string]interface{}{
-		"UID":        uid,
-		"Title":      title,
-		"Size":       size,
-		"Panels":     panels,
-		"JSON":       jsonStr,
-		"PanelInfos": panelInfos,
+		"UID":            uid,
+		"Title":          title,
+		"Size":           size,
+		"Panels":         panels,
+		"JSON":           jsonStr,
+		"PanelInfos":     panelInfos,
+		"PanelInfosJSON": string(panelJSON),
 	})
 }
 
-func (s *Server) handlePanelDetail(w http.ResponseWriter, r *http.Request) {
-	uid := r.URL.Query().Get("uid")
-	id := r.URL.Query().Get("id")
-	if uid == "" || id == "" {
-		http.Error(w, "missing uid or id", 400)
-		return
-	}
-
-	_, _, _, _, panelInfos, err := s.generatePreview(uid)
-	if err != nil {
-		s.renderPartial(w, "panel-detail.html", map[string]interface{}{"Error": err.Error()})
-		return
-	}
-
-	// Find the panel by ID
-	var idNum int
-	fmt.Sscanf(id, "%d", &idNum)
-	var panel *PanelInfo
-	for i := range panelInfos {
-		if panelInfos[i].ID == idNum {
-			panel = &panelInfos[i]
-			break
-		}
-	}
-	if panel == nil {
-		s.renderPartial(w, "panel-detail.html", map[string]interface{}{"Error": "panel not found"})
-		return
-	}
-
-	s.renderPartial(w, "panel-detail.html", map[string]interface{}{"Panel": panel, "UID": uid})
-}
 
 func (s *Server) generatePreview(uid string) (jsonStr string, title string, size int, panels int, panelInfos []PanelInfo, err error) {
 	cfg := s.Config()
