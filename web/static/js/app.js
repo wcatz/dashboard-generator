@@ -18,15 +18,34 @@ function copyHex(hex) {
   });
 }
 
-// Update swatch color from color picker and copy new hex
-function updateSwatch(input, colorName) {
-  var hex = input.value;
-  var swatch = input.previousElementSibling;
-  swatch.style.background = hex;
-  var hexLabel = input.parentElement.nextElementSibling.nextElementSibling;
-  if (hexLabel) hexLabel.textContent = hex;
-  navigator.clipboard.writeText(hex).then(function() {
-    showToast(colorName + ': ' + hex + ' copied', 'success');
+// ── Palette CRUD (palettes page) ──
+
+function paletteSetColor(palette, color, hex) {
+  htmx.ajax('POST', '/api/palette/color/set', {
+    target: '#palette-cards',
+    swap: 'innerHTML',
+    values: { palette: palette, color: color, hex: hex }
+  });
+  showToast(color + ': ' + hex, 'success');
+}
+
+function paletteAddColor(palette) {
+  var name = prompt('color name:');
+  if (!name || !name.trim()) return;
+  htmx.ajax('POST', '/api/palette/color/set', {
+    target: '#palette-cards',
+    swap: 'innerHTML',
+    values: { palette: palette, color: name.trim(), hex: '#6366f1' }
+  });
+}
+
+function paletteRenameColor(palette, oldName) {
+  var newName = prompt('rename "' + oldName + '" to:', oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+  htmx.ajax('POST', '/api/palette/color/rename', {
+    target: '#palette-cards',
+    swap: 'innerHTML',
+    values: { palette: palette, color: oldName, new_name: newName.trim() }
   });
 }
 

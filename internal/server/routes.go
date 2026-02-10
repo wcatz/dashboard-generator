@@ -38,4 +38,10 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/config/reload", s.handleConfigReload)
 	s.mux.HandleFunc("/api/config/save", s.handleConfigSave)
 	s.mux.HandleFunc("/api/preview", s.handlePreviewAPI)
+	s.mux.HandleFunc("/api/palette/color/set", s.handlePaletteColorSet)
+	s.mux.HandleFunc("/api/palette/color/delete", s.handlePaletteColorDelete)
+	s.mux.HandleFunc("/api/palette/color/rename", s.handlePaletteColorRename)
+	s.mux.HandleFunc("/api/palette/create", s.handlePaletteCreate)
+	s.mux.HandleFunc("/api/palette/delete", s.handlePaletteDelete)
+	s.mux.HandleFunc("/api/palette/activate", s.handlePaletteActivate)
 }
