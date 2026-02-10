@@ -1,0 +1,19 @@
+{{if .Error}}
+<div class="text-error text-xs">{{.Error}}</div>
+{{else if not .Metrics}}
+<div class="text-xs text-base-content/40">no metrics found for job '{{.Job}}'</div>
+{{else}}
+<div class="bg-base-200/50 rounded-lg p-3">
+  <div class="flex justify-between items-center mb-2">
+    <span class="text-xs font-semibold">{{.Total}} metrics for {{.Job}}</span>
+  </div>
+  <div class="space-y-0.5 max-h-[400px] overflow-y-auto">
+    {{range .Metrics}}
+    <div class="flex items-center gap-2 py-1 px-2 rounded hover:bg-base-100 text-xs">
+      <span class="font-mono flex-1 truncate">{{.Name}}</span>
+      <span class="badge badge-xs badge-outline shrink-0">{{.Type}}</span>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

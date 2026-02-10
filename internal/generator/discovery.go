@@ -30,6 +30,28 @@ type MetricInfo struct {
 	Help string
 }
 
+// TargetInfo holds information about a single Prometheus scrape target.
+type TargetInfo struct {
+	ScrapePool         string
+	Instance           string
+	Health             string // "up" or "down"
+	Labels             map[string]string
+	ScrapeURL          string
+	LastScrape         string
+	LastScrapeDuration float64
+	LastError          string
+	ScrapeInterval     string
+}
+
+// JobSummary groups targets by scrape pool (job name).
+type JobSummary struct {
+	Name        string
+	TargetCount int
+	UpCount     int
+	DownCount   int
+	Targets     []TargetInfo
+}
+
 func (md *MetricDiscovery) get(baseURL, path string) (interface{}, error) {
 	url := strings.TrimRight(baseURL, "/") + path
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -179,6 +201,114 @@ func (md *MetricDiscovery) FetchSeriesMetrics(dsName, label, value string) (map[
 		}
 	}
 	return metrics, nil
+}
+
+// FetchTargets retrieves active scrape targets from a Prometheus datasource.
+func (md *MetricDiscovery) FetchTargets(dsName string) ([]TargetInfo, error) {
+	baseURL := md.Config.GetDatasourceURL(dsName)
+	if baseURL == "" {
+		return nil, fmt.Errorf("no URL configured for datasource '%s'", dsName)
+	}
+	data, err := md.get(baseURL, "/api/v1/targets?state=active")
+	if err != nil {
+		return nil, err
+	}
+
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected targets response format")
+	}
+
+	activeList, ok := dataMap["activeTargets"].([]interface{})
+	if !ok {
+		return nil, nil
+	}
+
+	var targets []TargetInfo
+	for _, item := range activeList {
+		t, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		ti := TargetInfo{
+			Health: "unknown",
+		}
+		if v, ok := t["scrapePool"].(string); ok {
+			ti.ScrapePool = v
+		}
+		if v, ok := t["health"].(string); ok {
+			ti.Health = v
+		}
+		if v, ok := t["scrapeUrl"].(string); ok {
+			ti.ScrapeURL = v
+		}
+		if v, ok := t["lastScrape"].(string); ok {
+			ti.LastScrape = v
+		}
+		if v, ok := t["lastScrapeDuration"].(float64); ok {
+			ti.LastScrapeDuration = v
+		}
+		if v, ok := t["lastError"].(string); ok {
+			ti.LastError = v
+		}
+		if v, ok := t["scrapeInterval"].(string); ok {
+			ti.ScrapeInterval = v
+		}
+
+		ti.Labels = make(map[string]string)
+		if labels, ok := t["labels"].(map[string]interface{}); ok {
+			for k, v := range labels {
+				if s, ok := v.(string); ok {
+					ti.Labels[k] = s
+				}
+			}
+		}
+		if inst, ok := ti.Labels["instance"]; ok {
+			ti.Instance = inst
+		}
+
+		targets = append(targets, ti)
+	}
+
+	return targets, nil
+}
+
+// GroupTargetsByJob organizes targets into job-based summaries.
+func GroupTargetsByJob(targets []TargetInfo) []JobSummary {
+	groups := make(map[string]*JobSummary)
+	var order []string
+
+	for _, t := range targets {
+		job := t.ScrapePool
+		if job == "" {
+			job = t.Labels["job"]
+		}
+		if job == "" {
+			job = "unknown"
+		}
+
+		g, ok := groups[job]
+		if !ok {
+			g = &JobSummary{Name: job}
+			groups[job] = g
+			order = append(order, job)
+		}
+		g.TargetCount++
+		if t.Health == "up" {
+			g.UpCount++
+		} else {
+			g.DownCount++
+		}
+		g.Targets = append(g.Targets, t)
+	}
+
+	sort.Strings(order)
+	result := make([]JobSummary, 0, len(order))
+	for _, name := range order {
+		result = append(result, *groups[name])
+	}
+	return result
 }
 
 // Categorize compares metrics between two datasources.

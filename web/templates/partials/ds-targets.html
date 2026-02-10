@@ -1,0 +1,55 @@
+{{if .Error}}
+<div class="alert alert-error text-sm">
+  <span>{{.Error}}</span>
+</div>
+{{else if not .Jobs}}
+<div class="text-center py-4 text-base-content/50 text-xs">
+  <p>no active scrape targets found</p>
+</div>
+{{else}}
+<div class="bg-base-200/50 rounded-lg p-4">
+  <div class="flex justify-between items-center mb-3">
+    <span class="text-xs font-semibold text-base-content/50">scrape targets</span>
+    <span class="text-xs text-base-content/40">{{.TargetCount}} targets across {{len .Jobs}} jobs</span>
+  </div>
+
+  <div class="space-y-1">
+    {{range .Jobs}}
+    <div class="collapse collapse-arrow bg-base-100 border border-base-content/10 rounded-lg">
+      <input type="checkbox">
+      <div class="collapse-title py-2 px-3 min-h-0 flex items-center gap-3 text-sm">
+        <span class="font-mono font-semibold flex-1">{{.Name}}</span>
+        <span class="text-xs text-base-content/40">{{.TargetCount}} targets</span>
+        {{if .UpCount}}<span class="badge badge-xs badge-success">{{.UpCount}} up</span>{{end}}
+        {{if .DownCount}}<span class="badge badge-xs badge-error">{{.DownCount}} down</span>{{end}}
+      </div>
+      <div class="collapse-content px-3 pb-3">
+        <div class="space-y-1 mt-1">
+          {{range .Targets}}
+          <div class="flex items-center gap-2 text-xs py-1 px-2 rounded hover:bg-base-200">
+            {{if eq .Health "up"}}
+            <span class="w-2 h-2 rounded-full bg-success shrink-0"></span>
+            {{else}}
+            <span class="w-2 h-2 rounded-full bg-error shrink-0"></span>
+            {{end}}
+            <span class="font-mono flex-1 truncate">{{.Instance}}</span>
+            {{if .ScrapeInterval}}<span class="text-base-content/30">{{.ScrapeInterval}}</span>{{end}}
+            {{if .LastError}}<span class="text-error truncate max-w-[200px]" title="{{.LastError}}">{{.LastError}}</span>{{end}}
+          </div>
+          {{end}}
+        </div>
+        <button class="btn btn-xs btn-outline mt-3"
+                hx-get="/api/datasource/targets/metrics?name={{$.Datasource}}&job={{.Name}}"
+                hx-target="#ds-metrics-{{$.Datasource}}-{{.Name}}"
+                hx-indicator="#ds-metrics-spin-{{$.Datasource}}-{{.Name}}"
+                hx-disabled-elt="this"
+                hx-swap="innerHTML">
+          view metrics <span id="ds-metrics-spin-{{$.Datasource}}-{{.Name}}" class="htmx-indicator"><span class="spinner"></span></span>
+        </button>
+        <div id="ds-metrics-{{$.Datasource}}-{{.Name}}" class="mt-2"></div>
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{end}}

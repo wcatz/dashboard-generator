@@ -1,58 +1,99 @@
 {{define "content"}}
 <h1 class="text-xl font-bold mb-1">datasources</h1>
-<p class="text-sm text-base-content/50 mb-6">manage Prometheus connections for metric discovery</p>
+<p class="text-sm text-base-content/50 mb-6">manage Prometheus connections and browse scrape targets</p>
 
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-  {{range $name, $ds := .Datasources}}
-  <div class="card bg-base-100 border border-base-content/10">
-    <div class="card-body p-5">
-      <h3 class="card-title text-sm">{{$name}} {{if $ds.IsDefault}}<span class="badge badge-sm badge-success">default</span>{{end}}</h3>
-      <table class="text-xs w-full">
-        <tr><td class="text-base-content/50 w-16 py-1">type</td><td>{{$ds.Type}}</td></tr>
-        <tr><td class="text-base-content/50 py-1">uid</td><td><code class="text-xs">{{$ds.UID}}</code></td></tr>
-        <tr><td class="text-base-content/50 py-1">url</td><td>{{if $ds.URL}}<code class="text-xs">{{$ds.URL}}</code>{{else}}<span class="opacity-40">not set</span>{{end}}</td></tr>
-      </table>
-      {{if $ds.URL}}
-      <div class="mt-3">
-        <button class="btn btn-xs btn-outline" hx-get="/api/datasource/test?name={{$name}}" hx-target="#ds-status-{{$name}}" hx-indicator="#ds-spin-{{$name}}" hx-disabled-elt="this">
-          test connection <span id="ds-spin-{{$name}}" class="htmx-indicator"><span class="spinner"></span></span>
-        </button>
-        <div id="ds-status-{{$name}}" class="mt-2 text-xs"></div>
-      </div>
-      {{end}}
-    </div>
-  </div>
-  {{end}}
-</div>
-
-{{if not .Datasources}}
-<div class="text-center py-12 text-base-content/50">
-  <p>no datasources defined</p>
-</div>
-{{end}}
-
-<div class="card bg-base-100 border border-base-content/10 mt-6">
+<!-- add datasource -->
+<div class="card bg-base-100 border border-base-content/10 mb-6">
   <div class="card-body p-5">
-    <h3 class="card-title text-sm">add datasource URL</h3>
-    <p class="text-xs text-base-content/50 mb-3">set the URL for an existing datasource to enable metric discovery</p>
-    <form hx-post="/api/datasource/url" hx-target="#ds-url-result" hx-swap="innerHTML">
+    <h3 class="card-title text-sm">add datasource</h3>
+    <form hx-post="/api/datasource/add" hx-target="#ds-add-result" hx-indicator="#ds-add-spin">
       <div class="flex flex-wrap gap-3 items-end">
-        <label class="form-control flex-1 min-w-[150px]">
-          <div class="label"><span class="label-text text-xs">datasource name</span></div>
-          <select name="name" class="select select-bordered select-sm w-full">
-            {{range $name, $ds := .Datasources}}
-            <option value="{{$name}}">{{$name}}</option>
-            {{end}}
-          </select>
+        <label class="form-control flex-1 min-w-[120px]">
+          <div class="label"><span class="label-text text-xs">name</span></div>
+          <input type="text" name="name" placeholder="my-prometheus" required class="input input-bordered input-sm w-full">
         </label>
         <label class="form-control flex-[2] min-w-[200px]">
           <div class="label"><span class="label-text text-xs">Prometheus URL</span></div>
           <input type="url" name="url" placeholder="http://prometheus:9090" required class="input input-bordered input-sm w-full">
         </label>
-        <button type="submit" class="btn btn-sm btn-primary">set URL</button>
+        <button type="submit" class="btn btn-sm btn-primary">
+          add <span id="ds-add-spin" class="htmx-indicator"><span class="spinner"></span></span>
+        </button>
       </div>
     </form>
-    <div id="ds-url-result" class="mt-2 text-sm"></div>
+    <div id="ds-add-result" class="mt-2"></div>
   </div>
 </div>
+
+<!-- datasource cards -->
+{{if .Datasources}}
+<div class="space-y-4">
+  {{range $name, $ds := .Datasources}}
+  <div class="card bg-base-100 border border-base-content/10">
+    <div class="card-body p-5">
+      <div class="flex justify-between items-start">
+        <div>
+          <h3 class="card-title text-sm gap-2">
+            {{$name}}
+            {{if $ds.IsDefault}}<span class="badge badge-sm badge-success">default</span>{{end}}
+            <span class="badge badge-sm badge-outline">{{$ds.Type}}</span>
+          </h3>
+          {{if $ds.URL}}
+          <code class="text-xs text-base-content/50 mt-1 block">{{$ds.URL}}</code>
+          {{else}}
+          <span class="text-xs opacity-40 mt-1 block">no URL configured</span>
+          {{end}}
+        </div>
+        <button class="btn btn-ghost btn-xs text-error opacity-50 hover:opacity-100"
+                hx-post="/api/datasource/delete" hx-vals='{"name":"{{$name}}"}'
+                hx-confirm="delete datasource '{{$name}}'?" hx-disabled-elt="this">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </button>
+      </div>
+
+      <div class="text-xs text-base-content/40 mt-1">uid: <code>{{$ds.UID}}</code></div>
+
+      {{if $ds.URL}}
+      <div class="flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-xs btn-outline"
+                hx-get="/api/datasource/test?name={{$name}}"
+                hx-target="#ds-status-{{$name}}"
+                hx-indicator="#ds-spin-{{$name}}"
+                hx-disabled-elt="this">
+          test <span id="ds-spin-{{$name}}" class="htmx-indicator"><span class="spinner"></span></span>
+        </button>
+        <button class="btn btn-xs btn-outline"
+                hx-get="/api/datasource/targets?name={{$name}}"
+                hx-target="#ds-drill-{{$name}}"
+                hx-indicator="#ds-targets-spin-{{$name}}"
+                hx-disabled-elt="this">
+          view targets <span id="ds-targets-spin-{{$name}}" class="htmx-indicator"><span class="spinner"></span></span>
+        </button>
+      </div>
+      <div id="ds-status-{{$name}}" class="mt-2 text-xs"></div>
+      {{else}}
+      <form class="mt-3" hx-post="/api/datasource/url" hx-target="#ds-url-result-{{$name}}" hx-swap="innerHTML">
+        <input type="hidden" name="name" value="{{$name}}">
+        <div class="flex gap-2 items-end">
+          <label class="form-control flex-1">
+            <input type="url" name="url" placeholder="http://prometheus:9090" required class="input input-bordered input-xs w-full">
+          </label>
+          <button type="submit" class="btn btn-xs btn-primary">set URL</button>
+        </div>
+      </form>
+      <div id="ds-url-result-{{$name}}" class="mt-1 text-xs"></div>
+      {{end}}
+
+      <!-- drill-down target for HTMX -->
+      <div id="ds-drill-{{$name}}" class="mt-3"></div>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{else}}
+<div class="text-center py-12 text-base-content/50">
+  <p>no datasources defined</p>
+  <p class="text-xs mt-1">add one above to get started</p>
+</div>
+{{end}}
 {{end}}
