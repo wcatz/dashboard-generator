@@ -4,6 +4,9 @@
 </div>
 {{else}}
 <div class="flex gap-4">
+  <!-- Section nav sidebar -->
+  <div class="section-nav" id="section-nav"></div>
+
   <!-- Main preview area -->
   <div class="flex-1 min-w-0">
     <div class="card bg-base-100 border border-base-content/10">
@@ -20,22 +23,34 @@
 
         <div class="preview-tab-content" data-tab="visual" style="display:block">
           {{if .PanelInfos}}
-          <!-- Filter bar -->
+          <!-- Toolbar: search + type filters + zoom + stats -->
           <div class="flex flex-wrap gap-2 mb-3 items-center">
             <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-48" id="panel-search" oninput="applyPreviewFilters()">
             <div class="flex flex-wrap gap-1" id="type-filters"></div>
+            <div class="flex-1"></div>
+            <div class="zoom-control">
+              <span class="zoom-label" id="zoom-label">1x</span>
+              <input type="range" min="0.5" max="2" step="0.1" value="1" id="zoom-slider" oninput="setPreviewZoom(this.value)">
+            </div>
           </div>
+
+          <!-- Stats bar -->
+          <div class="preview-stats mb-3" id="preview-stats"></div>
 
           <!-- Panel data for client-side drawer -->
           <script id="panel-data" type="application/json">{{.PanelInfosJSON}}</script>
 
-          <div class="preview-grid" data-uid="{{$.UID}}">
+          <div class="preview-grid" data-uid="{{$.UID}}" id="preview-grid">
             {{range .PanelInfos}}
             {{if eq .Type "row"}}
-            <div class="preview-row" id="section-{{.Y}}" style="grid-row: {{add .Y 1}};">{{.Title}}</div>
+            <div class="preview-row" id="section-{{.Y}}" data-section-y="{{.Y}}" style="grid-row: {{add .Y 1}};" onclick="toggleRowCollapse(this)">
+              <span class="row-toggle">&#9660;</span>
+              {{.Title}}
+              <span class="row-panel-count"></span>
+            </div>
             {{else}}
             <div class="preview-panel type-{{.Type}}" style="grid-column: {{add .X 1}} / span {{.W}}; grid-row: {{add .Y 1}} / span {{.H}};"
-                 data-panel-id="{{.ID}}" data-panel-title="{{.Title}}" data-panel-type="{{.Type}}"
+                 data-panel-id="{{.ID}}" data-panel-title="{{.Title}}" data-panel-type="{{.Type}}" data-section-y="{{.SectionY}}"
                  onclick="openPanelDetail({{.ID}})">
               <div class="panel-header">
                 <span class="panel-type-badge">{{.Type}}</span>
@@ -71,28 +86,71 @@
 
 <script>
 (function() {
-  // Build type filter buttons from panel data
+  // Build type filter buttons and stats from panel data
   var types = {};
+  var totalPanels = 0;
   document.querySelectorAll('.preview-panel[data-panel-type]').forEach(function(el) {
     types[el.dataset.panelType] = (types[el.dataset.panelType] || 0) + 1;
+    totalPanels++;
   });
-  var container = document.getElementById('type-filters');
-  if (container) {
+
+  var filterContainer = document.getElementById('type-filters');
+  if (filterContainer) {
     Object.keys(types).sort().forEach(function(t) {
       var btn = document.createElement('button');
       btn.className = 'badge badge-xs badge-outline cursor-pointer type-filter-btn type-filter-' + t;
       btn.textContent = types[t] + ' ' + t;
       btn.dataset.type = t;
       btn.onclick = function() { toggleTypeFilter(t, this); };
-      container.appendChild(btn);
+      filterContainer.appendChild(btn);
     });
   }
+
+  // Stats bar
+  var statsEl = document.getElementById('preview-stats');
+  if (statsEl && totalPanels > 0) {
+    var rows = document.querySelectorAll('.preview-row').length;
+    statsEl.textContent = totalPanels + ' panels in ' + rows + ' sections';
+  }
+
+  // Section nav sidebar
+  var navEl = document.getElementById('section-nav');
+  var rowEls = document.querySelectorAll('.preview-row');
+  if (navEl && rowEls.length > 0) {
+    rowEls.forEach(function(row) {
+      var link = document.createElement('a');
+      link.className = 'section-nav-link';
+      link.href = '#' + row.id;
+      link.textContent = row.textContent.trim();
+      link.onclick = function(e) {
+        e.preventDefault();
+        row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelectorAll('.section-nav-link').forEach(function(l) { l.classList.remove('active'); });
+        link.classList.add('active');
+      };
+      navEl.appendChild(link);
+    });
+  } else if (navEl) {
+    navEl.style.display = 'none';
+  }
+
+  // Row panel counts
+  rowEls.forEach(function(row) {
+    var sectionY = row.dataset.sectionY;
+    var count = document.querySelectorAll('.preview-panel[data-section-y="' + sectionY + '"]').length;
+    var badge = row.querySelector('.row-panel-count');
+    if (badge) badge.textContent = count + ' panels';
+  });
 
   // Parse and store panel data for client-side drawer
   var dataEl = document.getElementById('panel-data');
   if (dataEl) {
     try { window._panelData = JSON.parse(dataEl.textContent); } catch(e) { window._panelData = []; }
   }
+
+  // Restore zoom from localStorage
+  var savedZoom = localStorage.getItem('preview-zoom');
+  if (savedZoom) setPreviewZoom(savedZoom);
 })();
 </script>
 {{end}}
