@@ -19,14 +19,22 @@ function copyHex(hex) {
 }
 
 // ── Palette CRUD (palettes page) ──
+// All palette/color names come from data-* attributes (safe from XSS)
+// rather than inline template interpolation in JS strings.
 
 function paletteSetColor(palette, color, hex) {
   htmx.ajax('POST', '/api/palette/color/set', {
     target: '#palette-cards',
     swap: 'innerHTML',
     values: { palette: palette, color: color, hex: hex }
+  }).then(function() {
+    showToast(color + ': ' + hex, 'success');
   });
-  showToast(color + ': ' + hex, 'success');
+}
+
+function paletteSetColorFromPicker(input) {
+  var group = input.closest('[data-palette]');
+  paletteSetColor(group.dataset.palette, group.dataset.color, input.value);
 }
 
 function paletteAddColor(palette) {
@@ -39,13 +47,42 @@ function paletteAddColor(palette) {
   });
 }
 
-function paletteRenameColor(palette, oldName) {
+function paletteRenameColorFromEl(el) {
+  var group = el.closest('[data-palette]');
+  var palette = group.dataset.palette;
+  var oldName = group.dataset.color;
   var newName = prompt('rename "' + oldName + '" to:', oldName);
   if (!newName || !newName.trim() || newName.trim() === oldName) return;
   htmx.ajax('POST', '/api/palette/color/rename', {
     target: '#palette-cards',
     swap: 'innerHTML',
     values: { palette: palette, color: oldName, new_name: newName.trim() }
+  });
+}
+
+function paletteDeleteColorFromEl(el) {
+  var group = el.closest('[data-palette]');
+  htmx.ajax('POST', '/api/palette/color/delete', {
+    target: '#palette-cards',
+    swap: 'innerHTML',
+    values: { palette: group.dataset.palette, color: group.dataset.color }
+  });
+}
+
+function paletteActivate(name) {
+  htmx.ajax('POST', '/api/palette/activate', {
+    target: '#palette-cards',
+    swap: 'innerHTML',
+    values: { name: name }
+  });
+}
+
+function paletteDeletePalette(name) {
+  if (!confirm('delete palette \'' + name + '\'?')) return;
+  htmx.ajax('POST', '/api/palette/delete', {
+    target: '#palette-cards',
+    swap: 'innerHTML',
+    values: { name: name }
   });
 }
 

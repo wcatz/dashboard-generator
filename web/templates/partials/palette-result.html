@@ -5,7 +5,7 @@
 {{end}}
 
 {{range $name, $colors := .Palettes}}
-<div class="card bg-base-100 border border-base-content/10 mb-4" id="palette-{{$name}}">
+<div class="card bg-base-100 border border-base-content/10 mb-4" data-palette-name="{{$name}}">
   <div class="card-body p-5">
     <div class="flex items-center gap-2 mb-3">
       <h3 class="card-title text-sm flex-1">
@@ -14,13 +14,12 @@
       </h3>
       {{if ne $name $.ActivePalette}}
       <button class="btn btn-xs btn-ghost" title="set as active palette"
-        hx-post="/api/palette/activate" hx-vals='{"name":"{{$name}}"}' hx-target="#palette-cards" hx-swap="innerHTML">
+        onclick="paletteActivate(this.closest('[data-palette-name]').dataset.paletteName)">
         activate
       </button>
       {{end}}
       <button class="btn btn-xs btn-ghost btn-error" title="delete palette"
-        hx-post="/api/palette/delete" hx-vals='{"name":"{{$name}}"}' hx-target="#palette-cards" hx-swap="innerHTML"
-        hx-confirm="delete palette '{{$name}}'?">
+        onclick="paletteDeletePalette(this.closest('[data-palette-name]').dataset.paletteName)">
         delete
       </button>
     </div>
@@ -31,13 +30,13 @@
         <div class="relative w-12 h-12">
           <div class="w-12 h-12 rounded-md border border-base-content/10 group-hover:scale-110 transition-transform cursor-pointer" style="background: {{$hex}};" onclick="this.nextElementSibling.click()" title="click to change color"></div>
           <input type="color" value="{{$hex}}" class="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-            onchange="paletteSetColor('{{$name}}', '{{$color}}', this.value)">
+            onchange="paletteSetColorFromPicker(this)">
         </div>
-        <div class="text-[0.65rem] mt-1 opacity-50 cursor-pointer hover:text-primary" onclick="paletteRenameColor('{{$name}}', '{{$color}}')" title="click to rename">{{$color}}</div>
+        <div class="text-[0.65rem] mt-1 opacity-50 cursor-pointer hover:text-primary" onclick="paletteRenameColorFromEl(this)" title="click to rename">{{$color}}</div>
         <div class="flex items-center justify-center gap-0.5">
           <span class="text-[0.6rem] font-mono text-base-content/60 cursor-pointer hover:text-primary" onclick="copyHex(this.textContent)" title="click to copy">{{$hex}}</span>
           <button class="btn btn-xs btn-ghost btn-circle opacity-0 group-hover:opacity-50 hover:!opacity-100 !h-4 !w-4 !min-h-0" title="delete color"
-            hx-post="/api/palette/color/delete" hx-vals='{"palette":"{{$name}}","color":"{{$color}}"}' hx-target="#palette-cards" hx-swap="innerHTML">
+            onclick="paletteDeleteColorFromEl(this)">
             &#215;
           </button>
         </div>
@@ -46,7 +45,8 @@
 
       <!-- Add color button -->
       <div class="text-center">
-        <button class="w-12 h-12 rounded-md border-2 border-dashed border-base-content/20 hover:border-primary flex items-center justify-center cursor-pointer transition-colors" onclick="paletteAddColor('{{$name}}')" title="add color">
+        <button class="w-12 h-12 rounded-md border-2 border-dashed border-base-content/20 hover:border-primary flex items-center justify-center cursor-pointer transition-colors"
+          onclick="paletteAddColor(this.closest('[data-palette-name]').dataset.paletteName)" title="add color">
           <span class="text-lg text-base-content/30">+</span>
         </button>
         <div class="text-[0.65rem] mt-1 opacity-30">add</div>

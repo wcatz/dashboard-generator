@@ -1012,7 +1012,10 @@ func (s *Server) handlePaletteColorSet(w http.ResponseWriter, r *http.Request) {
 		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
-	s.ReloadConfig()
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": "saved but reload failed: " + err.Error()})
+		return
+	}
 	s.renderPaletteCards(w)
 }
 
@@ -1033,7 +1036,10 @@ func (s *Server) handlePaletteColorDelete(w http.ResponseWriter, r *http.Request
 		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
-	s.ReloadConfig()
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": "saved but reload failed: " + err.Error()})
+		return
+	}
 	s.renderPaletteCards(w)
 }
 
@@ -1055,7 +1061,10 @@ func (s *Server) handlePaletteColorRename(w http.ResponseWriter, r *http.Request
 		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
-	s.ReloadConfig()
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": "saved but reload failed: " + err.Error()})
+		return
+	}
 	s.renderPaletteCards(w)
 }
 
@@ -1075,7 +1084,10 @@ func (s *Server) handlePaletteCreate(w http.ResponseWriter, r *http.Request) {
 		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
-	s.ReloadConfig()
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": "saved but reload failed: " + err.Error()})
+		return
+	}
 	s.renderPaletteCards(w)
 }
 
@@ -1095,7 +1107,10 @@ func (s *Server) handlePaletteDelete(w http.ResponseWriter, r *http.Request) {
 		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
-	s.ReloadConfig()
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": "saved but reload failed: " + err.Error()})
+		return
+	}
 	s.renderPaletteCards(w)
 }
 
@@ -1115,7 +1130,10 @@ func (s *Server) handlePaletteActivate(w http.ResponseWriter, r *http.Request) {
 		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
-	s.ReloadConfig()
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "palette-result.html", map[string]interface{}{"Error": "saved but reload failed: " + err.Error()})
+		return
+	}
 	s.renderPaletteCards(w)
 }
 

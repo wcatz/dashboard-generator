@@ -266,6 +266,11 @@ func (e *YAMLEditor) SetActivePalette(name string) error {
 		return err
 	}
 
+	palettesNode := findMappingKey(root, "palettes")
+	if palettesNode == nil || findMappingKey(palettesNode, name) == nil {
+		return fmt.Errorf("palette '%s' not found", name)
+	}
+
 	apNode := findMappingKey(root, "active_palette")
 	if apNode != nil {
 		apNode.Value = name
