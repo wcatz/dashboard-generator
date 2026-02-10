@@ -22,52 +22,9 @@
   </div>
 </div>
 
-<div id="preview-result">
-  {{if .JSON}}
-  <div class="card bg-base-100 border border-base-content/10">
-    <div class="card-body p-5">
-      <div class="flex justify-between items-center mb-3">
-        <h3 class="card-title text-sm">{{.PreviewTitle}}</h3>
-        <span class="text-xs text-base-content/50">{{.PreviewSize}} bytes &middot; {{.PreviewPanels}} panels</span>
-      </div>
-
-      <div role="tablist" class="tabs tabs-bordered mb-4">
-        <button role="tab" class="tab tab-active preview-tab-btn" data-tab="visual" onclick="togglePreviewTab('visual')">visual</button>
-        <button role="tab" class="tab preview-tab-btn" data-tab="json" onclick="togglePreviewTab('json')">JSON</button>
-      </div>
-
-      <div class="preview-tab-content" data-tab="visual" style="display:block">
-        {{if .PanelInfos}}
-        <div class="preview-grid">
-          {{range .PanelInfos}}
-          {{if eq .Type "row"}}
-          <div class="preview-row" style="grid-row: {{add .Y 1}};">{{.Title}}</div>
-          {{else}}
-          <div class="preview-panel type-{{.Type}}" style="grid-column: {{add .X 1}} / span {{.W}}; grid-row: {{add .Y 1}} / span {{.H}};">
-            <div class="panel-header">
-              <span class="panel-type-badge">{{.Type}}</span>
-              <span class="panel-dims">{{.W}}x{{.H}}</span>
-            </div>
-            <div class="panel-title">{{.Title}}</div>
-          </div>
-          {{end}}
-          {{end}}
-        </div>
-        {{else}}
-        <div class="text-center py-6 text-base-content/50"><p>no panels found</p></div>
-        {{end}}
-      </div>
-
-      <div class="preview-tab-content" data-tab="json" style="display:none">
-        <div class="flex justify-end gap-2 mb-2">
-          <button class="btn btn-xs btn-ghost" onclick="copyToClipboard('json-output')">copy</button>
-          <button class="btn btn-xs btn-ghost" onclick="downloadJSON('{{.PreviewTitle}}.json', 'json-output')">download</button>
-        </div>
-        <pre class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[600px]"><code id="json-output" class="language-json hljs-auto">{{.JSON}}</code></pre>
-      </div>
-    </div>
-  </div>
-  {{else}}
+<div id="preview-result"
+  {{if .SelectedUID}}hx-get="/api/preview?uid={{.SelectedUID}}" hx-trigger="load" hx-swap="innerHTML"{{end}}>
+  {{if not .SelectedUID}}
   <div class="text-center py-12 text-base-content/50">
     <p>select a dashboard and click preview</p>
   </div>

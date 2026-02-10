@@ -203,31 +203,14 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 
 	selectedUID := r.URL.Query().Get("uid")
 
-	data := map[string]interface{}{
+	s.renderPage(w, "preview.html", map[string]interface{}{
 		"Title":       "preview",
 		"Active":      "preview",
 		"ConfigPath":  s.ConfigPath(),
 		"GrafanaURL":  s.GrafanaURL(),
 		"Dashboards":  opts,
 		"SelectedUID": selectedUID,
-		"JSON":        "",
-	}
-
-	// If a UID was requested via query param, generate the preview
-	if selectedUID != "" {
-		jsonStr, title, size, panels, panelInfos, err := s.generatePreview(selectedUID)
-		if err != nil {
-			data["JSON"] = ""
-		} else {
-			data["JSON"] = jsonStr
-			data["PreviewTitle"] = title
-			data["PreviewSize"] = size
-			data["PreviewPanels"] = panels
-			data["PanelInfos"] = panelInfos
-		}
-	}
-
-	s.renderPage(w, "preview.html", data)
+	})
 }
 
 func (s *Server) handleVariables(w http.ResponseWriter, r *http.Request) {
@@ -604,13 +587,32 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 // DashboardConfig is a type alias for use in handler scope.
 type DashboardConfig = config.DashboardConfig
 
-// PanelInfo holds layout info for a single panel, used by the visual preview.
+// PanelInfo holds layout and detail info for a single panel, used by the visual preview.
 type PanelInfo struct {
-	ID      int
-	Title   string
-	Type    string
+	ID          int
+	Title       string
+	Type        string
 	X, Y, W, H int
-	Section string
+	Section     string
+	Datasource  string
+	Unit        string
+	Description string
+	Queries     []QueryInfo
+	Thresholds  []ThresholdStep
+}
+
+// QueryInfo holds a single target's expression and legend.
+type QueryInfo struct {
+	Expr       string
+	Legend     string
+	Datasource string
+	RefID      string
+}
+
+// ThresholdStep holds a single threshold step for display.
+type ThresholdStep struct {
+	Color string
+	Value string
 }
 
 // extractPanelInfo parses the panels array from a generated dashboard JSON map.
@@ -632,38 +634,13 @@ func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 		}
 
 		pType, _ := p["type"].(string)
-		title, _ := p["title"].(string)
-		id, _ := p["id"].(float64)
-
 		if pType == "row" {
+			title, _ := p["title"].(string)
 			currentSection = title
 		}
 
-		gp, ok := p["gridPos"].(map[string]interface{})
-		if !ok {
-			infos = append(infos, PanelInfo{
-				ID:      int(id),
-				Title:   title,
-				Type:    pType,
-				Section: currentSection,
-			})
-		} else {
-			x, _ := gp["x"].(float64)
-			y, _ := gp["y"].(float64)
-			w, _ := gp["w"].(float64)
-			h, _ := gp["h"].(float64)
-
-			infos = append(infos, PanelInfo{
-				ID:      int(id),
-				Title:   title,
-				Type:    pType,
-				X:       int(x),
-				Y:       int(y),
-				W:       int(w),
-				H:       int(h),
-				Section: currentSection,
-			})
-		}
+		info := parsePanelJSON(p, currentSection)
+		infos = append(infos, info)
 
 		// Recurse into collapsed row panels that nest their children.
 		if pType == "row" {
@@ -673,34 +650,101 @@ func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 					if !ok {
 						continue
 					}
-					nType, _ := np["type"].(string)
-					nTitle, _ := np["title"].(string)
-					nID, _ := np["id"].(float64)
-
-					info := PanelInfo{
-						ID:      int(nID),
-						Title:   nTitle,
-						Type:    nType,
-						Section: currentSection,
-					}
-
-					if ngp, ok := np["gridPos"].(map[string]interface{}); ok {
-						nx, _ := ngp["x"].(float64)
-						ny, _ := ngp["y"].(float64)
-						nw, _ := ngp["w"].(float64)
-						nh, _ := ngp["h"].(float64)
-						info.X = int(nx)
-						info.Y = int(ny)
-						info.W = int(nw)
-						info.H = int(nh)
-					}
-
-					infos = append(infos, info)
+					infos = append(infos, parsePanelJSON(np, currentSection))
 				}
 			}
 		}
 	}
 	return infos
+}
+
+// parsePanelJSON extracts PanelInfo from a single panel JSON map.
+func parsePanelJSON(p map[string]interface{}, section string) PanelInfo {
+	pType, _ := p["type"].(string)
+	title, _ := p["title"].(string)
+	id, _ := p["id"].(float64)
+	desc, _ := p["description"].(string)
+
+	info := PanelInfo{
+		ID:          int(id),
+		Title:       title,
+		Type:        pType,
+		Section:     section,
+		Description: desc,
+	}
+
+	// Grid position
+	if gp, ok := p["gridPos"].(map[string]interface{}); ok {
+		x, _ := gp["x"].(float64)
+		y, _ := gp["y"].(float64)
+		w, _ := gp["w"].(float64)
+		h, _ := gp["h"].(float64)
+		info.X = int(x)
+		info.Y = int(y)
+		info.W = int(w)
+		info.H = int(h)
+	}
+
+	// Datasource
+	if ds, ok := p["datasource"].(map[string]interface{}); ok {
+		if uid, ok := ds["uid"].(string); ok {
+			info.Datasource = uid
+		}
+	}
+
+	// Unit and thresholds from fieldConfig.defaults
+	if fc, ok := p["fieldConfig"].(map[string]interface{}); ok {
+		if defaults, ok := fc["defaults"].(map[string]interface{}); ok {
+			if unit, ok := defaults["unit"].(string); ok && unit != "none" {
+				info.Unit = unit
+			}
+			if th, ok := defaults["thresholds"].(map[string]interface{}); ok {
+				if steps, ok := th["steps"].([]interface{}); ok {
+					for _, s := range steps {
+						step, ok := s.(map[string]interface{})
+						if !ok {
+							continue
+						}
+						color, _ := step["color"].(string)
+						val := "base"
+						if v, ok := step["value"].(float64); ok {
+							val = fmt.Sprintf("%g", v)
+						}
+						info.Thresholds = append(info.Thresholds, ThresholdStep{Color: color, Value: val})
+					}
+				}
+			}
+		}
+	}
+
+	// Targets (queries)
+	if targets, ok := p["targets"].([]interface{}); ok {
+		for _, t := range targets {
+			target, ok := t.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			q := QueryInfo{
+				Expr:   stringFromMap(target, "expr"),
+				Legend: stringFromMap(target, "legendFormat"),
+				RefID:  stringFromMap(target, "refId"),
+			}
+			if ds, ok := target["datasource"].(map[string]interface{}); ok {
+				if uid, ok := ds["uid"].(string); ok {
+					q.Datasource = uid
+				}
+			}
+			info.Queries = append(info.Queries, q)
+		}
+	}
+
+	return info
+}
+
+// stringFromMap extracts a string from a map, returning "" if not found.
+func stringFromMap(m map[string]interface{}, key string) string {
+	v, _ := m[key].(string)
+	return v
 }
 
 func (s *Server) handleDatasourceTest(w http.ResponseWriter, r *http.Request) {
@@ -882,14 +926,20 @@ func (s *Server) handlePreviewAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Serialize panel infos as JSON for client-side drawer rendering
+	panelJSON, _ := json.Marshal(panelInfos)
+
 	s.renderPartial(w, "preview-result.html", map[string]interface{}{
-		"Title":      title,
-		"Size":       size,
-		"Panels":     panels,
-		"JSON":       jsonStr,
-		"PanelInfos": panelInfos,
+		"UID":            uid,
+		"Title":          title,
+		"Size":           size,
+		"Panels":         panels,
+		"JSON":           jsonStr,
+		"PanelInfos":     panelInfos,
+		"PanelInfosJSON": string(panelJSON),
 	})
 }
+
 
 func (s *Server) generatePreview(uid string) (jsonStr string, title string, size int, panels int, panelInfos []PanelInfo, err error) {
 	cfg := s.Config()

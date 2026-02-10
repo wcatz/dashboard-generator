@@ -3,47 +3,96 @@
   <span>error: {{.Error}}</span>
 </div>
 {{else}}
-<div class="card bg-base-100 border border-base-content/10">
-  <div class="card-body p-5">
-    <div class="flex justify-between items-center mb-3">
-      <h3 class="card-title text-sm">{{.Title}}</h3>
-      <span class="text-xs text-base-content/50">{{.Size}} bytes &middot; {{.Panels}} panels</span>
-    </div>
-
-    <div role="tablist" class="tabs tabs-bordered mb-4">
-      <button role="tab" class="tab tab-active preview-tab-btn" data-tab="visual" onclick="togglePreviewTab('visual')">visual</button>
-      <button role="tab" class="tab preview-tab-btn" data-tab="json" onclick="togglePreviewTab('json')">JSON</button>
-    </div>
-
-    <div class="preview-tab-content" data-tab="visual" style="display:block">
-      {{if .PanelInfos}}
-      <div class="preview-grid">
-        {{range .PanelInfos}}
-        {{if eq .Type "row"}}
-        <div class="preview-row" style="grid-row: {{add .Y 1}};">{{.Title}}</div>
-        {{else}}
-        <div class="preview-panel type-{{.Type}}" style="grid-column: {{add .X 1}} / span {{.W}}; grid-row: {{add .Y 1}} / span {{.H}};">
-          <div class="panel-header">
-            <span class="panel-type-badge">{{.Type}}</span>
-            <span class="panel-dims">{{.W}}x{{.H}}</span>
-          </div>
-          <div class="panel-title">{{.Title}}</div>
+<div class="flex gap-4">
+  <!-- Main preview area -->
+  <div class="flex-1 min-w-0">
+    <div class="card bg-base-100 border border-base-content/10">
+      <div class="card-body p-5">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="card-title text-sm">{{.Title}}</h3>
+          <span class="text-xs text-base-content/50">{{.Size}} bytes &middot; {{.Panels}} panels</span>
         </div>
-        {{end}}
-        {{end}}
-      </div>
-      {{else}}
-      <div class="text-center py-6 text-base-content/50"><p>no panels found</p></div>
-      {{end}}
-    </div>
 
-    <div class="preview-tab-content" data-tab="json" style="display:none">
-      <div class="flex justify-end gap-2 mb-2">
-        <button class="btn btn-xs btn-ghost" onclick="copyToClipboard('json-output')">copy</button>
-        <button class="btn btn-xs btn-ghost" onclick="downloadJSON('{{.Title}}.json', 'json-output')">download</button>
+        <div role="tablist" class="tabs tabs-bordered mb-4">
+          <button role="tab" class="tab tab-active preview-tab-btn" data-tab="visual" onclick="togglePreviewTab('visual')">visual</button>
+          <button role="tab" class="tab preview-tab-btn" data-tab="json" onclick="togglePreviewTab('json')">JSON</button>
+        </div>
+
+        <div class="preview-tab-content" data-tab="visual" style="display:block">
+          {{if .PanelInfos}}
+          <!-- Filter bar -->
+          <div class="flex flex-wrap gap-2 mb-3 items-center">
+            <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-48" id="panel-search" oninput="applyPreviewFilters()">
+            <div class="flex flex-wrap gap-1" id="type-filters"></div>
+          </div>
+
+          <!-- Panel data for client-side drawer -->
+          <script id="panel-data" type="application/json">{{.PanelInfosJSON}}</script>
+
+          <div class="preview-grid" data-uid="{{$.UID}}">
+            {{range .PanelInfos}}
+            {{if eq .Type "row"}}
+            <div class="preview-row" id="section-{{.Y}}" style="grid-row: {{add .Y 1}};">{{.Title}}</div>
+            {{else}}
+            <div class="preview-panel type-{{.Type}}" style="grid-column: {{add .X 1}} / span {{.W}}; grid-row: {{add .Y 1}} / span {{.H}};"
+                 data-panel-id="{{.ID}}" data-panel-title="{{.Title}}" data-panel-type="{{.Type}}"
+                 onclick="openPanelDetail({{.ID}})">
+              <div class="panel-header">
+                <span class="panel-type-badge">{{.Type}}</span>
+                <span class="panel-dims">{{.W}}x{{.H}}</span>
+              </div>
+              <div class="panel-title">{{.Title}}</div>
+              {{if .Queries}}<div class="panel-query-hint">{{(index .Queries 0).Expr}}</div>{{end}}
+            </div>
+            {{end}}
+            {{end}}
+          </div>
+          {{else}}
+          <div class="text-center py-6 text-base-content/50"><p>no panels found</p></div>
+          {{end}}
+        </div>
+
+        <div class="preview-tab-content" data-tab="json" style="display:none">
+          <div class="flex justify-end gap-2 mb-2">
+            <button class="btn btn-xs btn-ghost" onclick="copyToClipboard('json-output')">copy</button>
+            <button class="btn btn-xs btn-ghost" onclick="downloadJSON('{{.Title}}.json', 'json-output')">download</button>
+          </div>
+          <pre class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[600px]"><code id="json-output" class="language-json hljs-auto">{{.JSON}}</code></pre>
+        </div>
       </div>
-      <pre class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[600px]"><code id="json-output" class="language-json hljs-auto">{{.JSON}}</code></pre>
     </div>
   </div>
+
+  <!-- Panel detail drawer (right side, client-rendered) -->
+  <div id="panel-detail-drawer" class="panel-detail-drawer" style="display:none">
+    <div id="panel-detail-content"></div>
+  </div>
 </div>
+
+<script>
+(function() {
+  // Build type filter buttons from panel data
+  var types = {};
+  document.querySelectorAll('.preview-panel[data-panel-type]').forEach(function(el) {
+    types[el.dataset.panelType] = (types[el.dataset.panelType] || 0) + 1;
+  });
+  var container = document.getElementById('type-filters');
+  if (container) {
+    Object.keys(types).sort().forEach(function(t) {
+      var btn = document.createElement('button');
+      btn.className = 'badge badge-xs badge-outline cursor-pointer type-filter-btn type-filter-' + t;
+      btn.textContent = types[t] + ' ' + t;
+      btn.dataset.type = t;
+      btn.onclick = function() { toggleTypeFilter(t, this); };
+      container.appendChild(btn);
+    });
+  }
+
+  // Parse and store panel data for client-side drawer
+  var dataEl = document.getElementById('panel-data');
+  if (dataEl) {
+    try { window._panelData = JSON.parse(dataEl.textContent); } catch(e) { window._panelData = []; }
+  }
+})();
+</script>
 {{end}}

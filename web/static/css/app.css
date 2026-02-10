@@ -61,7 +61,9 @@
   overflow: hidden;
   transition: border-color 0.15s ease;
 }
+.preview-panel { cursor: pointer; }
 .preview-panel:hover { border-color: oklch(var(--bc) / 0.3); }
+.preview-panel.selected { border-color: oklch(var(--p)); box-shadow: 0 0 0 1px oklch(var(--p) / 0.3); }
 
 .preview-panel .panel-header {
   display: flex;
@@ -156,6 +158,54 @@
   border-radius: 1px;
 }
 
+/* Query hint in preview panel */
+.preview-panel .panel-query-hint {
+  font-size: 0.55rem;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  color: oklch(var(--bc) / 0.3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: auto;
+}
+
+/* Panel detail drawer */
+.panel-detail-drawer {
+  width: 360px;
+  min-width: 360px;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  background: oklch(var(--b1));
+  border: 1px solid oklch(var(--bc) / 0.1);
+  border-radius: 0.5rem;
+  position: sticky;
+  top: 100px;
+  animation: slideIn 0.2s ease;
+}
+
+/* Type badge colors for detail drawer */
+.type-badge-stat { background: oklch(var(--in) / 0.15); color: oklch(var(--in)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-gauge { background: oklch(var(--su) / 0.15); color: oklch(var(--su)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-timeseries { background: oklch(var(--s) / 0.15); color: oklch(var(--s)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-bargauge { background: oklch(var(--su) / 0.15); color: oklch(var(--su)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-heatmap { background: oklch(var(--er) / 0.15); color: oklch(var(--er)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-table { background: oklch(var(--wa) / 0.15); color: oklch(var(--wa)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-histogram { background: oklch(var(--wa) / 0.15); color: oklch(var(--wa)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-piechart { background: oklch(var(--a) / 0.15); color: oklch(var(--a)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-text { background: oklch(var(--bc) / 0.08); color: oklch(var(--bc) / 0.5); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-logs { background: oklch(var(--bc) / 0.1); color: oklch(var(--bc) / 0.5); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-comparison { background: oklch(var(--a) / 0.15); color: oklch(var(--a)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-state-timeline { background: oklch(var(--s) / 0.15); color: oklch(var(--s)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+.type-badge-status-history { background: oklch(var(--in) / 0.15); color: oklch(var(--in)); padding: 0.1rem 0.4rem; border-radius: 6px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; }
+
+/* Type filter buttons */
+.type-filter-btn { transition: opacity 0.15s ease; }
+.type-filter-btn.active { opacity: 1; outline: 1px solid oklch(var(--p)); }
+.type-filter-btn.dimmed { opacity: 0.35; }
+
+/* Hidden panels during filter/search */
+.preview-panel.panel-hidden { display: none; }
+
 /* ── Syntax highlighting overrides ── */
 pre code.hljs { background: transparent; padding: 0; }
 
@@ -185,4 +235,5 @@ pre code.hljs { background: transparent; padding: 0; }
 @media (max-width: 768px) {
   .preview-grid { display: block; }
   .preview-panel { margin-bottom: 0.5rem; }
+  .panel-detail-drawer { width: 100%; min-width: 100%; position: static; }
 }
