@@ -123,6 +123,167 @@ func (e *YAMLEditor) UpdateDatasourceURL(name, url string) error {
 	return e.save(doc)
 }
 
+// SetPaletteColor sets or updates a color in a named palette.
+func (e *YAMLEditor) SetPaletteColor(palette, color, hex string) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	palettesNode := findMappingKey(root, "palettes")
+	if palettesNode == nil {
+		return fmt.Errorf("no palettes section in config")
+	}
+
+	paletteNode := findMappingKey(palettesNode, palette)
+	if paletteNode == nil {
+		return fmt.Errorf("palette '%s' not found", palette)
+	}
+
+	colorVal := findMappingKey(paletteNode, color)
+	if colorVal != nil {
+		colorVal.Value = hex
+		colorVal.Style = yaml.DoubleQuotedStyle
+	} else {
+		paletteNode.Content = append(paletteNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: color},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: hex, Style: yaml.DoubleQuotedStyle},
+		)
+	}
+
+	return e.save(doc)
+}
+
+// DeletePaletteColor removes a color from a named palette.
+func (e *YAMLEditor) DeletePaletteColor(palette, color string) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	palettesNode := findMappingKey(root, "palettes")
+	if palettesNode == nil {
+		return fmt.Errorf("no palettes section in config")
+	}
+
+	paletteNode := findMappingKey(palettesNode, palette)
+	if paletteNode == nil {
+		return fmt.Errorf("palette '%s' not found", palette)
+	}
+
+	idx := findMappingKeyIndex(paletteNode, color)
+	if idx < 0 {
+		return fmt.Errorf("color '%s' not found in palette '%s'", color, palette)
+	}
+
+	paletteNode.Content = append(paletteNode.Content[:idx], paletteNode.Content[idx+2:]...)
+	return e.save(doc)
+}
+
+// RenamePaletteColor renames a color key within a palette.
+func (e *YAMLEditor) RenamePaletteColor(palette, oldName, newName string) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	palettesNode := findMappingKey(root, "palettes")
+	if palettesNode == nil {
+		return fmt.Errorf("no palettes section in config")
+	}
+
+	paletteNode := findMappingKey(palettesNode, palette)
+	if paletteNode == nil {
+		return fmt.Errorf("palette '%s' not found", palette)
+	}
+
+	idx := findMappingKeyIndex(paletteNode, oldName)
+	if idx < 0 {
+		return fmt.Errorf("color '%s' not found in palette '%s'", oldName, palette)
+	}
+
+	if findMappingKey(paletteNode, newName) != nil {
+		return fmt.Errorf("color '%s' already exists in palette '%s'", newName, palette)
+	}
+
+	paletteNode.Content[idx].Value = newName
+	return e.save(doc)
+}
+
+// AddPalette creates a new empty palette.
+func (e *YAMLEditor) AddPalette(name string) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	palettesNode := findMappingKey(root, "palettes")
+	if palettesNode == nil {
+		root.Content = append(root.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "palettes"},
+			&yaml.Node{Kind: yaml.MappingNode},
+		)
+		palettesNode = root.Content[len(root.Content)-1]
+	}
+
+	if findMappingKey(palettesNode, name) != nil {
+		return fmt.Errorf("palette '%s' already exists", name)
+	}
+
+	palettesNode.Content = append(palettesNode.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Value: name},
+		&yaml.Node{Kind: yaml.MappingNode},
+	)
+
+	return e.save(doc)
+}
+
+// DeletePalette removes a palette entirely.
+func (e *YAMLEditor) DeletePalette(name string) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	palettesNode := findMappingKey(root, "palettes")
+	if palettesNode == nil {
+		return fmt.Errorf("no palettes section in config")
+	}
+
+	idx := findMappingKeyIndex(palettesNode, name)
+	if idx < 0 {
+		return fmt.Errorf("palette '%s' not found", name)
+	}
+
+	palettesNode.Content = append(palettesNode.Content[:idx], palettesNode.Content[idx+2:]...)
+	return e.save(doc)
+}
+
+// SetActivePalette updates the active_palette key.
+func (e *YAMLEditor) SetActivePalette(name string) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	palettesNode := findMappingKey(root, "palettes")
+	if palettesNode == nil || findMappingKey(palettesNode, name) == nil {
+		return fmt.Errorf("palette '%s' not found", name)
+	}
+
+	apNode := findMappingKey(root, "active_palette")
+	if apNode != nil {
+		apNode.Value = name
+	} else {
+		root.Content = append(root.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "active_palette"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: name},
+		)
+	}
+
+	return e.save(doc)
+}
+
 func (e *YAMLEditor) load() (*yaml.Node, *yaml.Node, error) {
 	data, err := os.ReadFile(e.path)
 	if err != nil {
