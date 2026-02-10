@@ -128,6 +128,18 @@ function showCompareTab(tabName, btn) {
   btn.classList.add('tab-active');
 }
 
+// Switch between compare-all tabs (shared/exclusive per DS)
+function showCompareAllTab(tabName, btn) {
+  document.querySelectorAll('.compare-all-tab-content').forEach(function(el) {
+    el.style.display = 'none';
+  });
+  document.getElementById('compare-all-tab-' + tabName).style.display = 'block';
+  btn.parentElement.querySelectorAll('button').forEach(function(b) {
+    b.classList.remove('tab-active');
+  });
+  btn.classList.add('tab-active');
+}
+
 // Auto-dismiss toasts rendered by server (HTMX responses)
 document.addEventListener('htmx:afterSwap', function() {
   document.querySelectorAll('.toast-msg:not([data-auto])').forEach(function(toast) {

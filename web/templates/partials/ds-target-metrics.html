@@ -7,13 +7,26 @@
   <div class="flex justify-between items-center mb-2">
     <span class="text-xs font-semibold">{{.Total}} metrics for {{.Job}}</span>
   </div>
-  <div class="space-y-0.5 max-h-[400px] overflow-y-auto">
-    {{range .Metrics}}
-    <div class="flex items-center gap-2 py-1 px-2 rounded hover:bg-base-100 text-xs">
-      <span class="font-mono flex-1 truncate">{{.Name}}</span>
-      <span class="badge badge-xs badge-outline shrink-0">{{.Type}}</span>
+
+  <form hx-post="/api/metrics/snippet" hx-target="#job-snippet-{{.Datasource}}-{{.Job}}" hx-swap="innerHTML">
+    <input type="hidden" name="datasource" value="{{.Datasource}}">
+
+    <div class="space-y-0.5 max-h-[400px] overflow-y-auto mb-2">
+      {{range .Metrics}}
+      <label class="flex items-center gap-2 py-1 px-2 rounded hover:bg-base-100 cursor-pointer text-xs">
+        <input type="checkbox" name="metrics" value="{{.Name}}" class="checkbox checkbox-xs checkbox-primary">
+        <div class="flex-1 min-w-0">
+          <span class="font-mono truncate block">{{.Name}}</span>
+          {{if .Help}}<span class="text-base-content/40 truncate block text-[10px]">{{.Help}}</span>{{end}}
+        </div>
+        <span class="badge badge-xs badge-outline shrink-0">{{.Type}}</span>
+      </label>
+      {{end}}
     </div>
-    {{end}}
-  </div>
+
+    <button type="submit" class="btn btn-xs btn-primary">generate snippet from selected</button>
+  </form>
+
+  <div id="job-snippet-{{.Datasource}}-{{.Job}}" class="mt-2"></div>
 </div>
 {{end}}

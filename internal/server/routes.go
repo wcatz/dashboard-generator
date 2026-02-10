@@ -27,6 +27,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/datasource/delete", s.handleDatasourceDelete)
 	s.mux.HandleFunc("/api/datasource/targets", s.handleDatasourceTargets)
 	s.mux.HandleFunc("/api/datasource/targets/metrics", s.handleDatasourceTargetMetrics)
+	s.mux.HandleFunc("/api/datasources/compare-all", s.handleDatasourcesCompareAll)
 	s.mux.HandleFunc("/api/metrics/browse", s.handleMetricsBrowse)
 	s.mux.HandleFunc("/api/metrics/jobs", s.handleMetricsJobs)
 	s.mux.HandleFunc("/api/metrics/compare", s.handleMetricsCompare)

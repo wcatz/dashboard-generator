@@ -96,4 +96,22 @@
   <p class="text-xs mt-1">add one above to get started</p>
 </div>
 {{end}}
+
+<!-- compare across all datasources -->
+{{if ge .DsWithURL 2}}
+<div class="card bg-base-100 border border-base-content/10 mt-6">
+  <div class="card-body p-5">
+    <h3 class="card-title text-sm">compare across all datasources</h3>
+    <p class="text-xs text-base-content/50 mb-3">find metrics shared by all datasources or unique to each</p>
+    <button class="btn btn-sm btn-outline"
+            hx-get="/api/datasources/compare-all"
+            hx-target="#ds-compare-all-result"
+            hx-indicator="#ds-compare-all-spin"
+            hx-disabled-elt="this">
+      compare all <span id="ds-compare-all-spin" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+    <div id="ds-compare-all-result" class="mt-3"></div>
+  </div>
+</div>
+{{end}}
 {{end}}
