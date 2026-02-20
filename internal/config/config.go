@@ -10,6 +10,7 @@ import (
 )
 
 var bracedRefRe = regexp.MustCompile(`\$\{(\w+)\}`)
+var adjacentSelectorRe = regexp.MustCompile(`}\s*{`)
 
 // DatasourceDef is a datasource definition from config YAML.
 type DatasourceDef struct {
@@ -347,8 +348,10 @@ func (c *Config) resolveColorName(name string) string {
 }
 
 // ResolveRef resolves ${name} references in a string (constants and selectors).
+// After substitution, adjacent PromQL label selectors are merged:
+// metric{a="1"}{b="2"} becomes metric{a="1", b="2"}.
 func (c *Config) ResolveRef(value string) string {
-	return bracedRefRe.ReplaceAllStringFunc(value, func(match string) string {
+	result := bracedRefRe.ReplaceAllStringFunc(value, func(match string) string {
 		refName := bracedRefRe.FindStringSubmatch(match)[1]
 		if v := c.GetConstant(refName); v != "" {
 			return v
@@ -358,6 +361,8 @@ func (c *Config) ResolveRef(value string) string {
 		}
 		return match
 	})
+	result = adjacentSelectorRe.ReplaceAllString(result, ", ")
+	return result
 }
 
 // ResolveColor resolves a $color_name reference to a hex color.

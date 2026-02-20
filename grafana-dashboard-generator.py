@@ -153,6 +153,8 @@ class Config:
             return m.group(0)
 
         value = re.sub(r'\$\{(\w+)\}', replace_braced, value)
+        # merge adjacent PromQL label selectors: metric{a="1"}{b="2"} → metric{a="1", b="2"}
+        value = re.sub(r'}\s*{', ', ', value)
         return value
 
     def resolve_color(self, value):
