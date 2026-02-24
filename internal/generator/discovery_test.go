@@ -117,7 +117,7 @@ func TestSuggestQuery(t *testing.T) {
 	}{
 		{"http_requests_total", "counter", "rate(http_requests_total[5m])"},
 		{"node_memory_MemTotal_bytes", "gauge", "node_memory_MemTotal_bytes"},
-		{"request_duration_bucket", "histogram", "request_duration_bucket"},
+		{"request_duration_bucket", "histogram", "histogram_quantile(0.95, sum(rate(request_duration_bucket[5m])) by (le))"},
 	}
 	for _, tt := range tests {
 		got := SuggestQuery(tt.name, tt.metricType)

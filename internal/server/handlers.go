@@ -863,11 +863,13 @@ func (s *Server) handleMetricsBrowse(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, metricRow{Name: m, Type: mType, Help: help})
 	}
 
+	aiClient := generator.NewAIClient(cfg)
 	s.renderPartial(w, "metrics-result.html", map[string]interface{}{
 		"Metrics":    rows,
 		"Total":      len(rows),
 		"Datasource": dsName,
 		"Job":        job,
+		"AIEnabled":  aiClient.Available(),
 	})
 }
 
@@ -1237,29 +1239,85 @@ func (s *Server) handleMetricsSnippet(w http.ResponseWriter, r *http.Request) {
 	cfg := s.Config()
 	disc := generator.NewMetricDiscovery(cfg)
 	meta, _ := disc.FetchMetadata(dsName)
+	opts := generator.BuildSuggestOptions(cfg)
 
-	var lines []string
-	lines = append(lines, "      - title: \"discovered metrics\"")
-	lines = append(lines, "        panels:")
+	var suggestions []generator.PanelSuggestion
 	for _, m := range selected {
 		info, ok := meta[m]
 		if !ok {
 			info = generator.MetricInfo{Type: "untyped"}
 		}
-		panelType := generator.SuggestPanelType(info.Type)
-		query := generator.SuggestQuery(m, info.Type)
-		lines = append(lines, fmt.Sprintf("          - type: %s", panelType))
-		lines = append(lines, fmt.Sprintf("            title: \"%s\"", m))
-		lines = append(lines, fmt.Sprintf("            query: '%s'", query))
-		if dsName != "" {
-			lines = append(lines, fmt.Sprintf("            datasource: %s", dsName))
-		}
+		s := generator.SuggestPanel(m, info, opts)
+		w, h := generator.SuggestSize(s.Type, len(selected))
+		s.Width = w
+		s.Height = h
+		suggestions = append(suggestions, s)
 	}
 
-	snippet := strings.Join(lines, "\n")
+	snippet, hints := generator.FormatSnippetYAML(suggestions, "discovered metrics", dsName)
 	s.renderPartial(w, "snippet-result.html", map[string]interface{}{
 		"Snippet": snippet,
 		"Count":   len(selected),
+		"Hints":   hints,
+	})
+}
+
+// handleAISuggest uses the Anthropic API to generate intelligent panel suggestions.
+func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	cfg := s.Config()
+	aiClient := generator.NewAIClient(cfg)
+	if !aiClient.Available() {
+		s.renderPartial(w, "snippet-result.html", map[string]interface{}{
+			"Error": "anthropic API key not configured — set ANTHROPIC_API_KEY env var or anthropic_api_key in generator config",
+		})
+		return
+	}
+
+	r.ParseForm()
+	dsName := r.FormValue("datasource")
+	selected := r.Form["metrics"]
+
+	if len(selected) == 0 {
+		s.renderPartial(w, "snippet-result.html", map[string]interface{}{"Error": "select at least one metric"})
+		return
+	}
+
+	disc := generator.NewMetricDiscovery(cfg)
+	meta, _ := disc.FetchMetadata(dsName)
+
+	var metricContexts []generator.MetricContext
+	for _, m := range selected {
+		info, ok := meta[m]
+		if !ok {
+			info = generator.MetricInfo{Type: "untyped"}
+		}
+		metricContexts = append(metricContexts, generator.MetricContext{
+			Name: m,
+			Type: info.Type,
+			Help: info.Help,
+		})
+	}
+
+	configCtx := generator.BuildConfigContext(cfg)
+
+	result, err := aiClient.Suggest(metricContexts, configCtx)
+	if err != nil {
+		s.renderPartial(w, "snippet-result.html", map[string]interface{}{
+			"Error": "AI suggestion failed: " + err.Error(),
+		})
+		return
+	}
+
+	s.renderPartial(w, "snippet-result.html", map[string]interface{}{
+		"Snippet": result.YAML,
+		"Count":   len(selected),
+		"Hints":   result.Notes,
+		"IsAI":    true,
 	})
 }
 
@@ -1296,27 +1354,22 @@ func (s *Server) handleComparisonSnippet(w http.ResponseWriter, r *http.Request)
 	disc := generator.NewMetricDiscovery(cfg)
 	// Fetch metadata from first datasource for type info
 	meta, _ := disc.FetchMetadata(dsList[0])
+	opts := generator.BuildSuggestOptions(cfg)
 
-	dsListStr := strings.Join(dsList, ", ")
-	var lines []string
-	lines = append(lines, "      - title: \"shared metrics comparison\"")
-	lines = append(lines, "        panels:")
+	metricInfos := make(map[string]generator.MetricInfo)
 	for _, m := range selected {
 		info, ok := meta[m]
 		if !ok {
 			info = generator.MetricInfo{Type: "untyped"}
 		}
-		lines = append(lines, "          - type: comparison")
-		lines = append(lines, fmt.Sprintf("            title: \"%s\"", m))
-		lines = append(lines, fmt.Sprintf("            metric: \"%s\"", m))
-		lines = append(lines, fmt.Sprintf("            metric_type: \"%s\"", info.Type))
-		lines = append(lines, fmt.Sprintf("            datasources: [%s]", dsListStr))
+		metricInfos[m] = info
 	}
 
-	snippet := strings.Join(lines, "\n")
+	snippet, hints := generator.FormatComparisonSnippetYAML(selected, metricInfos, dsList, opts)
 	s.renderPartial(w, "snippet-result.html", map[string]interface{}{
 		"Snippet": snippet,
 		"Count":   len(selected),
+		"Hints":   hints,
 	})
 }
 

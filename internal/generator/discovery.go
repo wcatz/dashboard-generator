@@ -525,27 +525,36 @@ func GroupByPrefix(metrics map[string]MetricInfo) map[string]map[string]MetricIn
 }
 
 // SuggestPanelType returns a suggested panel type for a metric type.
+// Delegates to the enhanced heuristics in suggest.go.
 func SuggestPanelType(metricType string) string {
-	switch metricType {
-	case "counter":
-		return "timeseries"
-	case "gauge":
-		return "stat"
-	case "histogram":
-		return "heatmap"
-	case "summary":
-		return "timeseries"
-	default:
-		return "timeseries"
-	}
+	return suggestPanelTypeFromRules("", metricType, nil)
 }
 
 // SuggestQuery returns a suggested PromQL query for a metric.
+// Delegates to the enhanced heuristics in suggest.go.
 func SuggestQuery(metricName, metricType string) string {
-	if metricType == "counter" {
-		return fmt.Sprintf("rate(%s[5m])", metricName)
+	return suggestQueryExpr(metricName, metricType, "")
+}
+
+// BuildSuggestOptions creates SuggestOptions from a Config.
+func BuildSuggestOptions(cfg *config.Config) *SuggestOptions {
+	opts := &SuggestOptions{}
+
+	if cfg.GetConstant("rate_interval") != "" {
+		opts.RateInterval = "rate_interval"
 	}
-	return metricName
+
+	disc := cfg.GetDiscovery()
+	if disc.AutoPanels != nil {
+		opts.AutoPanels = disc.AutoPanels
+	}
+
+	opts.AvailableThresholds = make(map[string]bool)
+	for name := range cfg.Thresholds {
+		opts.AvailableThresholds[name] = true
+	}
+
+	return opts
 }
 
 // PrintDiscovery queries Prometheus and prints suggested YAML config.
@@ -579,6 +588,8 @@ func (md *MetricDiscovery) printSingleDiscovery(dsName string, include, exclude 
 		}
 	}
 
+	opts := BuildSuggestOptions(md.Config)
+
 	fmt.Printf("\n=== Metrics from %s: %d total ===\n\n", dsName, len(metrics))
 	grouped := GroupByPrefix(enriched)
 	prefixes := sortedKeys(grouped)
@@ -587,13 +598,13 @@ func (md *MetricDiscovery) printSingleDiscovery(dsName string, include, exclude 
 		fmt.Printf("# %s_* (%d metrics)\n", prefix, len(items))
 		for _, m := range sortedMetricKeys(items) {
 			info := items[m]
-			panel := SuggestPanelType(info.Type)
-			fmt.Printf("  %-60s (%-10s) -> %s\n", m, info.Type, panel)
+			s := SuggestPanel(m, info, opts)
+			fmt.Printf("  %-60s (%-10s) -> %-12s [%s]\n", m, info.Type, s.Type, s.Unit)
 		}
 		fmt.Println()
 	}
 
-	md.printYAMLSnippet(grouped, dsName)
+	md.printYAMLSnippet(grouped, dsName, opts)
 	return nil
 }
 
@@ -645,11 +656,12 @@ func (md *MetricDiscovery) printComparisonDiscovery(sources, include, exclude []
 		fmt.Printf("  %-60s (%s)\n", m, info.Type)
 	}
 
-	md.printComparisonYAML(cats, sources)
+	opts := BuildSuggestOptions(md.Config)
+	md.printComparisonYAML(cats, sources, opts)
 	return nil
 }
 
-func (md *MetricDiscovery) printYAMLSnippet(grouped map[string]map[string]MetricInfo, dsName string) {
+func (md *MetricDiscovery) printYAMLSnippet(grouped map[string]map[string]MetricInfo, dsName string, opts *SuggestOptions) {
 	fmt.Print("\n# --- suggested YAML config snippet ---\n\n")
 	fmt.Println("dashboards:")
 	fmt.Println("  discovered:")
@@ -665,16 +677,27 @@ func (md *MetricDiscovery) printYAMLSnippet(grouped map[string]map[string]Metric
 		fmt.Println("        panels:")
 		for _, m := range sortedMetricKeys(items) {
 			info := items[m]
-			panel := SuggestPanelType(info.Type)
-			query := SuggestQuery(m, info.Type)
-			fmt.Printf("          - type: %s\n", panel)
-			fmt.Printf("            title: \"%s\"\n", m)
-			fmt.Printf("            query: '%s'\n", query)
+			s := SuggestPanel(m, info, opts)
+			fmt.Printf("          - type: %s\n", s.Type)
+			fmt.Printf("            title: \"%s\"\n", s.Title)
+			fmt.Printf("            query: '%s'\n", s.Query)
+			if s.Unit != "" && s.Unit != "short" {
+				fmt.Printf("            unit: %s\n", s.Unit)
+			}
+			if s.Description != "" {
+				fmt.Printf("            description: \"%s\"\n", strings.ReplaceAll(s.Description, "\"", "\\\""))
+			}
+			if s.Legend != "" {
+				fmt.Printf("            legend: \"%s\"\n", s.Legend)
+			}
+			if s.Thresholds != "" {
+				fmt.Printf("            thresholds: %s\n", s.Thresholds)
+			}
 		}
 	}
 }
 
-func (md *MetricDiscovery) printComparisonYAML(cats map[string]map[string]MetricInfo, sources []string) {
+func (md *MetricDiscovery) printComparisonYAML(cats map[string]map[string]MetricInfo, sources []string, opts *SuggestOptions) {
 	fmt.Print("\n# --- suggested comparison YAML snippet ---\n\n")
 	fmt.Println("dashboards:")
 	fmt.Println("  comparison:")
@@ -690,46 +713,57 @@ func (md *MetricDiscovery) printComparisonYAML(cats map[string]map[string]Metric
 		fmt.Println("        panels:")
 		for _, m := range sortedMetricKeys(cats["shared"]) {
 			info := cats["shared"][m]
+			title := SuggestTitle(m)
+			unit := InferUnit(m)
 			fmt.Println("          - type: comparison")
-			fmt.Printf("            title: \"%s\"\n", m)
+			fmt.Printf("            title: \"%s\"\n", title)
 			fmt.Printf("            metric: \"%s\"\n", m)
 			fmt.Printf("            metric_type: \"%s\"\n", info.Type)
 			fmt.Printf("            datasources: [%s, %s]\n", sources[0], sources[1])
+			if unit != "" && unit != "short" {
+				fmt.Printf("            unit: %s\n", unit)
+			}
+			if info.Help != "" {
+				fmt.Printf("            description: \"%s\"\n", strings.ReplaceAll(info.Help, "\"", "\\\""))
+			}
 		}
 	}
 
-	if len(cats["only_a"]) > 0 {
-		fmt.Printf("      - title: \"%s only\"\n", sources[0])
-		fmt.Println("        panels:")
-		for _, m := range sortedMetricKeys(cats["only_a"]) {
-			info := cats["only_a"][m]
-			panel := SuggestPanelType(info.Type)
-			query := SuggestQuery(m, info.Type)
-			fmt.Printf("          - type: %s\n", panel)
-			fmt.Printf("            title: \"%s\"\n", m)
-			fmt.Printf("            query: '%s'\n", query)
-			fmt.Printf("            datasource: %s\n", sources[0])
+	printOnlySectionYAML := func(cat string, dsName string) {
+		if len(cats[cat]) > 0 {
+			fmt.Printf("      - title: \"%s only\"\n", dsName)
+			fmt.Println("        panels:")
+			for _, m := range sortedMetricKeys(cats[cat]) {
+				info := cats[cat][m]
+				s := SuggestPanel(m, info, opts)
+				fmt.Printf("          - type: %s\n", s.Type)
+				fmt.Printf("            title: \"%s\"\n", s.Title)
+				fmt.Printf("            query: '%s'\n", s.Query)
+				fmt.Printf("            datasource: %s\n", dsName)
+				if s.Unit != "" && s.Unit != "short" {
+					fmt.Printf("            unit: %s\n", s.Unit)
+				}
+				if s.Description != "" {
+					fmt.Printf("            description: \"%s\"\n", strings.ReplaceAll(s.Description, "\"", "\\\""))
+				}
+				if s.Legend != "" {
+					fmt.Printf("            legend: \"%s\"\n", s.Legend)
+				}
+				if s.Thresholds != "" {
+					fmt.Printf("            thresholds: %s\n", s.Thresholds)
+				}
+			}
 		}
 	}
 
-	if len(cats["only_b"]) > 0 {
-		fmt.Printf("      - title: \"%s only\"\n", sources[1])
-		fmt.Println("        panels:")
-		for _, m := range sortedMetricKeys(cats["only_b"]) {
-			info := cats["only_b"][m]
-			panel := SuggestPanelType(info.Type)
-			query := SuggestQuery(m, info.Type)
-			fmt.Printf("          - type: %s\n", panel)
-			fmt.Printf("            title: \"%s\"\n", m)
-			fmt.Printf("            query: '%s'\n", query)
-			fmt.Printf("            datasource: %s\n", sources[1])
-		}
-	}
+	printOnlySectionYAML("only_a", sources[0])
+	printOnlySectionYAML("only_b", sources[1])
 }
 
 // GenerateDiscoverySections generates dashboard sections from discovered metrics.
 func (md *MetricDiscovery) GenerateDiscoverySections(sources, include, exclude []string) ([]config.SectionConfig, error) {
 	var sections []config.SectionConfig
+	opts := BuildSuggestOptions(md.Config)
 
 	if len(sources) == 1 {
 		dsName := sources[0]
@@ -758,12 +792,23 @@ func (md *MetricDiscovery) GenerateDiscoverySections(sources, include, exclude [
 			var panels []map[string]interface{}
 			for _, m := range sortedMetricKeys(items) {
 				info := items[m]
-				panels = append(panels, map[string]interface{}{
-					"type":       SuggestPanelType(info.Type),
-					"title":      m,
-					"query":      SuggestQuery(m, info.Type),
+				s := SuggestPanel(m, info, opts)
+				panel := map[string]interface{}{
+					"type":       s.Type,
+					"title":      s.Title,
+					"query":      s.Query,
 					"datasource": dsName,
-				})
+				}
+				if s.Unit != "" && s.Unit != "short" {
+					panel["unit"] = s.Unit
+				}
+				if s.Description != "" {
+					panel["description"] = s.Description
+				}
+				if s.Thresholds != "" {
+					panel["thresholds"] = s.Thresholds
+				}
+				panels = append(panels, panel)
 			}
 			sections = append(sections, config.SectionConfig{
 				Title:  prefix,
@@ -796,13 +841,22 @@ func (md *MetricDiscovery) GenerateDiscoverySections(sources, include, exclude [
 			var panels []map[string]interface{}
 			for _, m := range sortedMetricKeys(cats["shared"]) {
 				info := cats["shared"][m]
-				panels = append(panels, map[string]interface{}{
+				title := SuggestTitle(m)
+				unit := InferUnit(m)
+				panel := map[string]interface{}{
 					"type":        "comparison",
-					"title":       m,
+					"title":       title,
 					"metric":      m,
 					"metric_type": info.Type,
 					"datasources": []interface{}{sources[0], sources[1]},
-				})
+				}
+				if unit != "" && unit != "short" {
+					panel["unit"] = unit
+				}
+				if info.Help != "" {
+					panel["description"] = info.Help
+				}
+				panels = append(panels, panel)
 			}
 			sections = append(sections, config.SectionConfig{
 				Title:  "shared metrics",
@@ -815,12 +869,23 @@ func (md *MetricDiscovery) GenerateDiscoverySections(sources, include, exclude [
 				var panels []map[string]interface{}
 				for _, m := range sortedMetricKeys(cats[cat]) {
 					info := cats[cat][m]
-					panels = append(panels, map[string]interface{}{
-						"type":       SuggestPanelType(info.Type),
-						"title":      m,
-						"query":      SuggestQuery(m, info.Type),
+					s := SuggestPanel(m, info, opts)
+					panel := map[string]interface{}{
+						"type":       s.Type,
+						"title":      s.Title,
+						"query":      s.Query,
 						"datasource": sources[i],
-					})
+					}
+					if s.Unit != "" && s.Unit != "short" {
+						panel["unit"] = s.Unit
+					}
+					if s.Description != "" {
+						panel["description"] = s.Description
+					}
+					if s.Thresholds != "" {
+						panel["thresholds"] = s.Thresholds
+					}
+					panels = append(panels, panel)
 				}
 				sections = append(sections, config.SectionConfig{
 					Title:  fmt.Sprintf("%s only", sources[i]),

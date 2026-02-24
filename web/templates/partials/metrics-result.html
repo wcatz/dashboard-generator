@@ -27,7 +27,19 @@
         </label>
         {{end}}
       </div>
-      <button type="submit" class="btn btn-sm btn-primary mt-3">generate YAML snippet</button>
+      <div class="flex gap-2 mt-3">
+        <button type="submit" class="btn btn-sm btn-primary">generate YAML snippet</button>
+        {{if .AIEnabled}}
+        <button type="button" class="btn btn-sm btn-secondary"
+                hx-post="/api/metrics/ai-suggest"
+                hx-target="#snippet-result"
+                hx-include="closest form"
+                hx-indicator="#ai-spinner">
+          AI suggest
+        </button>
+        <span id="ai-spinner" class="loading loading-spinner loading-xs htmx-indicator"></span>
+        {{end}}
+      </div>
     </form>
     <div id="snippet-result"></div>
   </div>

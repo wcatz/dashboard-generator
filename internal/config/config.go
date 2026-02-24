@@ -58,14 +58,16 @@ type VariableDef struct {
 
 // GeneratorSettings holds global generator config.
 type GeneratorSettings struct {
-	SchemaVersion int               `yaml:"schema_version"`
-	OutputDir     string            `yaml:"output_dir"`
-	Refresh       string            `yaml:"refresh"`
-	TimeRange     map[string]string `yaml:"time_range"`
-	Editable      *bool             `yaml:"editable"`
-	GraphTooltip  int               `yaml:"graph_tooltip"`
-	LiveNow       *bool             `yaml:"live_now"`
-	Timezone      string            `yaml:"timezone"`
+	SchemaVersion   int               `yaml:"schema_version"`
+	OutputDir       string            `yaml:"output_dir"`
+	Refresh         string            `yaml:"refresh"`
+	TimeRange       map[string]string `yaml:"time_range"`
+	Editable        *bool             `yaml:"editable"`
+	GraphTooltip    int               `yaml:"graph_tooltip"`
+	LiveNow         *bool             `yaml:"live_now"`
+	Timezone        string            `yaml:"timezone"`
+	AnthropicAPIKey string            `yaml:"anthropic_api_key"`
+	AnthropicModel  string            `yaml:"anthropic_model"`
 }
 
 // DiscoveryConfig holds metric discovery settings.
