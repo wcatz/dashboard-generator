@@ -177,6 +177,27 @@ func TestParseAIResponse_Empty(t *testing.T) {
 	}
 }
 
+func TestParseAIResponse_MultipleTextBlocks(t *testing.T) {
+	resp := map[string]interface{}{
+		"content": []map[string]interface{}{
+			{"type": "text", "text": "      - title: \"part one\"\n        panels:"},
+			{"type": "text", "text": "          - type: stat\n            title: \"up\""},
+		},
+	}
+	body, _ := json.Marshal(resp)
+
+	result, err := parseAIResponse(body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(result.YAML, "part one") {
+		t.Error("expected first block content")
+	}
+	if !strings.Contains(result.YAML, "type: stat") {
+		t.Error("expected second block content")
+	}
+}
+
 func TestAIClient_Suggest_MockServer(t *testing.T) {
 	// Create a mock Anthropic API server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -186,6 +207,9 @@ func TestAIClient_Suggest_MockServer(t *testing.T) {
 		}
 		if r.Header.Get("anthropic-version") != anthropicAPIVersion {
 			t.Errorf("expected anthropic-version header")
+		}
+		if r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("expected Content-Type application/json")
 		}
 
 		resp := map[string]interface{}{
@@ -200,10 +224,12 @@ func TestAIClient_Suggest_MockServer(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// Verify the mock server handles requests correctly
-	// (The AIClient.Suggest method uses a hardcoded URL, so we test
-	// prompt construction and response parsing separately)
-	_ = server // server validates headers when hit
+	client := &AIClient{
+		APIKey:     "test-key",
+		Model:      "test-model",
+		BaseURL:    server.URL,
+		httpClient: server.Client(),
+	}
 
 	metrics := []MetricContext{
 		{Name: "node_cpu_seconds_total", Type: "counter", Help: "CPU time."},
@@ -212,15 +238,15 @@ func TestAIClient_Suggest_MockServer(t *testing.T) {
 		Constants: map[string]string{"rate_interval": "5m"},
 	}
 
-	// Test prompt construction (doesn't need API)
-	sysPrompt := buildSystemPrompt(ctx)
-	if sysPrompt == "" {
-		t.Error("expected non-empty system prompt")
+	result, err := client.Suggest(metrics, ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	userPrompt := buildUserPrompt(metrics)
-	if !strings.Contains(userPrompt, "node_cpu_seconds_total") {
-		t.Error("expected metric in user prompt")
+	if !strings.Contains(result.YAML, "type: timeseries") {
+		t.Error("expected timeseries in YAML response")
+	}
+	if len(result.Notes) != 1 || result.Notes[0] != "Applied rate() for counter type" {
+		t.Errorf("unexpected notes: %v", result.Notes)
 	}
 }
 
@@ -260,6 +286,28 @@ func TestNewAIClient_NotAvailable(t *testing.T) {
 
 	if client.Available() {
 		t.Error("expected client to not be available without API key")
+	}
+}
+
+func TestIsAIAvailable(t *testing.T) {
+	cfg := &config.Config{}
+	if IsAIAvailable(cfg) {
+		t.Error("expected not available without key")
+	}
+
+	cfg.Generator.AnthropicAPIKey = "key"
+	if !IsAIAvailable(cfg) {
+		t.Error("expected available with key in config")
+	}
+}
+
+func TestAIClient_BaseURL(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Generator.AnthropicAPIKey = "key"
+	client := NewAIClient(cfg)
+
+	if client.BaseURL != anthropicAPIURL {
+		t.Errorf("expected default BaseURL %s, got: %s", anthropicAPIURL, client.BaseURL)
 	}
 }
 

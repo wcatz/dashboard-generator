@@ -234,6 +234,22 @@ func TestSuggestPanel_GaugePercent(t *testing.T) {
 	if s.Thresholds != "$percent_usage" {
 		t.Errorf("Thresholds = %q, want $percent_usage", s.Thresholds)
 	}
+	if s.Extra["max"] != "1" {
+		t.Errorf("Extra[max] = %q, want 1 for percentunit gauge", s.Extra["max"])
+	}
+}
+
+func TestSuggestPanel_GaugePercentUnit100(t *testing.T) {
+	info := MetricInfo{Type: "gauge", Help: "CPU usage percent."}
+	opts := &SuggestOptions{
+		AvailableThresholds: map[string]bool{"percent_usage": true},
+	}
+
+	s := SuggestPanel("cpu_usage_percent", info, opts)
+
+	if s.Extra["max"] != "100" {
+		t.Errorf("Extra[max] = %q, want 100 for percent gauge", s.Extra["max"])
+	}
 }
 
 func TestSuggestPanel_GaugeInfo(t *testing.T) {
@@ -423,12 +439,8 @@ func TestFormatSnippetYAML(t *testing.T) {
 		t.Error("expected legend in output")
 	}
 	// "short" unit should not be in output (it's the default)
-	lines := strings.Split(yaml, "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "http requests") {
-			// The line after title for the first panel should not have unit: short
-			continue
-		}
+	if strings.Contains(yaml, "unit: short") {
+		t.Error("did not expect unit: short in output")
 	}
 
 	if len(hints) == 0 {

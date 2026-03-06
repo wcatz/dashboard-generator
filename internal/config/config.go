@@ -66,8 +66,17 @@ type GeneratorSettings struct {
 	GraphTooltip    int               `yaml:"graph_tooltip"`
 	LiveNow         *bool             `yaml:"live_now"`
 	Timezone        string            `yaml:"timezone"`
-	AnthropicAPIKey string            `yaml:"anthropic_api_key"`
+	AnthropicAPIKey string            `yaml:"anthropic_api_key"` // prefer ANTHROPIC_API_KEY env var
 	AnthropicModel  string            `yaml:"anthropic_model"`
+}
+
+// String returns a safe representation with secrets masked.
+func (g GeneratorSettings) String() string {
+	masked := g
+	if masked.AnthropicAPIKey != "" {
+		masked.AnthropicAPIKey = "***"
+	}
+	return fmt.Sprintf("%+v", masked)
 }
 
 // DiscoveryConfig holds metric discovery settings.

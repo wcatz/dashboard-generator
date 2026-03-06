@@ -188,7 +188,12 @@ func SuggestPanel(metricName string, info MetricInfo, opts *SuggestOptions) Pane
 		}
 	case "gauge":
 		extra["min"] = "0"
-		extra["max"] = "100"
+		switch unit {
+		case "percentunit":
+			extra["max"] = "1"
+		case "percent":
+			extra["max"] = "100"
+		}
 	}
 
 	return PanelSuggestion{

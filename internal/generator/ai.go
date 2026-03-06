@@ -24,7 +24,14 @@ const (
 type AIClient struct {
 	APIKey     string
 	Model      string
+	BaseURL    string // configurable for testing; defaults to anthropicAPIURL
 	httpClient *http.Client
+}
+
+// IsAIAvailable reports whether an Anthropic API key is configured,
+// without allocating an http.Client.
+func IsAIAvailable(cfg *config.Config) bool {
+	return cfg.Generator.AnthropicAPIKey != "" || os.Getenv("ANTHROPIC_API_KEY") != ""
 }
 
 // NewAIClient creates a new AI client. Falls back to ANTHROPIC_API_KEY env var.
@@ -42,6 +49,7 @@ func NewAIClient(cfg *config.Config) *AIClient {
 	return &AIClient{
 		APIKey:     apiKey,
 		Model:      model,
+		BaseURL:    anthropicAPIURL,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -97,7 +105,11 @@ func (c *AIClient) Suggest(metrics []MetricContext, configCtx ConfigContext) (*A
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, anthropicAPIURL, bytes.NewReader(jsonBody))
+	baseURL := c.BaseURL
+	if baseURL == "" {
+		baseURL = anthropicAPIURL
+	}
+	req, err := http.NewRequest(http.MethodPost, baseURL, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -172,6 +184,7 @@ func buildSystemPrompt(ctx ConfigContext) string {
 | status-history | 12x5 | Multi-target status history |
 | text | 24x3 | Markdown documentation |
 | logs | 24x8 | Log streams |
+| row | 24x1 | Section headers / grouping |
 | comparison | 12x8 | Cross-datasource metric overlay |
 
 ## Panel Config Keys
@@ -291,7 +304,17 @@ func parseAIResponse(body []byte) (*AISuggestionResponse, error) {
 		return nil, fmt.Errorf("empty response from API")
 	}
 
-	text := resp.Content[0].Text
+	// Concatenate all text content blocks
+	var textParts []string
+	for _, block := range resp.Content {
+		if block.Type == "text" {
+			textParts = append(textParts, block.Text)
+		}
+	}
+	if len(textParts) == 0 {
+		return nil, fmt.Errorf("no text content in API response")
+	}
+	text := strings.Join(textParts, "\n")
 
 	// Extract YAML and notes
 	yaml, notes := extractYAMLAndNotes(text)

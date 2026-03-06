@@ -863,13 +863,12 @@ func (s *Server) handleMetricsBrowse(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, metricRow{Name: m, Type: mType, Help: help})
 	}
 
-	aiClient := generator.NewAIClient(cfg)
 	s.renderPartial(w, "metrics-result.html", map[string]interface{}{
 		"Metrics":    rows,
 		"Total":      len(rows),
 		"Datasource": dsName,
 		"Job":        job,
-		"AIEnabled":  aiClient.Available(),
+		"AIEnabled":  generator.IsAIAvailable(cfg),
 	})
 }
 
@@ -1241,17 +1240,17 @@ func (s *Server) handleMetricsSnippet(w http.ResponseWriter, r *http.Request) {
 	meta, _ := disc.FetchMetadata(dsName)
 	opts := generator.BuildSuggestOptions(cfg)
 
-	var suggestions []generator.PanelSuggestion
+	suggestions := make([]generator.PanelSuggestion, 0, len(selected))
 	for _, m := range selected {
 		info, ok := meta[m]
 		if !ok {
 			info = generator.MetricInfo{Type: "untyped"}
 		}
-		s := generator.SuggestPanel(m, info, opts)
-		w, h := generator.SuggestSize(s.Type, len(selected))
-		s.Width = w
-		s.Height = h
-		suggestions = append(suggestions, s)
+		panel := generator.SuggestPanel(m, info, opts)
+		pw, ph := generator.SuggestSize(panel.Type, len(selected))
+		panel.Width = pw
+		panel.Height = ph
+		suggestions = append(suggestions, panel)
 	}
 
 	snippet, hints := generator.FormatSnippetYAML(suggestions, "discovered metrics", dsName)
@@ -1281,6 +1280,11 @@ func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	dsName := r.FormValue("datasource")
 	selected := r.Form["metrics"]
+
+	if dsName == "" {
+		s.renderPartial(w, "snippet-result.html", map[string]interface{}{"Error": "datasource is required"})
+		return
+	}
 
 	if len(selected) == 0 {
 		s.renderPartial(w, "snippet-result.html", map[string]interface{}{"Error": "select at least one metric"})
