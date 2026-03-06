@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -329,5 +330,161 @@ dashboards:
 		if order[i] != name {
 			t.Errorf("order[%d] = %s, want %s", i, order[i], name)
 		}
+	}
+}
+
+func TestDatasourceAuth(t *testing.T) {
+	cfg := `
+datasources:
+  cloud:
+    type: prometheus
+    uid: cloud-prom
+    url: https://prom.grafana.net/api/prom
+    basic_user: "123456"
+    basic_pass: "secret-key"
+  local:
+    type: prometheus
+    uid: local-prom
+    url: http://localhost:9090
+  token_ds:
+    type: prometheus
+    uid: token-prom
+    url: http://prom.internal:9090
+    token: "my-bearer-token"
+dashboards: {}
+`
+	path := writeTestConfig(t, cfg)
+	c, err := Load(path, nil)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+
+	cloud := c.Datasources["cloud"]
+	if cloud.BasicUser != "123456" {
+		t.Errorf("basic_user = %q, want 123456", cloud.BasicUser)
+	}
+	if cloud.BasicPass != "secret-key" {
+		t.Errorf("basic_pass = %q, want secret-key", cloud.BasicPass)
+	}
+	if cloud.ResolvedBasicPass() != "secret-key" {
+		t.Errorf("ResolvedBasicPass = %q, want secret-key", cloud.ResolvedBasicPass())
+	}
+
+	local := c.Datasources["local"]
+	if local.BasicUser != "" || local.Token != "" {
+		t.Error("local should have no auth")
+	}
+
+	tokenDS := c.Datasources["token_ds"]
+	if tokenDS.Token != "my-bearer-token" {
+		t.Errorf("token = %q, want my-bearer-token", tokenDS.Token)
+	}
+	if tokenDS.ResolvedToken() != "my-bearer-token" {
+		t.Errorf("ResolvedToken = %q, want my-bearer-token", tokenDS.ResolvedToken())
+	}
+}
+
+func TestDatasourceAuthEnvVar(t *testing.T) {
+	t.Setenv("TEST_DS_TOKEN", "env-token-value")
+	t.Setenv("TEST_DS_PASS", "env-pass-value")
+
+	cfg := `
+datasources:
+  cloud:
+    type: prometheus
+    uid: cloud-prom
+    basic_user: "user"
+    basic_pass: "$TEST_DS_PASS"
+    token: "$TEST_DS_TOKEN"
+dashboards: {}
+`
+	path := writeTestConfig(t, cfg)
+	c, err := Load(path, nil)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+
+	ds := c.Datasources["cloud"]
+	if ds.ResolvedBasicPass() != "env-pass-value" {
+		t.Errorf("ResolvedBasicPass = %q, want env-pass-value", ds.ResolvedBasicPass())
+	}
+	if ds.ResolvedToken() != "env-token-value" {
+		t.Errorf("ResolvedToken = %q, want env-token-value", ds.ResolvedToken())
+	}
+}
+
+func TestDatasourceDefString(t *testing.T) {
+	ds := DatasourceDef{
+		Type:      "prometheus",
+		UID:       "prom",
+		URL:       "http://localhost:9090",
+		BasicUser: "admin",
+		BasicPass: "secret",
+		Token:     "bearer-token",
+	}
+	s := ds.String()
+	if strings.Contains(s, "secret") {
+		t.Error("String() should mask BasicPass")
+	}
+	if strings.Contains(s, "bearer-token") {
+		t.Error("String() should mask Token")
+	}
+	if !strings.Contains(s, "***") {
+		t.Error("String() should contain masked value")
+	}
+	if !strings.Contains(s, "admin") {
+		t.Error("String() should show BasicUser")
+	}
+}
+
+func TestYAMLEditorDatasourceAuth(t *testing.T) {
+	initial := `
+datasources:
+  existing:
+    type: prometheus
+    uid: prom
+dashboards: {}
+`
+	path := writeTestConfig(t, initial)
+
+	editor := NewYAMLEditor(path)
+	err := editor.AddDatasource("cloud", DatasourceDef{
+		Type:      "prometheus",
+		UID:       "cloud-prom",
+		URL:       "https://prom.grafana.net",
+		BasicUser: "123456",
+		BasicPass: "$CLOUD_API_KEY",
+	})
+	if err != nil {
+		t.Fatalf("AddDatasource error: %v", err)
+	}
+
+	c, err := Load(path, nil)
+	if err != nil {
+		t.Fatalf("Load error: %v", err)
+	}
+	ds := c.Datasources["cloud"]
+	if ds.BasicUser != "123456" {
+		t.Errorf("basic_user = %q, want 123456", ds.BasicUser)
+	}
+	if ds.BasicPass != "$CLOUD_API_KEY" {
+		t.Errorf("basic_pass = %q, want $CLOUD_API_KEY", ds.BasicPass)
+	}
+
+	// Test UpdateDatasourceAuth
+	err = editor.UpdateDatasourceAuth("cloud", "", "", "new-token")
+	if err != nil {
+		t.Fatalf("UpdateDatasourceAuth error: %v", err)
+	}
+	c, err = Load(path, nil)
+	if err != nil {
+		t.Fatalf("Reload error: %v", err)
+	}
+	ds = c.Datasources["cloud"]
+	if ds.BasicUser != "" {
+		t.Errorf("basic_user should be cleared, got %q", ds.BasicUser)
+	}
+	if ds.Token != "new-token" {
+		t.Errorf("token = %q, want new-token", ds.Token)
 	}
 }

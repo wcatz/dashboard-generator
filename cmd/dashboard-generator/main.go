@@ -14,17 +14,20 @@ import (
 )
 
 var (
-	cfgFile       string
-	profile       string
-	outputDir     string
-	prometheusURL string
-	grafanaURL    string
-	grafanaUser   string
-	grafanaPass   string
-	grafanaToken  string
-	dryRun        bool
-	verbose       bool
-	servePort     int
+	cfgFile         string
+	profile         string
+	outputDir       string
+	prometheusURL   string
+	prometheusUser  string
+	prometheusPass  string
+	prometheusToken string
+	grafanaURL      string
+	grafanaUser     string
+	grafanaPass     string
+	grafanaToken    string
+	dryRun          bool
+	verbose         bool
+	servePort       int
 )
 
 func main() {
@@ -52,6 +55,9 @@ func main() {
 	}
 	discoverCmd.Flags().StringVar(&cfgFile, "config", "", "path to YAML config file (required)")
 	discoverCmd.Flags().StringVar(&prometheusURL, "prometheus-url", "", "Prometheus URL for discovery")
+	discoverCmd.Flags().StringVar(&prometheusUser, "prometheus-user", "", "Prometheus basic auth username")
+	discoverCmd.Flags().StringVar(&prometheusPass, "prometheus-pass", "", "Prometheus basic auth password")
+	discoverCmd.Flags().StringVar(&prometheusToken, "prometheus-token", "", "Prometheus bearer token")
 	discoverCmd.MarkFlagRequired("config")
 
 	pushCmd := &cobra.Command{
@@ -120,7 +126,12 @@ func runDiscover(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no datasources configured for discovery")
 	}
 
-	disc := generator.NewMetricDiscovery(cfg)
+	var disc *generator.MetricDiscovery
+	if prometheusUser != "" || prometheusToken != "" {
+		disc = generator.NewMetricDiscoveryWithAuth(cfg, prometheusUser, prometheusPass, prometheusToken)
+	} else {
+		disc = generator.NewMetricDiscovery(cfg)
+	}
 	return disc.PrintDiscovery(sources, discoveryCfg.IncludePatterns, discoveryCfg.ExcludePatterns)
 }
 

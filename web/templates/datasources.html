@@ -20,6 +20,24 @@
           add <span id="ds-add-spin" class="htmx-indicator"><span class="spinner"></span></span>
         </button>
       </div>
+      <details class="mt-3">
+        <summary class="text-xs text-base-content/50 cursor-pointer hover:text-base-content/70">authentication (optional)</summary>
+        <div class="flex flex-wrap gap-3 items-end mt-2 pl-1 border-l-2 border-base-content/10">
+          <label class="form-control flex-1 min-w-[120px]">
+            <div class="label"><span class="label-text text-xs">basic auth user</span></div>
+            <input type="text" name="basic_user" placeholder="username or instance ID" class="input input-bordered input-sm w-full">
+          </label>
+          <label class="form-control flex-1 min-w-[120px]">
+            <div class="label"><span class="label-text text-xs">basic auth password</span></div>
+            <input type="password" name="basic_pass" placeholder="password or $ENV_VAR" class="input input-bordered input-sm w-full">
+          </label>
+          <label class="form-control flex-1 min-w-[200px]">
+            <div class="label"><span class="label-text text-xs">bearer token</span></div>
+            <input type="password" name="token" placeholder="token or $ENV_VAR" class="input input-bordered input-sm w-full">
+          </label>
+        </div>
+        <p class="text-xs text-base-content/40 mt-1 pl-1">use <code>$ENV_VAR</code> to reference environment variables (e.g. <code>$GRAFANA_CLOUD_API_KEY</code>)</p>
+      </details>
     </form>
     <div id="ds-add-result" class="mt-2"></div>
   </div>
@@ -51,7 +69,10 @@
         </button>
       </div>
 
-      <div class="text-xs text-base-content/40 mt-1">uid: <code>{{$ds.UID}}</code></div>
+      <div class="text-xs text-base-content/40 mt-1">
+        uid: <code>{{$ds.UID}}</code>
+        {{if or $ds.BasicUser $ds.Token}}<span class="badge badge-xs badge-info ml-2">auth configured</span>{{end}}
+      </div>
 
       {{if $ds.URL}}
       <div class="flex flex-wrap gap-2 mt-3">

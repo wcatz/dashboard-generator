@@ -60,6 +60,24 @@ func (e *YAMLEditor) AddDatasource(name string, ds DatasourceDef) error {
 			&yaml.Node{Kind: yaml.ScalarNode, Value: "true", Tag: "!!bool"},
 		)
 	}
+	if ds.BasicUser != "" {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "basic_user"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: ds.BasicUser},
+		)
+	}
+	if ds.BasicPass != "" {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "basic_pass"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: ds.BasicPass},
+		)
+	}
+	if ds.Token != "" {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "token"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: ds.Token},
+		)
+	}
 
 	dsNode.Content = append(dsNode.Content,
 		&yaml.Node{Kind: yaml.ScalarNode, Value: name},
@@ -121,6 +139,51 @@ func (e *YAMLEditor) UpdateDatasourceURL(name, url string) error {
 	}
 
 	return e.save(doc)
+}
+
+// UpdateDatasourceAuth updates auth fields for an existing datasource.
+// Empty values remove the corresponding field.
+func (e *YAMLEditor) UpdateDatasourceAuth(name, basicUser, basicPass, token string) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	dsNode := findMappingKey(root, "datasources")
+	if dsNode == nil {
+		return fmt.Errorf("no datasources section in config")
+	}
+
+	entryNode := findMappingKey(dsNode, name)
+	if entryNode == nil {
+		return fmt.Errorf("datasource '%s' not found", name)
+	}
+
+	setOrRemoveField(entryNode, "basic_user", basicUser)
+	setOrRemoveField(entryNode, "basic_pass", basicPass)
+	setOrRemoveField(entryNode, "token", token)
+
+	return e.save(doc)
+}
+
+// setOrRemoveField sets a scalar field on a mapping node, or removes it if value is empty.
+func setOrRemoveField(node *yaml.Node, key, value string) {
+	if value != "" {
+		existing := findMappingKey(node, key)
+		if existing != nil {
+			existing.Value = value
+		} else {
+			node.Content = append(node.Content,
+				&yaml.Node{Kind: yaml.ScalarNode, Value: key},
+				&yaml.Node{Kind: yaml.ScalarNode, Value: value},
+			)
+		}
+	} else {
+		idx := findMappingKeyIndex(node, key)
+		if idx >= 0 {
+			node.Content = append(node.Content[:idx], node.Content[idx+2:]...)
+		}
+	}
 }
 
 // SetPaletteColor sets or updates a color in a named palette.

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make build)",
+      "Bash(gh api repos/wcatz/dashboard-generator/pulls/18/reviews)",
+      "Bash(gh api repos/wcatz/dashboard-generator/pulls/18/comments)"
+    ]
+  }
+}
