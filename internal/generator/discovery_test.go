@@ -1,6 +1,13 @@
 package generator
 
-import "testing"
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/wcatz/dashboard-generator/internal/config"
+)
 
 func TestFilterMetrics(t *testing.T) {
 	metrics := map[string]bool{
@@ -124,5 +131,140 @@ func TestSuggestQuery(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("SuggestQuery(%q, %q) = %q, want %q", tt.name, tt.metricType, got, tt.want)
 		}
+	}
+}
+
+func TestDiscoveryAuthBearer(t *testing.T) {
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "success",
+			"data":   []string{"up", "node_cpu_seconds_total"},
+		})
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"test": {Type: "prometheus", UID: "test", URL: server.URL, Token: "my-token"},
+		},
+	}
+	disc := NewMetricDiscovery(cfg)
+	_, err := disc.FetchMetrics("test")
+	if err != nil {
+		t.Fatalf("FetchMetrics error: %v", err)
+	}
+	if gotAuth != "Bearer my-token" {
+		t.Errorf("Authorization = %q, want %q", gotAuth, "Bearer my-token")
+	}
+}
+
+func TestDiscoveryAuthBasic(t *testing.T) {
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "success",
+			"data":   []string{"up"},
+		})
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"cloud": {Type: "prometheus", UID: "cloud", URL: server.URL, BasicUser: "123456", BasicPass: "api-key"},
+		},
+	}
+	disc := NewMetricDiscovery(cfg)
+	_, err := disc.FetchMetrics("cloud")
+	if err != nil {
+		t.Fatalf("FetchMetrics error: %v", err)
+	}
+	if gotAuth == "" {
+		t.Fatal("expected Authorization header")
+	}
+	if gotAuth[:6] != "Basic " {
+		t.Errorf("Authorization should start with 'Basic ', got %q", gotAuth)
+	}
+}
+
+func TestDiscoveryAuthExplicitOverridesConfig(t *testing.T) {
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "success",
+			"data":   []string{"up"},
+		})
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"test": {Type: "prometheus", UID: "test", URL: server.URL, Token: "config-token"},
+		},
+	}
+	disc := NewMetricDiscoveryWithAuth(cfg, "", "", "cli-token")
+	_, err := disc.FetchMetrics("test")
+	if err != nil {
+		t.Fatalf("FetchMetrics error: %v", err)
+	}
+	if gotAuth != "Bearer cli-token" {
+		t.Errorf("Authorization = %q, want %q (explicit should override config)", gotAuth, "Bearer cli-token")
+	}
+}
+
+func TestDiscoveryNoAuth(t *testing.T) {
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "success",
+			"data":   []string{"up"},
+		})
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"local": {Type: "prometheus", UID: "local", URL: server.URL},
+		},
+	}
+	disc := NewMetricDiscovery(cfg)
+	_, err := disc.FetchMetrics("local")
+	if err != nil {
+		t.Fatalf("FetchMetrics error: %v", err)
+	}
+	if gotAuth != "" {
+		t.Errorf("expected no Authorization header, got %q", gotAuth)
+	}
+}
+
+func TestDiscoveryAuthEnvVar(t *testing.T) {
+	t.Setenv("TEST_PROM_TOKEN", "env-resolved-token")
+
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "success",
+			"data":   []string{"up"},
+		})
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"cloud": {Type: "prometheus", UID: "cloud", URL: server.URL, Token: "$TEST_PROM_TOKEN"},
+		},
+	}
+	disc := NewMetricDiscovery(cfg)
+	_, err := disc.FetchMetrics("cloud")
+	if err != nil {
+		t.Fatalf("FetchMetrics error: %v", err)
+	}
+	if gotAuth != "Bearer env-resolved-token" {
+		t.Errorf("Authorization = %q, want %q", gotAuth, "Bearer env-resolved-token")
 	}
 }

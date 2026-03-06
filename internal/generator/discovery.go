@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,13 +16,28 @@ import (
 
 // MetricDiscovery queries Prometheus API for available metrics.
 type MetricDiscovery struct {
-	Config *config.Config
-	cache  map[string]interface{}
+	Config    *config.Config
+	cache     map[string]interface{}
+	basicUser string
+	basicPass string
+	token     string
 }
 
 // NewMetricDiscovery creates a new discovery instance.
 func NewMetricDiscovery(cfg *config.Config) *MetricDiscovery {
 	return &MetricDiscovery{Config: cfg, cache: make(map[string]interface{})}
+}
+
+// NewMetricDiscoveryWithAuth creates a discovery instance with explicit auth credentials.
+// These override any datasource-level auth from the config.
+func NewMetricDiscoveryWithAuth(cfg *config.Config, basicUser, basicPass, token string) *MetricDiscovery {
+	return &MetricDiscovery{
+		Config:    cfg,
+		cache:     make(map[string]interface{}),
+		basicUser: basicUser,
+		basicPass: basicPass,
+		token:     token,
+	}
 }
 
 // MetricInfo holds type and help text for a discovered metric.
@@ -55,7 +71,14 @@ type JobSummary struct {
 func (md *MetricDiscovery) get(baseURL, path string) (interface{}, error) {
 	url := strings.TrimRight(baseURL, "/") + path
 	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	md.applyAuth(req, baseURL)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "  error querying %s: %v\n", url, err)
 		return nil, err
@@ -73,6 +96,33 @@ func (md *MetricDiscovery) get(baseURL, path string) (interface{}, error) {
 		fmt.Fprintf(os.Stderr, "  warning: non-success response from %s\n", url)
 	}
 	return result["data"], nil
+}
+
+// applyAuth sets Authorization headers. Explicit auth on the MetricDiscovery
+// takes priority; otherwise falls back to per-datasource auth from config.
+func (md *MetricDiscovery) applyAuth(req *http.Request, baseURL string) {
+	token := md.token
+	basicUser := md.basicUser
+	basicPass := md.basicPass
+
+	// Fall back to per-datasource auth from config
+	if token == "" && basicUser == "" {
+		for _, ds := range md.Config.Datasources {
+			if ds.URL != "" && strings.TrimRight(ds.URL, "/") == strings.TrimRight(baseURL, "/") {
+				token = ds.ResolvedToken()
+				basicUser = ds.BasicUser
+				basicPass = ds.ResolvedBasicPass()
+				break
+			}
+		}
+	}
+
+	if token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	} else if basicUser != "" && basicPass != "" {
+		creds := base64.StdEncoding.EncodeToString([]byte(basicUser + ":" + basicPass))
+		req.Header.Set("Authorization", fmt.Sprintf("Basic %s", creds))
+	}
 }
 
 // FetchMetrics retrieves all metric names from a datasource.

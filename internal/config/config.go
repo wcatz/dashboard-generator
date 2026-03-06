@@ -17,6 +17,44 @@ type DatasourceDef struct {
 	UID       string `yaml:"uid"`
 	URL       string `yaml:"url"`
 	IsDefault bool   `yaml:"is_default"`
+	BasicUser string `yaml:"basic_user,omitempty"`
+	BasicPass string `yaml:"basic_pass,omitempty"` // supports $ENV_VAR references
+	Token     string `yaml:"token,omitempty"`      // supports $ENV_VAR references
+}
+
+// ResolvedBasicPass returns the basic_pass value, resolving $ENV_VAR references.
+func (d DatasourceDef) ResolvedBasicPass() string {
+	return resolveEnvRef(d.BasicPass)
+}
+
+// ResolvedToken returns the token value, resolving $ENV_VAR references.
+func (d DatasourceDef) ResolvedToken() string {
+	return resolveEnvRef(d.Token)
+}
+
+// String returns a safe representation with secrets masked.
+func (d DatasourceDef) String() string {
+	pass := d.BasicPass
+	if pass != "" {
+		pass = "***"
+	}
+	tok := d.Token
+	if tok != "" {
+		tok = "***"
+	}
+	return fmt.Sprintf("{Type:%s UID:%s URL:%s IsDefault:%t BasicUser:%s BasicPass:%s Token:%s}",
+		d.Type, d.UID, d.URL, d.IsDefault, d.BasicUser, pass, tok)
+}
+
+// resolveEnvRef resolves a $ENV_VAR reference to its value, or returns the string as-is.
+func resolveEnvRef(val string) string {
+	if strings.HasPrefix(val, "$") && !strings.Contains(val, " ") {
+		envName := val[1:]
+		if v := os.Getenv(envName); v != "" {
+			return v
+		}
+	}
+	return val
 }
 
 // DatasourceRef is a Grafana datasource reference used in panels.

@@ -1679,9 +1679,12 @@ func (s *Server) handleDatasourceAdd(w http.ResponseWriter, r *http.Request) {
 	uid := strings.ReplaceAll(name, "-", "_")
 
 	ds := config.DatasourceDef{
-		Type: "prometheus",
-		UID:  uid,
-		URL:  dsURL,
+		Type:      "prometheus",
+		UID:       uid,
+		URL:       dsURL,
+		BasicUser: strings.TrimSpace(r.FormValue("basic_user")),
+		BasicPass: strings.TrimSpace(r.FormValue("basic_pass")),
+		Token:     strings.TrimSpace(r.FormValue("token")),
 	}
 
 	editor := config.NewYAMLEditor(s.cfgPath)
