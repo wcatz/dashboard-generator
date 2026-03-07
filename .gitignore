@@ -16,6 +16,7 @@ docs/
 
 # Claude Code
 .claude/
+.omp/
 
 # Python artifacts
 __pycache__/

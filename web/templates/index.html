@@ -13,31 +13,31 @@
 {{end}}
 
 <div class="flex flex-wrap gap-4 mb-6">
-  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
+  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4" title="Grafana JSON dashboards defined in config">
     <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">dashboards</div>
     <div class="text-2xl font-bold text-info mt-1">{{.DashboardCount}}</div>
   </div>
-  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
+  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4" title="Total visualization panels across all dashboards">
     <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">panels</div>
     <div class="text-2xl font-bold text-primary mt-1">{{.PanelCount}}</div>
   </div>
-  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
+  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4" title="Prometheus/datasource connections for queries and discovery">
     <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">datasources</div>
     <div class="text-2xl font-bold text-success mt-1">{{.DatasourceCount}}</div>
   </div>
-  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
+  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4" title="Template variables for dashboard dropdown filters (e.g. job, namespace)">
     <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">variables</div>
     <div class="text-2xl font-bold text-warning mt-1">{{.VariableCount}}</div>
   </div>
-  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
+  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4" title="Named dashboard subsets for selective generation">
     <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">profiles</div>
     <div class="text-2xl font-bold text-secondary mt-1">{{.ProfileCount}}</div>
   </div>
-  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
+  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4" title="Reusable string constants for DRY PromQL expressions (referenced as ${name})">
     <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">constants</div>
     <div class="text-2xl font-bold text-accent mt-1">{{.ConstantCount}}</div>
   </div>
-  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
+  <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4" title="Named PromQL label selectors for filtering queries (referenced as ${name})">
     <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">selectors</div>
     <div class="text-2xl font-bold text-error mt-1">{{.SelectorCount}}</div>
   </div>

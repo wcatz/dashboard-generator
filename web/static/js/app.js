@@ -393,12 +393,6 @@ function toggleSectionCollapse(sectionEl) {
   sectionEl.classList.toggle('collapsed');
 }
 
-// Legacy compat
-function toggleRowCollapse(rowEl) {
-  var section = rowEl.closest('.preview-section');
-  if (section) toggleSectionCollapse(section);
-}
-
 // ── Compact mode toggle ──
 function toggleCompactMode(isCompact) {
   var sections = document.getElementById('preview-sections');

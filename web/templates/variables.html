@@ -86,11 +86,11 @@
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <label class="form-control">
           <div class="label"><span class="label-text text-xs">name</span></div>
-          <input type="text" name="name" placeholder="network" class="input input-bordered input-sm" required pattern="[a-zA-Z_][a-zA-Z0-9_]*">
+          <input type="text" name="name" placeholder="network" class="input input-bordered input-sm" required pattern="[a-zA-Z_][a-zA-Z0-9_]*" title="Variable name used in queries as $name">
         </label>
         <label class="form-control">
           <div class="label"><span class="label-text text-xs">type</span></div>
-          <select name="type" class="select select-bordered select-sm">
+          <select name="type" class="select select-bordered select-sm" title="query: from Prometheus label_values(), custom: static list, datasource: picker, interval: time interval">
             <option value="query">query</option>
             <option value="custom">custom</option>
             <option value="datasource">datasource</option>
@@ -99,7 +99,7 @@
         </label>
         <label class="form-control">
           <div class="label"><span class="label-text text-xs">datasource</span></div>
-          <select name="datasource" class="select select-bordered select-sm">
+          <select name="datasource" class="select select-bordered select-sm" title="which Prometheus to query for values (for query type)">
             <option value="">default</option>
             {{range .DatasourceNames}}
             <option value="{{.}}">{{.}}</option>
@@ -108,19 +108,19 @@
         </label>
         <label class="form-control">
           <div class="label"><span class="label-text text-xs">query / values</span></div>
-          <input type="text" name="query" placeholder="label_values(network)" class="input input-bordered input-sm font-mono text-xs">
+          <input type="text" name="query" placeholder="label_values(network)" class="input input-bordered input-sm font-mono text-xs" title="For query type: label_values(label) or label_values(metric, label). For custom type: comma-separated values">
         </label>
       </div>
       <div class="flex items-center gap-4 mt-3">
-        <label class="flex items-center gap-1.5">
+        <label class="flex items-center gap-1.5" title="allow selecting multiple values at once in the dropdown">
           <input type="checkbox" name="multi" value="true" checked class="checkbox checkbox-xs checkbox-primary">
           <span class="text-xs">multi-value</span>
         </label>
-        <label class="flex items-center gap-1.5">
+        <label class="flex items-center gap-1.5" title="add an 'All' option that selects every value">
           <input type="checkbox" name="include_all" value="true" checked class="checkbox checkbox-xs checkbox-primary">
           <span class="text-xs">include all</span>
         </label>
-        <label class="form-control form-control-sm">
+        <label class="form-control form-control-sm" title="filter values with a regular expression (e.g. .*prod.*)">
           <input type="text" name="regex" placeholder="regex filter (optional)" class="input input-bordered input-xs w-48 font-mono text-xs">
         </label>
         <div class="flex-1"></div>
