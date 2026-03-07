@@ -129,6 +129,7 @@ constants:
   rate_interval: "5m"
 selectors:
   host: '{instance=~"$instance"}'
+  by_ns: '{namespace=~"$namespace"}'
 datasources:
   primary:
     type: prometheus
@@ -148,6 +149,9 @@ dashboards: {}
 		{"up${host}", `up{instance=~"$instance"}`},
 		{"no refs here", "no refs here"},
 		{"${unknown}", "${unknown}"},
+		// adjacent selectors are merged into a single block
+		{`metric${host}{job="test"}`, `metric{instance=~"$instance", job="test"}`},
+		{`metric${host}${by_ns}`, `metric{instance=~"$instance", namespace=~"$namespace"}`},
 	}
 	for _, tt := range tests {
 		got := c.ResolveRef(tt.input)
