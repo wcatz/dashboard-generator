@@ -14,6 +14,12 @@ import (
 )
 
 var (
+	// build-time version info (injected via ldflags)
+	version   = "dev"
+	commit    = "none"
+	buildDate = "unknown"
+
+	// CLI flags
 	cfgFile         string
 	profile         string
 	outputDir       string
@@ -32,8 +38,9 @@ var (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "dashboard-generator",
-		Short: "config-driven Grafana dashboard generator",
+		Use:     "dashboard-generator",
+		Short:   "config-driven Grafana dashboard generator",
+		Version: formatVersion(),
 	}
 
 	genCmd := &cobra.Command{
@@ -301,4 +308,11 @@ func formatTotalSize(n int) string {
 		result = append(result, byte(c))
 	}
 	return string(result)
+}
+
+func formatVersion() string {
+	if commit != "none" {
+		return fmt.Sprintf("%s (commit: %s, built: %s)", version, commit[:7], buildDate)
+	}
+	return version
 }
