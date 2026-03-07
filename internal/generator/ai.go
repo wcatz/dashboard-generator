@@ -36,7 +36,7 @@ func IsAIAvailable(cfg *config.Config) bool {
 
 // NewAIClient creates a new AI client. Falls back to ANTHROPIC_API_KEY env var.
 func NewAIClient(cfg *config.Config) *AIClient {
-	apiKey := cfg.Generator.AnthropicAPIKey
+	apiKey := cfg.Generator.ResolvedAnthropicAPIKey()
 	if apiKey == "" {
 		apiKey = os.Getenv("ANTHROPIC_API_KEY")
 	}

@@ -134,7 +134,7 @@ func (pf *PanelFactory) buildTargets(cfg map[string]interface{}, datasource map[
 func (pf *PanelFactory) thresholds(cfg map[string]interface{}, defaultColor string) []interface{} {
 	if t, ok := cfg["thresholds"]; ok {
 		resolved := pf.Config.ResolveThresholds(t)
-		if resolved != nil && len(resolved) > 0 {
+		if len(resolved) > 0 {
 			steps := make([]interface{}, len(resolved))
 			for i, s := range resolved {
 				steps[i] = map[string]interface{}{"color": s.Color, "value": s.Value}

@@ -12,6 +12,8 @@
             {{range .Dashboards}}
             <option value="{{.UID}}" {{if eq .UID $.SelectedUID}}selected{{end}}>{{.Title}}</option>
             {{end}}
+            <option disabled>───────────</option>
+            <option value="all" {{if eq "all" $.SelectedUID}}selected{{end}}>all dashboards</option>
           </select>
         </label>
         <button type="submit" class="btn btn-sm btn-primary">

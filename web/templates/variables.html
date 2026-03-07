@@ -1,50 +1,73 @@
 {{define "content"}}
 <h1 class="text-xl font-bold mb-1">variables</h1>
-<p class="text-sm text-base-content/50 mb-6">template variables used across dashboards</p>
+<p class="text-sm text-base-content/50 mb-6">template variables for dashboard filtering — discover labels from prometheus, create variables, use in queries</p>
 
-{{if .Variables}}
-{{range .Variables}}
-<div class="flex items-center justify-between p-3 bg-base-100 border border-base-content/10 rounded-lg mb-2 hover:bg-base-200 transition-colors gap-3">
-  <div class="flex-1">
-    <div class="font-mono font-semibold text-sm">{{.Name}}</div>
-    <div class="text-xs text-base-content/50 flex items-center gap-2 flex-wrap mt-1">
-      <span class="badge badge-sm badge-secondary">{{.Type}}</span>
-      {{if .Datasource}}<span>datasource: {{.Datasource}}</span>{{end}}
-      {{if .Multi}}<span class="badge badge-sm badge-info">multi</span>{{end}}
-      {{if .IncludeAll}}<span class="badge badge-sm badge-info">all</span>{{end}}
-    </div>
-  </div>
-  <div class="text-xs text-base-content/50">
-    {{if .Query}}<code class="text-xs">{{.Query}}</code>{{end}}
-    {{if .Values}}{{.Values}}{{end}}
-    {{if .DsType}}type: {{.DsType}}{{end}}
-  </div>
-</div>
-{{if .ChainsFrom}}
-<div class="flex items-center gap-2 font-mono text-xs text-base-content/50 py-1">
-  {{range .ChainsFrom}}<span>{{.}}</span> <span class="opacity-40">&rarr;</span> {{end}}<span class="text-accent">{{.Name}}</span>
-</div>
-{{end}}
-{{end}}
-{{else}}
-<div class="text-center py-12 text-base-content/50">
-  <p>no variables defined</p>
-  <p>add variables in the <a href="/editor" class="link link-primary">config editor</a></p>
-</div>
-{{end}}
-
-{{if .UsedBy}}
-<div class="card bg-base-100 border border-base-content/10 mt-6">
+<!-- Existing variables -->
+<div class="card bg-base-100 border border-base-content/10 mb-4">
   <div class="card-body p-5">
-    <h3 class="card-title text-sm">variable usage</h3>
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="card-title text-sm">defined variables</h3>
+      <span class="text-xs text-base-content/50">{{len .Variables}} variables</span>
+    </div>
+
+    {{if .Variables}}
+    <div class="space-y-2" id="variables-list">
+      {{range .Variables}}
+      <div class="flex items-center justify-between p-3 bg-base-200 border border-base-content/10 rounded-lg hover:border-base-content/20 transition-colors gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="font-mono font-semibold text-sm">${{.Name}}</span>
+            <span class="badge badge-xs badge-secondary">{{.Type}}</span>
+            {{if .Datasource}}<span class="badge badge-xs badge-ghost">{{.Datasource}}</span>{{end}}
+            {{if .Multi}}<span class="badge badge-xs badge-info">multi</span>{{end}}
+            {{if .IncludeAll}}<span class="badge badge-xs badge-info">all</span>{{end}}
+          </div>
+          <div class="text-xs text-base-content/40 mt-1 font-mono truncate">
+            {{if .Query}}{{.Query}}{{end}}
+            {{if .Values}}{{.Values}}{{end}}
+            {{if .DsType}}type: {{.DsType}}{{end}}
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-xs text-error"
+                hx-post="/api/variable/delete"
+                hx-vals='{"name": "{{.Name}}"}'
+                hx-target="#var-add-result"
+                hx-swap="innerHTML"
+                hx-confirm="delete variable '{{.Name}}'?"
+                hx-on::after-request="setTimeout(function(){location.reload()}, 500)">
+          delete
+        </button>
+      </div>
+      {{if .ChainsFrom}}
+      <div class="flex items-center gap-2 font-mono text-xs text-base-content/50 pl-4">
+        {{range .ChainsFrom}}<span>{{.}}</span> <span class="opacity-40">&rarr;</span> {{end}}<span class="text-accent">{{.Name}}</span>
+      </div>
+      {{end}}
+      {{end}}
+    </div>
+    {{else}}
+    <div class="text-center py-6 text-base-content/50">
+      <p>no variables defined — discover labels below to create them</p>
+    </div>
+    {{end}}
+  </div>
+</div>
+
+<div id="var-add-result"></div>
+
+<!-- Variable usage -->
+{{if .UsedBy}}
+<div class="card bg-base-100 border border-base-content/10 mb-4">
+  <div class="card-body p-4">
+    <h3 class="card-title text-sm mb-2">variable usage</h3>
     <div class="overflow-x-auto">
       <table class="table table-xs">
         <thead><tr><th>variable</th><th>dashboards</th></tr></thead>
         <tbody>
           {{range .UsedBy}}
           <tr>
-            <td class="font-mono">{{.Name}}</td>
-            <td>{{range .Dashboards}}<span class="badge badge-sm badge-info mr-1">{{.}}</span>{{end}}</td>
+            <td class="font-mono">${{.Name}}</td>
+            <td>{{range .Dashboards}}<span class="badge badge-xs badge-info mr-1">{{.}}</span>{{end}}</td>
           </tr>
           {{end}}
         </tbody>
@@ -53,4 +76,80 @@
   </div>
 </div>
 {{end}}
+
+<!-- Add variable manually -->
+<div class="card bg-base-100 border border-base-content/10 mb-4">
+  <div class="card-body p-5">
+    <h3 class="card-title text-sm mb-3">add variable</h3>
+    <form hx-post="/api/variable/add" hx-target="#var-add-result" hx-swap="innerHTML"
+          hx-on::after-request="if(event.detail.successful) setTimeout(function(){location.reload()}, 800)">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <label class="form-control">
+          <div class="label"><span class="label-text text-xs">name</span></div>
+          <input type="text" name="name" placeholder="network" class="input input-bordered input-sm" required pattern="[a-zA-Z_][a-zA-Z0-9_]*" title="Variable name used in queries as $name">
+        </label>
+        <label class="form-control">
+          <div class="label"><span class="label-text text-xs">type</span></div>
+          <select name="type" class="select select-bordered select-sm" title="query: from Prometheus label_values(), custom: static list, datasource: picker, interval: time interval">
+            <option value="query">query</option>
+            <option value="custom">custom</option>
+            <option value="datasource">datasource</option>
+            <option value="interval">interval</option>
+          </select>
+        </label>
+        <label class="form-control">
+          <div class="label"><span class="label-text text-xs">datasource</span></div>
+          <select name="datasource" class="select select-bordered select-sm" title="which Prometheus to query for values (for query type)">
+            <option value="">default</option>
+            {{range .DatasourceNames}}
+            <option value="{{.}}">{{.}}</option>
+            {{end}}
+          </select>
+        </label>
+        <label class="form-control">
+          <div class="label"><span class="label-text text-xs">query / values</span></div>
+          <input type="text" name="query" placeholder="label_values(network)" class="input input-bordered input-sm font-mono text-xs" title="For query type: label_values(label) or label_values(metric, label). For custom type: comma-separated values">
+        </label>
+      </div>
+      <div class="flex items-center gap-4 mt-3">
+        <label class="flex items-center gap-1.5" title="allow selecting multiple values at once in the dropdown">
+          <input type="checkbox" name="multi" value="true" checked class="checkbox checkbox-xs checkbox-primary">
+          <span class="text-xs">multi-value</span>
+        </label>
+        <label class="flex items-center gap-1.5" title="add an 'All' option that selects every value">
+          <input type="checkbox" name="include_all" value="true" checked class="checkbox checkbox-xs checkbox-primary">
+          <span class="text-xs">include all</span>
+        </label>
+        <label class="form-control form-control-sm" title="filter values with a regular expression (e.g. .*prod.*)">
+          <input type="text" name="regex" placeholder="regex filter (optional)" class="input input-bordered input-xs w-48 font-mono text-xs">
+        </label>
+        <div class="flex-1"></div>
+        <button type="submit" class="btn btn-sm btn-primary">add variable</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Label discovery from Prometheus -->
+<div class="card bg-base-100 border border-base-content/10">
+  <div class="card-body p-5">
+    <div class="flex justify-between items-center mb-3">
+      <div>
+        <h3 class="card-title text-sm">discover labels from prometheus</h3>
+        <p class="text-xs text-base-content/50 mt-1">fetches all label names and sample values from configured datasources</p>
+      </div>
+      <button class="btn btn-sm btn-secondary" id="discover-labels-btn"
+              hx-get="/api/labels/discover"
+              hx-target="#labels-result"
+              hx-indicator="#discover-spinner">
+        discover labels <span id="discover-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+      </button>
+    </div>
+    <div id="labels-result">
+      <div class="text-center py-8 text-base-content/50">
+        <p>click "discover labels" to fetch available labels from prometheus</p>
+      </div>
+    </div>
+  </div>
+</div>
 {{end}}

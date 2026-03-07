@@ -378,7 +378,7 @@ document.addEventListener('keydown', function(e) {
 // ── Preview zoom controls ──
 
 function setPreviewZoom(value) {
-  var grid = document.getElementById('preview-grid');
+  var grid = document.getElementById('preview-sections');
   if (grid) grid.style.setProperty('--preview-scale', value);
   var label = document.getElementById('zoom-label');
   if (label) label.textContent = parseFloat(value).toFixed(1) + 'x';
@@ -387,14 +387,23 @@ function setPreviewZoom(value) {
   localStorage.setItem('preview-zoom', value);
 }
 
-// ── Row collapse/expand ──
+// ── Section collapse/expand ──
 
-function toggleRowCollapse(rowEl) {
-  var sectionY = rowEl.dataset.sectionY;
-  var isCollapsed = rowEl.classList.toggle('collapsed');
-  document.querySelectorAll('.preview-panel[data-section-y="' + sectionY + '"]').forEach(function(el) {
-    el.style.display = isCollapsed ? 'none' : '';
-  });
+function toggleSectionCollapse(sectionEl) {
+  sectionEl.classList.toggle('collapsed');
+}
+
+// ── Compact mode toggle ──
+function toggleCompactMode(isCompact) {
+  var sections = document.getElementById('preview-sections');
+  if (sections) {
+    if (isCompact) {
+      sections.classList.add('compact');
+    } else {
+      sections.classList.remove('compact');
+    }
+  }
+  localStorage.setItem('preview-compact', isCompact);
 }
 
 // ── Preview search and filter (combined to avoid conflicts) ──
@@ -433,8 +442,9 @@ function applyPreviewFilters() {
     var matchesSearch = true;
     if (q !== '') {
       var title = (el.dataset.panelTitle || '').toLowerCase();
-      var hint = el.querySelector('.panel-query-hint');
-      var queryText = hint ? hint.textContent.toLowerCase() : '';
+      var queries = el.querySelectorAll('.panel-card-query');
+      var queryText = '';
+      queries.forEach(function(qEl) { queryText += qEl.textContent.toLowerCase() + ' '; });
       matchesSearch = title.indexOf(q) !== -1 || queryText.indexOf(q) !== -1;
     }
     if (matchesType && matchesSearch) {

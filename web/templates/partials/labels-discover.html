@@ -1,0 +1,125 @@
+{{if .Errors}}
+<div class="mb-3">
+  {{range .Errors}}
+  <div class="alert alert-warning text-sm py-2 mb-1">
+    <span>{{.}}</span>
+  </div>
+  {{end}}
+</div>
+{{end}}
+{{if .Labels}}
+<div class="overflow-x-auto max-h-[60vh]">
+  <table class="table table-xs table-pin-rows">
+    <thead>
+      <tr>
+        <th class="w-8"></th>
+        <th>label</th>
+        <th>sources</th>
+        <th>values</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Labels}}
+      <tr class="hover">
+        <td>
+          {{if index $.ExistingVars .Name}}
+          <span class="badge badge-xs badge-success" title="variable exists">var</span>
+          {{else}}
+          <input type="checkbox" name="labels" value="{{.Name}}" class="checkbox checkbox-xs checkbox-primary label-check" data-label="{{.Name}}" data-ds="{{index .Sources 0}}">
+          {{end}}
+        </td>
+        <td class="font-mono text-sm font-semibold">{{.Name}}</td>
+        <td>
+          {{range .Sources}}<span class="badge badge-xs badge-ghost mr-0.5">{{.}}</span>{{end}}
+        </td>
+        <td>
+          <div id="vals-{{.Name}}" class="inline">
+            <button class="btn btn-xs btn-ghost text-base-content/50"
+                    hx-get="/api/labels/values?label={{.Name}}&datasource={{index .Sources 0}}"
+                    hx-target="#vals-{{.Name}}"
+                    hx-swap="innerHTML"
+                    hx-indicator="#spin-{{.Name}}">
+              show values <span id="spin-{{.Name}}" class="htmx-indicator"><span class="loading loading-spinner loading-xs"></span></span>
+            </button>
+          </div>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+
+<div class="flex items-center gap-3 mt-4 pt-3 border-t border-base-content/10">
+  <span class="text-xs text-base-content/50" id="label-select-count">0 selected</span>
+  <div class="flex-1"></div>
+  <select id="var-ds-select" class="select select-bordered select-xs">
+    <option value="">auto (from source)</option>
+    {{range .Datasources}}
+    <option value="{{.}}">{{.}}</option>
+    {{end}}
+  </select>
+  <label class="flex items-center gap-1.5">
+    <input type="checkbox" id="var-multi" checked class="checkbox checkbox-xs checkbox-primary">
+    <span class="text-xs">multi</span>
+  </label>
+  <label class="flex items-center gap-1.5">
+    <input type="checkbox" id="var-include-all" checked class="checkbox checkbox-xs checkbox-primary">
+    <span class="text-xs">include all</span>
+  </label>
+  <button class="btn btn-sm btn-primary" onclick="addSelectedVariables()">
+    add as variables
+  </button>
+</div>
+
+<script>
+(function() {
+  var checks = document.querySelectorAll('.label-check');
+  var countEl = document.getElementById('label-select-count');
+  checks.forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      var count = document.querySelectorAll('.label-check:checked').length;
+      countEl.textContent = count + ' selected';
+    });
+  });
+})();
+
+function addSelectedVariables() {
+  var checked = document.querySelectorAll('.label-check:checked');
+  if (checked.length === 0) { showToast('select at least one label', 'warning'); return; }
+
+  var dsOverride = document.getElementById('var-ds-select').value;
+  var multi = document.getElementById('var-multi').checked;
+  var includeAll = document.getElementById('var-include-all').checked;
+  var pending = checked.length;
+
+  checked.forEach(function(cb) {
+    var label = cb.dataset.label;
+    var ds = dsOverride || cb.dataset.ds;
+    htmx.ajax('POST', '/api/variable/add', {
+      target: '#var-add-result',
+      swap: 'innerHTML',
+      values: {
+        name: label,
+        type: 'query',
+        datasource: ds,
+        query: "label_values(" + label + ")",
+        multi: multi ? 'true' : 'false',
+        include_all: includeAll ? 'true' : 'false'
+      }
+    }).then(function() {
+      pending--;
+      if (pending === 0) {
+        showToast(checked.length + ' variable(s) added', 'success');
+        var discoverBtn = document.getElementById('discover-labels-btn');
+        if (discoverBtn) discoverBtn.click();
+      }
+    });
+  });
+}
+</script>
+{{else}}
+<div class="text-center py-8 text-base-content/50">
+  <p>no labels discovered</p>
+  <p class="text-xs mt-1">check that datasources have URLs configured and are reachable</p>
+</div>
+{{end}}

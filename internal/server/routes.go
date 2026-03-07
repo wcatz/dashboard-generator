@@ -45,4 +45,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/palette/create", s.handlePaletteCreate)
 	s.mux.HandleFunc("/api/palette/delete", s.handlePaletteDelete)
 	s.mux.HandleFunc("/api/palette/activate", s.handlePaletteActivate)
+	s.mux.HandleFunc("/api/labels/discover", s.handleLabelsDiscover)
+	s.mux.HandleFunc("/api/labels/values", s.handleLabelValues)
+	s.mux.HandleFunc("/api/variable/add", s.handleVariableAdd)
+	s.mux.HandleFunc("/api/variable/delete", s.handleVariableDelete)
 }

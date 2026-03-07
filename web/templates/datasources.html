@@ -10,11 +10,11 @@
       <div class="flex flex-wrap gap-3 items-end">
         <label class="form-control flex-1 min-w-[120px]">
           <div class="label"><span class="label-text text-xs">name</span></div>
-          <input type="text" name="name" placeholder="my-prometheus" required class="input input-bordered input-sm w-full">
+          <input type="text" name="name" placeholder="my-prometheus" required class="input input-bordered input-sm w-full" title="Unique identifier for this datasource, used in panel configs and variable queries">
         </label>
         <label class="form-control flex-[2] min-w-[200px]">
           <div class="label"><span class="label-text text-xs">Prometheus URL</span></div>
-          <input type="url" name="url" placeholder="http://prometheus:9090" required class="input input-bordered input-sm w-full">
+          <input type="url" name="url" placeholder="http://prometheus:9090" required class="input input-bordered input-sm w-full" title="URL used for metric discovery and label browsing (not embedded in dashboards)">
         </label>
         <button type="submit" class="btn btn-sm btn-primary">
           add <span id="ds-add-spin" class="htmx-indicator"><span class="spinner"></span></span>
@@ -64,7 +64,8 @@
         </div>
         <button class="btn btn-ghost btn-xs text-error opacity-50 hover:opacity-100"
                 hx-post="/api/datasource/delete" hx-vals='{"name":"{{$name}}"}'
-                hx-confirm="delete datasource '{{$name}}'?" hx-disabled-elt="this">
+                hx-confirm="delete datasource '{{$name}}'?" hx-disabled-elt="this"
+                aria-label="delete datasource {{$name}}" title="delete datasource">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
         </button>
       </div>
@@ -114,7 +115,8 @@
 {{else}}
 <div class="text-center py-12 text-base-content/50">
   <p>no datasources defined</p>
-  <p class="text-xs mt-1">add one above to get started</p>
+  <p class="text-xs mt-2">datasources connect to Prometheus for metric discovery and label browsing</p>
+  <p class="text-xs mt-1">add one above or configure them in the <a href="/editor" class="link link-primary">config editor</a></p>
 </div>
 {{end}}
 
@@ -129,14 +131,16 @@
               hx-get="/api/datasources/compare-all"
               hx-target="#ds-compare-all-result"
               hx-indicator="#ds-compare-all-spin"
-              hx-disabled-elt="this">
+              hx-disabled-elt="this"
+              title="find metrics shared across datasources or unique to each">
         compare metrics <span id="ds-compare-all-spin" class="htmx-indicator"><span class="spinner"></span></span>
       </button>
       <button class="btn btn-sm btn-outline"
               hx-get="/api/datasources/compare-labels"
               hx-target="#ds-compare-all-result"
               hx-indicator="#ds-compare-labels-spin"
-              hx-disabled-elt="this">
+              hx-disabled-elt="this"
+              title="compare label names across datasources to find shared filtering dimensions">
         compare labels <span id="ds-compare-labels-spin" class="htmx-indicator"><span class="spinner"></span></span>
       </button>
     </div>

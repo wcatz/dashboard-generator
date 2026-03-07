@@ -46,7 +46,7 @@ func main() {
 	genCmd.Flags().StringVar(&outputDir, "output-dir", "", "override output directory")
 	genCmd.Flags().BoolVar(&dryRun, "dry-run", false, "generate to memory only")
 	genCmd.Flags().BoolVar(&verbose, "verbose", false, "print panel details")
-	genCmd.MarkFlagRequired("config")
+	_ = genCmd.MarkFlagRequired("config")
 
 	discoverCmd := &cobra.Command{
 		Use:   "discover",
@@ -58,7 +58,7 @@ func main() {
 	discoverCmd.Flags().StringVar(&prometheusUser, "prometheus-user", "", "Prometheus basic auth username")
 	discoverCmd.Flags().StringVar(&prometheusPass, "prometheus-pass", "", "Prometheus basic auth password")
 	discoverCmd.Flags().StringVar(&prometheusToken, "prometheus-token", "", "Prometheus bearer token")
-	discoverCmd.MarkFlagRequired("config")
+	_ = discoverCmd.MarkFlagRequired("config")
 
 	pushCmd := &cobra.Command{
 		Use:   "push",
@@ -73,8 +73,8 @@ func main() {
 	pushCmd.Flags().StringVar(&grafanaPass, "grafana-pass", "", "Grafana basic auth password")
 	pushCmd.Flags().StringVar(&grafanaToken, "grafana-token", "", "Grafana API token")
 	pushCmd.Flags().BoolVar(&verbose, "verbose", false, "print panel details")
-	pushCmd.MarkFlagRequired("config")
-	pushCmd.MarkFlagRequired("grafana-url")
+	_ = pushCmd.MarkFlagRequired("config")
+	_ = pushCmd.MarkFlagRequired("grafana-url")
 
 	serveCmd := &cobra.Command{
 		Use:   "serve",
@@ -84,7 +84,7 @@ func main() {
 	serveCmd.Flags().StringVar(&cfgFile, "config", "", "path to YAML config file (required)")
 	serveCmd.Flags().IntVar(&servePort, "port", 8080, "HTTP server port")
 	serveCmd.Flags().StringVar(&grafanaURL, "grafana-url", "", "Grafana URL for push (or set GRAFANA_URL env)")
-	serveCmd.MarkFlagRequired("config")
+	_ = serveCmd.MarkFlagRequired("config")
 
 	rootCmd.AddCommand(genCmd, discoverCmd, pushCmd, serveCmd)
 
@@ -252,8 +252,8 @@ func generateDashboards(cfg *config.Config, push bool) error {
 			return fmt.Errorf("building dashboard '%s': %w", name, err)
 		}
 
-		filename := dbCfg.Filename
-		if filename == "" {
+		filename := filepath.Base(dbCfg.Filename)
+		if filename == "" || filename == "." {
 			filename = name + ".json"
 		}
 		fpath := filepath.Join(outDir, filename)

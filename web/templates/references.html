@@ -21,7 +21,10 @@
       </table>
     </div>
     {{else}}
-    <div class="text-center py-6 text-base-content/50"><p>no constants defined</p></div>
+    <div class="text-center py-6 text-base-content/50">
+      <p>no constants defined</p>
+      <p class="text-xs mt-1">constants are reusable strings referenced as <code>${name}</code> in queries (e.g. <code>rate_interval: "$__rate_interval"</code>)</p>
+    </div>
     {{end}}
   </div>
 </div>
@@ -45,7 +48,10 @@
       </table>
     </div>
     {{else}}
-    <div class="text-center py-6 text-base-content/50"><p>no selectors defined</p></div>
+    <div class="text-center py-6 text-base-content/50">
+      <p>no selectors defined</p>
+      <p class="text-xs mt-1">selectors are named PromQL label matchers referenced as <code>${name}</code> (e.g. <code>cardano: 'job=~"cardano/.*"'</code>)</p>
+    </div>
     {{end}}
   </div>
 </div>

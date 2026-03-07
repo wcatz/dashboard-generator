@@ -347,6 +347,115 @@ func (e *YAMLEditor) SetActivePalette(name string) error {
 	return e.save(doc)
 }
 
+// AddVariable adds a new variable entry to the config file.
+func (e *YAMLEditor) AddVariable(name string, v VariableDef) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	varNode := findMappingKey(root, "variables")
+	if varNode == nil {
+		root.Content = append(root.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "variables"},
+			&yaml.Node{Kind: yaml.MappingNode},
+		)
+		varNode = root.Content[len(root.Content)-1]
+	}
+
+	if findMappingKey(varNode, name) != nil {
+		return fmt.Errorf("variable '%s' already exists", name)
+	}
+
+	valueNode := &yaml.Node{Kind: yaml.MappingNode}
+	valueNode.Content = append(valueNode.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Value: "type"},
+		&yaml.Node{Kind: yaml.ScalarNode, Value: v.Type},
+	)
+	if v.Datasource != "" {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "datasource"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: v.Datasource},
+		)
+	}
+	if v.Query != "" {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "query"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: v.Query, Style: yaml.SingleQuotedStyle},
+		)
+	}
+	if v.Values != "" {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "values"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: v.Values},
+		)
+	}
+	if v.Multi {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "multi"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "true", Tag: "!!bool"},
+		)
+	}
+	if v.IncludeAll {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "include_all"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "true", Tag: "!!bool"},
+		)
+	}
+	if v.Refresh > 0 {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "refresh"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: fmt.Sprintf("%d", v.Refresh), Tag: "!!int"},
+		)
+	}
+	if v.Sort > 0 {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "sort"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: fmt.Sprintf("%d", v.Sort), Tag: "!!int"},
+		)
+	}
+	if v.Regex != "" {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "regex"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: v.Regex, Style: yaml.SingleQuotedStyle},
+		)
+	}
+	if v.DsType != "" {
+		valueNode.Content = append(valueNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "ds_type"},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: v.DsType},
+		)
+	}
+
+	varNode.Content = append(varNode.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Value: name},
+		valueNode,
+	)
+
+	return e.save(doc)
+}
+
+// DeleteVariable removes a variable entry from the config file.
+func (e *YAMLEditor) DeleteVariable(name string) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	varNode := findMappingKey(root, "variables")
+	if varNode == nil {
+		return fmt.Errorf("no variables section in config")
+	}
+
+	idx := findMappingKeyIndex(varNode, name)
+	if idx < 0 {
+		return fmt.Errorf("variable '%s' not found", name)
+	}
+
+	varNode.Content = append(varNode.Content[:idx], varNode.Content[idx+2:]...)
+	return e.save(doc)
+}
+
 func (e *YAMLEditor) load() (*yaml.Node, *yaml.Node, error) {
 	data, err := os.ReadFile(e.path)
 	if err != nil {

@@ -1,24 +1,31 @@
 name: CI
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+   push:
+      branches: [master]
+   pull_request:
+      branches: [master]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-      - name: Vet
-        run: go vet ./...
-      - name: Test
-        run: go test ./... -v
-      - name: Build
-        run: go build -o dashboard-generator ./cmd/dashboard-generator/
-      - name: Dry run
-        run: ./dashboard-generator generate --config example-config.yaml --dry-run
+   test:
+      runs-on: ubuntu-latest
+      steps:
+         - uses: actions/checkout@v4
+         - uses: actions/setup-go@v5
+           with:
+              go-version: "1.24"
+         - name: Vet
+           run: go vet ./...
+         - name: Lint
+           uses: golangci/golangci-lint-action@v6
+           with:
+              version: latest
+              args: --timeout=5m
+         - name: Test
+           run: go test ./... -v -coverprofile=coverage.out
+         - name: Coverage summary
+           run: go tool cover -func=coverage.out | tail -1
+         - name: Build
+           run: go build -o dashboard-generator ./cmd/dashboard-generator/
+         - name: Dry run
+           run: ./dashboard-generator generate --config example-config.yaml --dry-run

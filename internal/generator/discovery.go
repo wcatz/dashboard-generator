@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"sort"
 	"strings"
@@ -213,7 +214,7 @@ func (md *MetricDiscovery) FetchLabelValues(dsName, label string) ([]string, err
 	if url == "" {
 		return nil, nil
 	}
-	data, err := md.get(url, fmt.Sprintf("/api/v1/label/%s/values", label))
+	data, err := md.get(url, fmt.Sprintf("/api/v1/label/%s/values", neturl.PathEscape(label)))
 	if err != nil {
 		return nil, err
 	}

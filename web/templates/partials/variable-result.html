@@ -1,0 +1,9 @@
+{{if .Error}}
+<div class="alert alert-error text-sm py-2">
+  <span>{{.Error}}</span>
+</div>
+{{else if .Success}}
+<div class="alert alert-success text-sm py-2">
+  <span>{{.Success}}</span>
+</div>
+{{end}}

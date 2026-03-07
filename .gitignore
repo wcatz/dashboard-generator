@@ -7,6 +7,17 @@ output/
 *.gen.json
 gen-*.json
 
+# Client configs (may contain tokens/secrets)
+configs/
+!configs/.gitkeep
+
+# Internal docs
+docs/
+
+# Claude Code
+.claude/
+.omp/
+
 # Python artifacts
 __pycache__/
 *.py[codz]
