@@ -92,7 +92,10 @@ func (s *Server) handleVariableSnippet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 	dsName := r.FormValue("datasource")
 	selected := r.Form["labels"]
 
@@ -128,7 +131,10 @@ func (s *Server) handleVariableAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 
 	name := strings.TrimSpace(r.FormValue("name"))
 	varType := r.FormValue("type")
@@ -185,7 +191,10 @@ func (s *Server) handleVariableDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 	name := r.FormValue("name")
 	if name == "" {
 		s.renderPartial(w, "variable-result.html", map[string]interface{}{"Error": "variable name required"})

@@ -185,7 +185,10 @@ func (s *Server) handleMetricsSnippet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 	dsName := r.FormValue("datasource")
 	selected := r.Form["metrics"]
 
@@ -236,7 +239,10 @@ func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 	dsName := r.FormValue("datasource")
 	selected := r.Form["metrics"]
 
@@ -291,7 +297,10 @@ func (s *Server) handleComparisonSnippet(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 	selected := r.Form["metrics"]
 
 	if len(selected) == 0 {

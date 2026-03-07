@@ -117,7 +117,7 @@ func newTestServer(t *testing.T) (*Server, string) {
 
 	// Create output dir so generate handler can write files
 	outDir := filepath.Join(dir, "output")
-	os.MkdirAll(outDir, 0755)
+	_ = os.MkdirAll(outDir, 0755)
 
 	webFS, err := fs.Sub(web.EmbeddedFS, ".")
 	if err != nil {

@@ -232,15 +232,6 @@ func extractNavLinks(dashboard map[string]interface{}) []NavLink {
 	return links
 }
 
-func lookupMetaInfo(name string, primary, fallback map[string]generator.MetricInfo) generator.MetricInfo {
-	if info, ok := primary[name]; ok {
-		return info
-	}
-	if info, ok := fallback[name]; ok {
-		return info
-	}
-	return generator.MetricInfo{Type: "untyped"}
-}
 
 func filterMetricInfoMap(m map[string]generator.MetricInfo, patterns []string) map[string]generator.MetricInfo {
 	keys := make(map[string]bool)

@@ -53,7 +53,10 @@ func (s *Server) handleDatasourceURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 	name := r.FormValue("name")
 	dsURL := r.FormValue("url")
 
@@ -213,7 +216,10 @@ func (s *Server) handleDatasourceAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 	name := r.FormValue("name")
 	dsURL := r.FormValue("url")
 
@@ -261,7 +267,10 @@ func (s *Server) handleDatasourceDelete(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 	name := r.FormValue("name")
 	if name == "" {
 		http.Error(w, "name required", 400)

@@ -182,5 +182,5 @@ func (s *Server) renderPartial(w http.ResponseWriter, name string, data interfac
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	buf.WriteTo(w)
+	_, _ = buf.WriteTo(w)
 }

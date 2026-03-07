@@ -24,7 +24,10 @@ func (s *Server) handleConfigSave(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
 	content := r.FormValue("content")
 	if content == "" {
 		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "empty content"})
