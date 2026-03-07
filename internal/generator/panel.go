@@ -22,6 +22,8 @@ var DefaultSizes = map[string][2]int{
 	"logs":           {24, 8},
 	"row":            {24, 1},
 	"comparison":     {12, 8},
+	"alertlist":      {12, 5},
+	"dashlist":       {12, 5},
 }
 
 // PanelFactory creates Grafana panel JSON dicts.
@@ -65,6 +67,10 @@ func (pf *PanelFactory) FromConfig(cfg map[string]interface{}, x, y int) (map[st
 		return pf.Logs(cfg, x, y), nil
 	case "comparison":
 		return pf.Comparison(cfg, x, y)
+	case "alertlist":
+		return pf.Alertlist(cfg, x, y), nil
+	case "dashlist":
+		return pf.Dashlist(cfg, x, y), nil
 	default:
 		return nil, fmt.Errorf("unknown panel type: %s", ptype)
 	}
@@ -812,4 +818,68 @@ func (pf *PanelFactory) Comparison(cfg map[string]interface{}, x, y int) (map[st
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "timeseries",
 	}, nil
+}
+
+// Alertlist creates an alert list panel.
+func (pf *PanelFactory) Alertlist(cfg map[string]interface{}, x, y int) map[string]interface{} {
+	dw, dh := DefaultSizes["alertlist"][0], DefaultSizes["alertlist"][1]
+	w := getInt(cfg, "width", dw)
+	h := getInt(cfg, "height", dh)
+	return map[string]interface{}{
+		"datasource":  map[string]interface{}{"type": "datasource", "uid": "-- Grafana --"},
+		"description": getString(cfg, "description", ""),
+		"gridPos":     map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
+		"id":          pf.IDGen.Next(),
+		"options": map[string]interface{}{
+			"alertInstanceLabelFilter": getString(cfg, "label_filter", ""),
+			"alertName":                 getString(cfg, "alert_name", ""),
+			"dashboardAlerts":           getBool(cfg, "dashboard_alerts", false),
+			"groupBy":                   getStringSlice(cfg, "group_by", []string{}),
+			"groupMode":                 getString(cfg, "group_mode", "default"),
+			"maxItems":                  getInt(cfg, "max_items", 20),
+			"sortOrder":                 getInt(cfg, "sort_order", 1),
+			"stateFilter": map[string]interface{}{
+				"error":    getBool(cfg, "show_error", true),
+				"firing":   getBool(cfg, "show_firing", true),
+				"noData":   getBool(cfg, "show_nodata", false),
+				"normal":   getBool(cfg, "show_normal", false),
+				"pending":  getBool(cfg, "show_pending", true),
+			},
+			"viewMode": getString(cfg, "view_mode", "list"),
+		},
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"title":         getString(cfg, "title", "alerts"),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "alertlist",
+	}
+}
+
+// Dashlist creates a dashboard list panel.
+func (pf *PanelFactory) Dashlist(cfg map[string]interface{}, x, y int) map[string]interface{} {
+	dw, dh := DefaultSizes["dashlist"][0], DefaultSizes["dashlist"][1]
+	w := getInt(cfg, "width", dw)
+	h := getInt(cfg, "height", dh)
+	return map[string]interface{}{
+		"datasource":  map[string]interface{}{"type": "datasource", "uid": "-- Grafana --"},
+		"description": getString(cfg, "description", ""),
+		"gridPos":     map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
+		"id":          pf.IDGen.Next(),
+		"options": map[string]interface{}{
+			"folderId":       getInt(cfg, "folder_id", 0),
+			"headings":       getBool(cfg, "show_headings", true),
+			"includeVars":    getBool(cfg, "include_vars", false),
+			"keepTime":       getBool(cfg, "keep_time", false),
+			"limit":          getInt(cfg, "limit", 10),
+			"maxItems":       getInt(cfg, "max_items", 10),
+			"query":          getString(cfg, "query", ""),
+			"recent":         getBool(cfg, "show_recent", true),
+			"search":         getBool(cfg, "show_search", false),
+			"starred":        getBool(cfg, "show_starred", true),
+			"tags":           getStringSlice(cfg, "tags", []string{}),
+		},
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"title":         getString(cfg, "title", "dashboards"),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "dashlist",
+	}
 }
