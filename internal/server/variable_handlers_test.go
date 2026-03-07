@@ -58,3 +58,23 @@ func TestVariablesPage(t *testing.T) {
 	assertStatus(t, w, 200)
 	assertContains(t, w, "instance")
 }
+
+
+func TestHandleVariableSnippet(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	rec := doPost(t, srv, "/api/datasources/variable-snippet", "datasource=primary&labels=job&labels=instance")
+	assertStatus(t, rec, 200)
+	assertContains(t, rec, "variables:")
+	assertContains(t, rec, "label_values(job)")
+	assertContains(t, rec, "label_values(instance)")
+	assertContains(t, rec, "datasource: primary")
+}
+
+func TestHandleVariableSnippetNoLabels(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	rec := doPost(t, srv, "/api/datasources/variable-snippet", "datasource=primary")
+	assertStatus(t, rec, 200)
+	assertContains(t, rec, "select at least one")
+}

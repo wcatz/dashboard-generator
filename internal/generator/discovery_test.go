@@ -524,3 +524,313 @@ func TestFetchTargetsError(t *testing.T) {
 		t.Fatal("expected error for unknown datasource")
 	}
 }
+
+func TestGroupTargetsByJob(t *testing.T) {
+	targets := []TargetInfo{
+		{ScrapePool: "node-exporter", Health: "up", Labels: map[string]string{"job": "node-exporter", "instance": "host1:9100"}},
+		{ScrapePool: "node-exporter", Health: "down", Labels: map[string]string{"job": "node-exporter", "instance": "host2:9100"}},
+		{ScrapePool: "prometheus", Health: "up", Labels: map[string]string{"job": "prometheus", "instance": "localhost:9090"}},
+		{ScrapePool: "prometheus", Health: "up", Labels: map[string]string{"job": "prometheus", "instance": "localhost:9091"}},
+	}
+
+	result := GroupTargetsByJob(targets)
+	if len(result) != 2 {
+		t.Fatalf("group count = %d, want 2", len(result))
+	}
+	// sorted by name: node-exporter < prometheus
+	if result[0].Name != "node-exporter" {
+		t.Errorf("result[0].Name = %q, want node-exporter", result[0].Name)
+	}
+	if result[0].TargetCount != 2 {
+		t.Errorf("node-exporter TargetCount = %d, want 2", result[0].TargetCount)
+	}
+	if result[0].UpCount != 1 {
+		t.Errorf("node-exporter UpCount = %d, want 1", result[0].UpCount)
+	}
+	if result[0].DownCount != 1 {
+		t.Errorf("node-exporter DownCount = %d, want 1", result[0].DownCount)
+	}
+	if len(result[0].Targets) != 2 {
+		t.Errorf("node-exporter Targets count = %d, want 2", len(result[0].Targets))
+	}
+	if result[1].Name != "prometheus" {
+		t.Errorf("result[1].Name = %q, want prometheus", result[1].Name)
+	}
+	if result[1].TargetCount != 2 {
+		t.Errorf("prometheus TargetCount = %d, want 2", result[1].TargetCount)
+	}
+	if result[1].UpCount != 2 {
+		t.Errorf("prometheus UpCount = %d, want 2", result[1].UpCount)
+	}
+	if result[1].DownCount != 0 {
+		t.Errorf("prometheus DownCount = %d, want 0", result[1].DownCount)
+	}
+}
+
+func TestGroupTargetsByJobEmpty(t *testing.T) {
+	result := GroupTargetsByJob(nil)
+	if len(result) != 0 {
+		t.Errorf("expected empty result, got %d entries", len(result))
+	}
+}
+
+func TestGroupTargetsByJobFallbackLabel(t *testing.T) {
+	targets := []TargetInfo{
+		{ScrapePool: "", Health: "up", Labels: map[string]string{"job": "custom-job", "instance": "host1:9100"}},
+		{ScrapePool: "", Health: "up", Labels: map[string]string{"job": "custom-job", "instance": "host2:9100"}},
+		{ScrapePool: "", Health: "down", Labels: map[string]string{"job": "other-job", "instance": "host3:8080"}},
+	}
+
+	result := GroupTargetsByJob(targets)
+	if len(result) != 2 {
+		t.Fatalf("group count = %d, want 2", len(result))
+	}
+	if result[0].Name != "custom-job" {
+		t.Errorf("result[0].Name = %q, want custom-job", result[0].Name)
+	}
+	if result[0].TargetCount != 2 {
+		t.Errorf("custom-job TargetCount = %d, want 2", result[0].TargetCount)
+	}
+	if result[0].UpCount != 2 {
+		t.Errorf("custom-job UpCount = %d, want 2", result[0].UpCount)
+	}
+	if result[1].Name != "other-job" {
+		t.Errorf("result[1].Name = %q, want other-job", result[1].Name)
+	}
+	if result[1].DownCount != 1 {
+		t.Errorf("other-job DownCount = %d, want 1", result[1].DownCount)
+	}
+}
+
+func TestCategorize(t *testing.T) {
+	serverA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/label/__name__/values":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"status": "success",
+				"data":   []string{"up", "node_cpu", "node_mem"},
+			})
+		case "/api/v1/metadata":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"status": "success",
+				"data": map[string]interface{}{
+					"up":       []map[string]string{{"type": "gauge", "help": "Target up"}},
+					"node_cpu": []map[string]string{{"type": "counter", "help": "CPU usage"}},
+					"node_mem": []map[string]string{{"type": "gauge", "help": "Memory usage"}},
+				},
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer serverA.Close()
+
+	serverB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/label/__name__/values":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"status": "success",
+				"data":   []string{"up", "node_mem", "go_gc"},
+			})
+		case "/api/v1/metadata":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"status": "success",
+				"data": map[string]interface{}{
+					"up":       []map[string]string{{"type": "gauge", "help": "Target up"}},
+					"node_mem": []map[string]string{{"type": "gauge", "help": "Memory usage"}},
+					"go_gc":    []map[string]string{{"type": "counter", "help": "GC cycles"}},
+				},
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer serverB.Close()
+
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"ds_a": {Type: "prometheus", UID: "a", URL: serverA.URL},
+			"ds_b": {Type: "prometheus", UID: "b", URL: serverB.URL},
+		},
+	}
+	disc := NewMetricDiscovery(cfg)
+	result, err := disc.Categorize("ds_a", "ds_b")
+	if err != nil {
+		t.Fatalf("Categorize error: %v", err)
+	}
+
+	// shared: up, node_mem
+	if len(result["shared"]) != 2 {
+		t.Errorf("shared count = %d, want 2", len(result["shared"]))
+	}
+	if _, ok := result["shared"]["up"]; !ok {
+		t.Error("expected 'up' in shared")
+	}
+	if _, ok := result["shared"]["node_mem"]; !ok {
+		t.Error("expected 'node_mem' in shared")
+	}
+
+	// only_a: node_cpu
+	if len(result["only_a"]) != 1 {
+		t.Errorf("only_a count = %d, want 1", len(result["only_a"]))
+	}
+	if _, ok := result["only_a"]["node_cpu"]; !ok {
+		t.Error("expected 'node_cpu' in only_a")
+	}
+	if result["only_a"]["node_cpu"].Type != "counter" {
+		t.Errorf("node_cpu type = %q, want counter", result["only_a"]["node_cpu"].Type)
+	}
+
+	// only_b: go_gc
+	if len(result["only_b"]) != 1 {
+		t.Errorf("only_b count = %d, want 1", len(result["only_b"]))
+	}
+	if _, ok := result["only_b"]["go_gc"]; !ok {
+		t.Error("expected 'go_gc' in only_b")
+	}
+}
+
+func TestCompareAll(t *testing.T) {
+	newMockServer := func(metrics []string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/api/v1/label/__name__/values":
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"status": "success",
+					"data":   metrics,
+				})
+			case "/api/v1/metadata":
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+					"status": "success",
+					"data":   map[string]interface{}{},
+				})
+			default:
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+	}
+
+	srvA := newMockServer([]string{"m1", "m2", "m3"})
+	defer srvA.Close()
+	srvB := newMockServer([]string{"m1", "m2", "m4"})
+	defer srvB.Close()
+	srvC := newMockServer([]string{"m1", "m5"})
+	defer srvC.Close()
+
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"a": {Type: "prometheus", UID: "a", URL: srvA.URL},
+			"b": {Type: "prometheus", UID: "b", URL: srvB.URL},
+			"c": {Type: "prometheus", UID: "c", URL: srvC.URL},
+		},
+	}
+	disc := NewMetricDiscovery(cfg)
+	shared, exclusive, err := disc.CompareAll([]string{"a", "b", "c"})
+	if err != nil {
+		t.Fatalf("CompareAll error: %v", err)
+	}
+
+	// shared: only m1 is on all three
+	if len(shared) != 1 {
+		t.Errorf("shared count = %d, want 1", len(shared))
+	}
+	if _, ok := shared["m1"]; !ok {
+		t.Error("expected 'm1' in shared")
+	}
+
+	// exclusive a: m3 (m2 is also on b, so not exclusive)
+	if len(exclusive["a"]) != 1 {
+		t.Errorf("exclusive[a] count = %d, want 1", len(exclusive["a"]))
+	}
+	if _, ok := exclusive["a"]["m3"]; !ok {
+		t.Error("expected 'm3' exclusive to a")
+	}
+
+	// exclusive b: m4
+	if len(exclusive["b"]) != 1 {
+		t.Errorf("exclusive[b] count = %d, want 1", len(exclusive["b"]))
+	}
+	if _, ok := exclusive["b"]["m4"]; !ok {
+		t.Error("expected 'm4' exclusive to b")
+	}
+
+	// exclusive c: m5
+	if len(exclusive["c"]) != 1 {
+		t.Errorf("exclusive[c] count = %d, want 1", len(exclusive["c"]))
+	}
+	if _, ok := exclusive["c"]["m5"]; !ok {
+		t.Error("expected 'm5' exclusive to c")
+	}
+}
+
+func TestCompareAllTooFew(t *testing.T) {
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"a": {Type: "prometheus", UID: "a", URL: "http://localhost:9090"},
+		},
+	}
+	disc := NewMetricDiscovery(cfg)
+	_, _, err := disc.CompareAll([]string{"a"})
+	if err == nil {
+		t.Fatal("expected error for < 2 datasources")
+	}
+}
+
+func TestLookupMeta(t *testing.T) {
+	primary := map[string]MetricInfo{
+		"up": {Type: "gauge", Help: "Target up"},
+	}
+	fallback := map[string]MetricInfo{
+		"node_cpu": {Type: "counter", Help: "CPU seconds"},
+	}
+
+	// Found in primary
+	info := lookupMeta("up", primary, fallback)
+	if info.Type != "gauge" {
+		t.Errorf("lookupMeta(up) type = %q, want gauge", info.Type)
+	}
+
+	// Found in fallback
+	info = lookupMeta("node_cpu", primary, fallback)
+	if info.Type != "counter" {
+		t.Errorf("lookupMeta(node_cpu) type = %q, want counter", info.Type)
+	}
+
+	// Not found anywhere
+	info = lookupMeta("missing", primary, fallback)
+	if info.Type != "untyped" {
+		t.Errorf("lookupMeta(missing) type = %q, want untyped", info.Type)
+	}
+}
+
+func TestSortedKeys(t *testing.T) {
+	m := map[string]bool{"zebra": true, "alpha": true, "mango": true}
+	got := sortedKeys(m)
+	want := []string{"alpha", "mango", "zebra"}
+	if len(got) != len(want) {
+		t.Fatalf("sortedKeys len = %d, want %d", len(got), len(want))
+	}
+	for i, v := range want {
+		if got[i] != v {
+			t.Errorf("sortedKeys[%d] = %q, want %q", i, got[i], v)
+		}
+	}
+}
+
+func TestSortedMetricKeys(t *testing.T) {
+	m := map[string]MetricInfo{
+		"node_mem": {Type: "gauge"},
+		"cpu":      {Type: "counter"},
+		"up":       {Type: "gauge"},
+	}
+	got := sortedMetricKeys(m)
+	want := []string{"cpu", "node_mem", "up"}
+	if len(got) != len(want) {
+		t.Fatalf("sortedMetricKeys len = %d, want %d", len(got), len(want))
+	}
+	for i, v := range want {
+		if got[i] != v {
+			t.Errorf("sortedMetricKeys[%d] = %q, want %q", i, got[i], v)
+		}
+	}
+}

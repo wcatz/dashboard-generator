@@ -1104,3 +1104,75 @@ dashboards:
 		}
 	}
 }
+
+func TestGetDashboardOrderNoProfile(t *testing.T) {
+	yaml := `
+dashboards:
+  alpha:
+    uid: alpha
+    title: alpha
+    filename: alpha.json
+    sections: []
+  beta:
+    uid: beta
+    title: beta
+    filename: beta.json
+    sections: []
+  gamma:
+    uid: gamma
+    title: gamma
+    filename: gamma.json
+    sections: []
+`
+	cfg, err := LoadFromBytes([]byte(yaml))
+	if err != nil {
+		t.Fatalf("LoadFromBytes: %v", err)
+	}
+	order, err := cfg.GetDashboardOrder("")
+	if err != nil {
+		t.Fatalf("GetDashboardOrder: %v", err)
+	}
+	if len(order) != 3 {
+		t.Fatalf("expected 3 dashboards, got %d: %v", len(order), order)
+	}
+	// YAML order should be alpha, beta, gamma
+	if order[0] != "alpha" || order[1] != "beta" || order[2] != "gamma" {
+		t.Errorf("expected [alpha beta gamma], got %v", order)
+	}
+}
+
+func TestGetDashboardOrderBadProfile(t *testing.T) {
+	cfg, _ := LoadFromBytes([]byte(`dashboards: {}`))
+	_, err := cfg.GetDashboardOrder("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for unknown profile")
+	}
+}
+
+func TestGetDefaultDatasourceNoDefault(t *testing.T) {
+	yaml := `
+datasources:
+  myds:
+    type: prometheus
+    uid: myds_uid
+`
+	cfg, err := LoadFromBytes([]byte(yaml))
+	if err != nil {
+		t.Fatalf("LoadFromBytes: %v", err)
+	}
+	ds := cfg.GetDefaultDatasource()
+	if ds.UID != "myds_uid" {
+		t.Errorf("expected UID myds_uid, got %s", ds.UID)
+	}
+}
+
+func TestGetDefaultDatasourceEmpty(t *testing.T) {
+	cfg, err := LoadFromBytes([]byte(`{}`))
+	if err != nil {
+		t.Fatalf("LoadFromBytes: %v", err)
+	}
+	ds := cfg.GetDefaultDatasource()
+	if ds.Type != "prometheus" || ds.UID != "prometheus" {
+		t.Errorf("expected fallback {prometheus, prometheus}, got {%s, %s}", ds.Type, ds.UID)
+	}
+}

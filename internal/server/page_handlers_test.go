@@ -96,3 +96,45 @@ func TestIndexNotFoundPath(t *testing.T) {
 	w := doGet(t, srv, "/nonexistent")
 	assertStatus(t, w, http.StatusNotFound)
 }
+
+
+func TestHandleDatasources(t *testing.T) {
+	srv, _ := newTestServer(t)
+	w := doGet(t, srv, "/datasources")
+	assertStatus(t, w, http.StatusOK)
+	assertContains(t, w, "primary")
+}
+
+func TestHandleVariables(t *testing.T) {
+	srv, _ := newTestServer(t)
+	w := doGet(t, srv, "/variables")
+	assertStatus(t, w, http.StatusOK)
+	assertContains(t, w, "instance")
+}
+
+func TestHandlePalettes(t *testing.T) {
+	srv, _ := newTestServer(t)
+	w := doGet(t, srv, "/palettes")
+	assertStatus(t, w, http.StatusOK)
+	assertContains(t, w, "default")
+}
+
+func TestHandleReferences(t *testing.T) {
+	srv, _ := newTestServer(t)
+	w := doGet(t, srv, "/references")
+	assertStatus(t, w, http.StatusOK)
+	assertContains(t, w, "host")
+}
+
+func TestHandleProfiles(t *testing.T) {
+	srv, _ := newTestServer(t)
+	w := doGet(t, srv, "/profiles")
+	assertStatus(t, w, http.StatusOK)
+	assertContains(t, w, "core")
+}
+
+func TestHandleMetrics(t *testing.T) {
+	srv, _ := newTestServer(t)
+	w := doGet(t, srv, "/metrics")
+	assertStatus(t, w, http.StatusOK)
+}
