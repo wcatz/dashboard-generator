@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"path/filepath"
 	"regexp"
@@ -115,6 +116,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		"SelectorCount":   len(cfg.Selectors),
 		"PanelCount":      totalPanels,
 		"GrafanaURL":      s.GrafanaURL(),
+		"Warnings":        cfg.Warnings,
 	})
 }
 
@@ -206,6 +208,7 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	s.renderPage(w, "preview.html", map[string]interface{}{
 		"Title":       "preview",
 		"Active":      "preview",
+		"FullWidth":   true,
 		"ConfigPath":  s.ConfigPath(),
 		"GrafanaURL":  s.GrafanaURL(),
 		"Dashboards":  opts,
@@ -272,13 +275,21 @@ func (s *Server) handleVariables(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Collect datasource names for the add-variable form
+	var dsNames []string
+	for name := range cfg.Datasources {
+		dsNames = append(dsNames, name)
+	}
+	sort.Strings(dsNames)
+
 	s.renderPage(w, "variables.html", map[string]interface{}{
-		"Title":      "variables",
-		"Active":     "variables",
-		"ConfigPath": s.ConfigPath(),
-		"GrafanaURL": s.GrafanaURL(),
-		"Variables":  vars,
-		"UsedBy":     usedBy,
+		"Title":          "variables",
+		"Active":         "variables",
+		"ConfigPath":     s.ConfigPath(),
+		"GrafanaURL":     s.GrafanaURL(),
+		"Variables":      vars,
+		"UsedBy":         usedBy,
+		"DatasourceNames": dsNames,
 	})
 }
 
@@ -587,6 +598,18 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 // DashboardConfig is a type alias for use in handler scope.
 type DashboardConfig = config.DashboardConfig
 
+// toInt extracts an int from a value that may be int or float64.
+func toInt(v interface{}) int {
+	switch n := v.(type) {
+	case int:
+		return n
+	case float64:
+		return int(n)
+	default:
+		return 0
+	}
+}
+
 // PanelInfo holds layout and detail info for a single panel, used by the visual preview.
 type PanelInfo struct {
 	ID          int
@@ -600,6 +623,17 @@ type PanelInfo struct {
 	Description string
 	Queries     []QueryInfo
 	Thresholds  []ThresholdStep
+	// Rendering hints for visual preview
+	ColorMode  string  `json:",omitempty"` // stat: background/value, timeseries: palette-classic-by-name/fixed/thresholds
+	GraphMode  string  `json:",omitempty"` // stat: none/area
+	TextMode   string  `json:",omitempty"` // stat: value/value_and_name/name
+	DrawStyle  string  `json:",omitempty"` // timeseries: line/bars/points
+	FillOpacity int    `json:",omitempty"` // timeseries/bargauge fill
+	GaugeMin   float64 `json:",omitempty"` // gauge/bargauge min
+	GaugeMax   float64 `json:",omitempty"` // gauge/bargauge max
+	StackMode  string  `json:",omitempty"` // timeseries: none/normal
+	PieType    string  `json:",omitempty"` // piechart: donut/pie
+	TextContent string `json:",omitempty"` // text panel content
 }
 
 // QueryInfo holds a single target's expression and legend.
@@ -608,6 +642,36 @@ type QueryInfo struct {
 	Legend     string
 	Datasource string
 	RefID      string
+}
+
+// VariableInfo holds summary info about a template variable for preview display.
+type VariableInfo struct {
+	Name       string
+	Type       string
+	Query      string
+	Values     string
+	Multi      bool
+	IncludeAll bool
+}
+
+// PreviewDashboard holds a single dashboard's preview data for multi-dashboard rendering.
+type PreviewDashboard struct {
+	UID            string
+	Title          string
+	Size           int
+	Panels         int
+	JSON           string
+	PanelInfos     []PanelInfo
+	PanelInfosJSON template.JS
+	Variables      []VariableInfo
+}
+
+// NavLink holds a parsed dashboard navigation link for the preview page.
+type NavLink struct {
+	Title   string
+	UID     string
+	Icon    string
+	Tooltip string
 }
 
 // ThresholdStep holds a single threshold step for display.
@@ -640,9 +704,7 @@ func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 			title, _ := p["title"].(string)
 			currentSection = title
 			if gp, ok := p["gridPos"].(map[string]interface{}); ok {
-				if y, ok := gp["y"].(float64); ok {
-					currentSectionY = int(y)
-				}
+				currentSectionY = toInt(gp["y"])
 			}
 		}
 
@@ -669,11 +731,10 @@ func extractPanelInfo(dashboard map[string]interface{}) []PanelInfo {
 func parsePanelJSON(p map[string]interface{}, section string, sectionY int) PanelInfo {
 	pType, _ := p["type"].(string)
 	title, _ := p["title"].(string)
-	id, _ := p["id"].(float64)
 	desc, _ := p["description"].(string)
 
 	info := PanelInfo{
-		ID:          int(id),
+		ID:          toInt(p["id"]),
 		Title:       title,
 		Type:        pType,
 		Section:     section,
@@ -681,16 +742,12 @@ func parsePanelJSON(p map[string]interface{}, section string, sectionY int) Pane
 		Description: desc,
 	}
 
-	// Grid position
+	// Grid position (values may be int or float64 depending on source)
 	if gp, ok := p["gridPos"].(map[string]interface{}); ok {
-		x, _ := gp["x"].(float64)
-		y, _ := gp["y"].(float64)
-		w, _ := gp["w"].(float64)
-		h, _ := gp["h"].(float64)
-		info.X = int(x)
-		info.Y = int(y)
-		info.W = int(w)
-		info.H = int(h)
+		info.X = toInt(gp["x"])
+		info.Y = toInt(gp["y"])
+		info.W = toInt(gp["w"])
+		info.H = toInt(gp["h"])
 	}
 
 	// Datasource
@@ -721,6 +778,49 @@ func parsePanelJSON(p map[string]interface{}, section string, sectionY int) Pane
 						info.Thresholds = append(info.Thresholds, ThresholdStep{Color: color, Value: val})
 					}
 				}
+			}
+		}
+	}
+
+	// Rendering hints from options
+	if opts, ok := p["options"].(map[string]interface{}); ok {
+		info.ColorMode = stringFromMap(opts, "colorMode")
+		info.GraphMode = stringFromMap(opts, "graphMode")
+		info.TextMode = stringFromMap(opts, "textMode")
+		if rs, ok := opts["reduceOptions"].(map[string]interface{}); ok {
+			_ = rs // available for future use
+		}
+		// Piechart
+		info.PieType = stringFromMap(opts, "pieType")
+		// Text panel
+		if content, ok := opts["content"].(string); ok {
+			info.TextContent = content
+		}
+		// Tooltip draw style
+		info.DrawStyle = stringFromMap(opts, "drawStyle")
+	}
+	// fieldConfig.defaults.custom for timeseries-specific options
+	if fc, ok := p["fieldConfig"].(map[string]interface{}); ok {
+		if defaults, ok := fc["defaults"].(map[string]interface{}); ok {
+			if custom, ok := defaults["custom"].(map[string]interface{}); ok {
+				if ds := stringFromMap(custom, "drawStyle"); ds != "" {
+					info.DrawStyle = ds
+				}
+				if fo, ok := custom["fillOpacity"].(float64); ok {
+					info.FillOpacity = int(fo)
+				}
+				if sm := stringFromMap(custom, "stacking"); sm != "" {
+					// stacking is nested: {"mode": "normal", "group": "A"}
+					if stacking, ok := custom["stacking"].(map[string]interface{}); ok {
+						info.StackMode = stringFromMap(stacking, "mode")
+					}
+				}
+			}
+			if min, ok := defaults["min"].(float64); ok {
+				info.GaugeMin = min
+			}
+			if max, ok := defaults["max"].(float64); ok {
+				info.GaugeMax = max
 			}
 		}
 	}
@@ -834,9 +934,13 @@ func (s *Server) handleMetricsBrowse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Apply glob filter
+	// Apply glob filter (supports comma-separated patterns)
 	if filter != "" {
-		metrics = generator.FilterMetrics(metrics, []string{filter}, nil)
+		patterns := strings.Split(filter, ",")
+		for i := range patterns {
+			patterns[i] = strings.TrimSpace(patterns[i])
+		}
+		metrics = generator.FilterMetrics(metrics, patterns, nil)
 	}
 
 	// Get metadata
@@ -929,11 +1033,77 @@ func (s *Server) handlePreviewAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonStr, title, size, panels, panelInfos, err := s.generatePreview(uid)
+	cfg := s.Config()
+
+	// "All dashboards" mode
+	if uid == "all" {
+		dashboards, err := cfg.GetDashboards("")
+		if err != nil {
+			s.renderPartial(w, "preview-result.html", map[string]interface{}{"Error": err.Error()})
+			return
+		}
+		order, _ := cfg.GetDashboardOrder("")
+
+		var allDashboards []PreviewDashboard
+		var previewErrors []string
+		totalSize := 0
+		totalPanels := 0
+
+		for _, name := range order {
+			db, ok := dashboards[name]
+			if !ok {
+				continue
+			}
+			jsonStr, _, size, panels, panelInfos, _, err := s.generatePreview(db.UID)
+			if err != nil {
+				previewErrors = append(previewErrors, fmt.Sprintf("%s: %v", db.Title, err))
+				continue
+			}
+			panelJSON, _ := json.Marshal(panelInfos)
+			varInfos := s.buildVariableInfos(cfg, db.Variables)
+			allDashboards = append(allDashboards, PreviewDashboard{
+				UID:            db.UID,
+				Title:          db.Title,
+				Size:           size,
+				Panels:         panels,
+				JSON:           jsonStr,
+				PanelInfos:     panelInfos,
+				PanelInfosJSON: template.JS(panelJSON),
+				Variables:      varInfos,
+			})
+			totalSize += size
+			totalPanels += panels
+		}
+
+		s.renderPartial(w, "preview-result.html", map[string]interface{}{
+			"UID":            "all",
+			"Title":          "all dashboards",
+			"Size":           totalSize,
+			"Panels":         totalPanels,
+			"AllDashboards":  allDashboards,
+			"IsAll":          true,
+			"Errors":         previewErrors,
+		})
+		return
+	}
+
+	// Single dashboard mode
+	jsonStr, title, size, panels, panelInfos, previewNavLinks, err := s.generatePreview(uid)
 	if err != nil {
 		s.renderPartial(w, "preview-result.html", map[string]interface{}{"Error": err.Error()})
 		return
 	}
+
+	// Look up variable definitions for this dashboard
+	var dbCfg config.DashboardConfig
+	dashboards, _ := cfg.GetDashboards("")
+	for _, db := range dashboards {
+		if db.UID == uid {
+			dbCfg = db
+			break
+		}
+	}
+	varInfos := s.buildVariableInfos(cfg, dbCfg.Variables)
 
 	// Serialize panel infos as JSON for client-side drawer rendering
 	panelJSON, _ := json.Marshal(panelInfos)
@@ -945,16 +1115,46 @@ func (s *Server) handlePreviewAPI(w http.ResponseWriter, r *http.Request) {
 		"Panels":         panels,
 		"JSON":           jsonStr,
 		"PanelInfos":     panelInfos,
-		"PanelInfosJSON": string(panelJSON),
+		"PanelInfosJSON": template.JS(panelJSON),
+		"Variables":      varInfos,
+		"NavLinks":       previewNavLinks,
 	})
 }
 
+// buildVariableInfos constructs VariableInfo slices from dashboard variable names.
+func (s *Server) buildVariableInfos(cfg *config.Config, varNames []string) []VariableInfo {
+	var infos []VariableInfo
+	for _, name := range varNames {
+		vDef, ok := cfg.GetVariableDef(name)
+		if !ok {
+			infos = append(infos, VariableInfo{Name: name, Type: "unknown"})
+			continue
+		}
+		vi := VariableInfo{
+			Name:       name,
+			Type:       vDef.Type,
+			Multi:      vDef.Multi,
+			IncludeAll: vDef.IncludeAll,
+		}
+		switch vDef.Type {
+		case "query":
+			vi.Query = vDef.Query
+		case "custom", "interval":
+			vi.Values = vDef.Values
+		case "datasource":
+			vi.Values = vDef.DsType
+		}
+		infos = append(infos, vi)
+	}
+	return infos
+}
 
-func (s *Server) generatePreview(uid string) (jsonStr string, title string, size int, panels int, panelInfos []PanelInfo, err error) {
+
+func (s *Server) generatePreview(uid string) (jsonStr string, title string, size int, panels int, panelInfos []PanelInfo, navLinks []NavLink, err error) {
 	cfg := s.Config()
 	dashboards, err := cfg.GetDashboards("")
 	if err != nil {
-		return "", "", 0, 0, nil, err
+		return "", "", 0, 0, nil, nil, err
 	}
 	order, _ := cfg.GetDashboardOrder("")
 
@@ -969,28 +1169,88 @@ func (s *Server) generatePreview(uid string) (jsonStr string, title string, size
 		}
 	}
 	if !found {
-		return "", "", 0, 0, nil, fmt.Errorf("dashboard with uid '%s' not found", uid)
+		return "", "", 0, 0, nil, nil, fmt.Errorf("dashboard with uid '%s' not found", uid)
 	}
 
 	idGen := generator.NewIDGenerator()
 	panelFactory := generator.NewPanelFactory(cfg, idGen)
 	layoutEngine := generator.NewLayoutEngine()
 	builder := generator.NewDashboardBuilder(cfg, panelFactory, layoutEngine)
-	navLinks := builder.BuildNavigationLinks(dashboards, order)
+	grafanaNavLinks := builder.BuildNavigationLinks(dashboards, order)
 
-	dashboard, err := builder.Build(dbCfg, navLinks, nil)
+	dashboard, err := builder.Build(dbCfg, grafanaNavLinks, nil)
 	if err != nil {
-		return "", "", 0, 0, nil, err
+		return "", "", 0, 0, nil, nil, err
 	}
 
 	data, err := json.MarshalIndent(dashboard, "", "  ")
 	if err != nil {
-		return "", "", 0, 0, nil, err
+		return "", "", 0, 0, nil, nil, err
+	}
+
+	// Build UID-to-name map from config datasources
+	uidToName := make(map[string]string)
+	for name, ds := range cfg.Datasources {
+		uidToName[ds.UID] = name
 	}
 
 	panelList, _ := dashboard["panels"].([]interface{})
 	pInfos := extractPanelInfo(dashboard)
-	return string(data), dbCfg.Title, len(data), len(panelList), pInfos, nil
+
+	// Resolve datasource UIDs to human-readable names
+	for i := range pInfos {
+		if name, ok := uidToName[pInfos[i].Datasource]; ok {
+			pInfos[i].Datasource = name
+		}
+		for j := range pInfos[i].Queries {
+			if name, ok := uidToName[pInfos[i].Queries[j].Datasource]; ok {
+				pInfos[i].Queries[j].Datasource = name
+			}
+		}
+	}
+
+	// Extract navigation links from dashboard JSON
+	parsedNavLinks := extractNavLinks(dashboard)
+
+	return string(data), dbCfg.Title, len(data), len(panelList), pInfos, parsedNavLinks, nil
+}
+
+// extractNavLinks parses the links array from a generated dashboard JSON map
+// and converts Grafana URLs (/d/{uid}) to preview page URLs.
+func extractNavLinks(dashboard map[string]interface{}) []NavLink {
+	rawLinks, ok := dashboard["links"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var links []NavLink
+	for _, rl := range rawLinks {
+		link, ok := rl.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		title, _ := link["title"].(string)
+		url, _ := link["url"].(string)
+		icon, _ := link["icon"].(string)
+		tooltip, _ := link["tooltip"].(string)
+
+		// Extract UID from Grafana URL format /d/{uid}
+		uid := ""
+		if strings.HasPrefix(url, "/d/") {
+			uid = strings.TrimPrefix(url, "/d/")
+		}
+		if uid == "" {
+			continue
+		}
+
+		links = append(links, NavLink{
+			Title:   title,
+			UID:     uid,
+			Icon:    icon,
+			Tooltip: tooltip,
+		})
+	}
+	return links
 }
 
 // ── Palette CRUD handlers ──
@@ -1194,10 +1454,14 @@ func (s *Server) handleMetricsCompare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Apply glob filter
+	// Apply glob filter (supports comma-separated patterns)
 	if filter != "" {
+		patterns := strings.Split(filter, ",")
+		for i := range patterns {
+			patterns[i] = strings.TrimSpace(patterns[i])
+		}
 		for _, cat := range []string{"shared", "only_a", "only_b"} {
-			cats[cat] = filterMetricInfoMap(cats[cat], filter)
+			cats[cat] = filterMetricInfoMap(cats[cat], patterns)
 		}
 	}
 
@@ -1387,12 +1651,12 @@ func lookupMetaInfo(name string, primary, fallback map[string]generator.MetricIn
 	return generator.MetricInfo{Type: "untyped"}
 }
 
-func filterMetricInfoMap(m map[string]generator.MetricInfo, pattern string) map[string]generator.MetricInfo {
+func filterMetricInfoMap(m map[string]generator.MetricInfo, patterns []string) map[string]generator.MetricInfo {
 	keys := make(map[string]bool)
 	for k := range m {
 		keys[k] = true
 	}
-	filtered := generator.FilterMetrics(keys, []string{pattern}, nil)
+	filtered := generator.FilterMetrics(keys, patterns, nil)
 	result := make(map[string]generator.MetricInfo)
 	for k := range filtered {
 		result[k] = m[k]
@@ -1830,6 +2094,181 @@ func (s *Server) handleDatasourceTargetMetrics(w http.ResponseWriter, r *http.Re
 }
 
 // validateFilename checks for path traversal in dashboard filenames.
+// handleLabelsDiscover fetches label names from all datasources (fast — no value fetching).
+func (s *Server) handleLabelsDiscover(w http.ResponseWriter, r *http.Request) {
+	cfg := s.Config()
+	disc := generator.NewMetricDiscovery(cfg)
+
+	type labelInfo struct {
+		Name       string
+		Sources    []string
+	}
+
+	// Collect datasources that have URLs
+	var dsNames []string
+	for name, ds := range cfg.Datasources {
+		if ds.URL != "" {
+			dsNames = append(dsNames, name)
+		}
+	}
+	sort.Strings(dsNames)
+
+	// Fetch label names only (one request per datasource)
+	labelSources := make(map[string][]string) // label → datasource names
+	var errors []string
+
+	for _, dsName := range dsNames {
+		labels, err := disc.FetchLabels(dsName)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("%s: %v", dsName, err))
+			continue
+		}
+		for _, label := range labels {
+			if label == "__name__" {
+				continue
+			}
+			labelSources[label] = append(labelSources[label], dsName)
+		}
+	}
+
+	// Build sorted label list
+	var allLabels []labelInfo
+	for name, sources := range labelSources {
+		allLabels = append(allLabels, labelInfo{Name: name, Sources: sources})
+	}
+	sort.Slice(allLabels, func(i, j int) bool {
+		return allLabels[i].Name < allLabels[j].Name
+	})
+
+	// Check which labels already have variables
+	existingVars := make(map[string]bool)
+	for name := range cfg.Variables {
+		existingVars[name] = true
+	}
+
+	s.renderPartial(w, "labels-discover.html", map[string]interface{}{
+		"Labels":       allLabels,
+		"Datasources":  dsNames,
+		"ExistingVars": existingVars,
+		"Errors":       errors,
+	})
+}
+
+// handleLabelValues fetches values for a single label from a datasource.
+func (s *Server) handleLabelValues(w http.ResponseWriter, r *http.Request) {
+	label := r.URL.Query().Get("label")
+	dsName := r.URL.Query().Get("datasource")
+	if label == "" || dsName == "" {
+		http.Error(w, "label and datasource required", 400)
+		return
+	}
+
+	cfg := s.Config()
+	disc := generator.NewMetricDiscovery(cfg)
+	values, err := disc.FetchLabelValues(dsName, label)
+	if err != nil {
+		s.renderPartial(w, "label-values.html", map[string]interface{}{
+			"Error": err.Error(),
+		})
+		return
+	}
+	if len(values) > 100 {
+		values = values[:100]
+	}
+
+	s.renderPartial(w, "label-values.html", map[string]interface{}{
+		"Values": values,
+		"Total":  len(values),
+	})
+}
+
+// handleVariableAdd adds a new variable to the config via YAMLEditor.
+func (s *Server) handleVariableAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	r.ParseForm()
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	varType := r.FormValue("type")
+	dsName := r.FormValue("datasource")
+	query := r.FormValue("query")
+	values := r.FormValue("values")
+	multi := r.FormValue("multi") == "true"
+	includeAll := r.FormValue("include_all") == "true"
+	regex := r.FormValue("regex")
+
+	if name == "" {
+		s.renderPartial(w, "variable-result.html", map[string]interface{}{"Error": "variable name required"})
+		return
+	}
+
+	// Sanitize name (only alphanumeric and underscores)
+	if matched, _ := regexp.MatchString(`^[a-zA-Z_][a-zA-Z0-9_]*$`, name); !matched {
+		s.renderPartial(w, "variable-result.html", map[string]interface{}{"Error": "invalid variable name (use letters, numbers, underscores)"})
+		return
+	}
+
+	v := config.VariableDef{
+		Type:       varType,
+		Datasource: dsName,
+		Query:      query,
+		Values:     values,
+		Multi:      multi,
+		IncludeAll: includeAll,
+		Refresh:    2,
+		Sort:       1,
+		Regex:      regex,
+	}
+
+	editor := config.NewYAMLEditor(s.ConfigPath())
+	if err := editor.AddVariable(name, v); err != nil {
+		s.renderPartial(w, "variable-result.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "variable-result.html", map[string]interface{}{"Error": "saved but reload failed: " + err.Error()})
+		return
+	}
+
+	s.renderPartial(w, "variable-result.html", map[string]interface{}{
+		"Success": fmt.Sprintf("variable '%s' added", name),
+		"Name":    name,
+	})
+}
+
+// handleVariableDelete removes a variable from the config.
+func (s *Server) handleVariableDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	r.ParseForm()
+	name := r.FormValue("name")
+	if name == "" {
+		s.renderPartial(w, "variable-result.html", map[string]interface{}{"Error": "variable name required"})
+		return
+	}
+
+	editor := config.NewYAMLEditor(s.ConfigPath())
+	if err := editor.DeleteVariable(name); err != nil {
+		s.renderPartial(w, "variable-result.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "variable-result.html", map[string]interface{}{"Error": "deleted but reload failed: " + err.Error()})
+		return
+	}
+
+	s.renderPartial(w, "variable-result.html", map[string]interface{}{
+		"Success": fmt.Sprintf("variable '%s' deleted", name),
+		"Name":    name,
+	})
+}
+
 func validateFilename(filename string) error {
 	if strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
 		return fmt.Errorf("filename cannot contain path separators")

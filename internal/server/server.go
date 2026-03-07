@@ -1,9 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log"
+	"strings"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,7 +16,8 @@ import (
 )
 
 var funcMap = template.FuncMap{
-	"add": func(a, b int) int { return a + b },
+	"add":   func(a, b int) int { return a + b },
+	"upper": strings.ToUpper,
 }
 
 // Server holds the HTTP server state and config.
@@ -132,6 +136,21 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net")
+
+	// CSRF protection: reject state-changing requests from foreign origins
+	if r.Method == http.MethodPost {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			origin = r.Header.Get("Referer")
+		}
+		host := r.Host
+		if origin != "" && !strings.Contains(origin, host) {
+			http.Error(w, "forbidden: cross-origin request", http.StatusForbidden)
+			return
+		}
+	}
+
 	s.mux.ServeHTTP(w, r)
 }
 
@@ -156,8 +175,12 @@ func (s *Server) renderPage(w http.ResponseWriter, page string, data map[string]
 
 // renderPartial renders a partial template (HTMX response).
 func (s *Server) renderPartial(w http.ResponseWriter, name string, data interface{}) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.partials.ExecuteTemplate(w, name, data); err != nil {
+	var buf bytes.Buffer
+	if err := s.partials.ExecuteTemplate(&buf, name, data); err != nil {
+		log.Printf("renderPartial %s error: %v", name, err)
 		http.Error(w, "render error: "+err.Error(), 500)
+		return
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	buf.WriteTo(w)
 }

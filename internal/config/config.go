@@ -109,6 +109,11 @@ type GeneratorSettings struct {
 	AnthropicModel  string            `yaml:"anthropic_model"`
 }
 
+// ResolvedAnthropicAPIKey returns the API key, resolving $ENV_VAR references.
+func (g GeneratorSettings) ResolvedAnthropicAPIKey() string {
+	return resolveEnvRef(g.AnthropicAPIKey)
+}
+
 // String returns a safe representation with secrets masked.
 func (g GeneratorSettings) String() string {
 	masked := g
@@ -166,6 +171,8 @@ type Config struct {
 	Profiles    map[string]ProfileDef      `yaml:"profiles"`
 	Dashboards  map[string]DashboardConfig `yaml:"dashboards"`
 
+	Warnings []string `yaml:"-"`
+
 	palette        map[string]string
 	cliArgs        map[string]string
 	dashboardOrder []string
@@ -203,8 +210,42 @@ func loadFromData(data []byte, cliArgs map[string]string) (*Config, error) {
 		c.cliArgs = make(map[string]string)
 	}
 	c.palette = c.resolvePalette()
+	c.validate()
 
 	return &c, nil
+}
+
+// validate checks config for common issues and populates Warnings.
+func (c *Config) validate() {
+	// Check that dashboard variable references exist
+	for name, db := range c.Dashboards {
+		for _, varName := range db.Variables {
+			if _, ok := c.Variables[varName]; !ok {
+				c.Warnings = append(c.Warnings, fmt.Sprintf("dashboard '%s' references undefined variable '%s'", name, varName))
+			}
+		}
+	}
+	// Check that variable datasource references exist
+	for name, v := range c.Variables {
+		if v.Datasource != "" {
+			if _, ok := c.Datasources[v.Datasource]; !ok {
+				c.Warnings = append(c.Warnings, fmt.Sprintf("variable '%s' references undefined datasource '%s'", name, v.Datasource))
+			}
+		}
+		for _, chain := range v.ChainsFrom {
+			if _, ok := c.Variables[chain]; !ok {
+				c.Warnings = append(c.Warnings, fmt.Sprintf("variable '%s' chains_from undefined variable '%s'", name, chain))
+			}
+		}
+	}
+	// Check profile dashboard references
+	for name, p := range c.Profiles {
+		for _, dbName := range p.Dashboards {
+			if _, ok := c.Dashboards[dbName]; !ok {
+				c.Warnings = append(c.Warnings, fmt.Sprintf("profile '%s' references undefined dashboard '%s'", name, dbName))
+			}
+		}
+	}
 }
 
 func (c *Config) resolvePalette() map[string]string {

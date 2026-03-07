@@ -2,7 +2,268 @@
 <div class="alert alert-error text-sm">
   <span>error: {{.Error}}</span>
 </div>
+{{else if .IsAll}}
+<!-- All dashboards mode -->
+{{if .Errors}}
+<div class="mb-3">
+  {{range .Errors}}
+  <div class="alert alert-warning text-sm py-2 mb-1">
+    <span>{{.}}</span>
+  </div>
+  {{end}}
+</div>
+{{end}}
+<div class="flex gap-4">
+  <!-- Section nav sidebar (all dashboards) -->
+  <div class="section-nav" id="section-nav"></div>
+
+  <!-- Main preview area -->
+  <div class="flex-1 min-w-0">
+    <div class="card bg-base-100 border border-base-content/10">
+      <div class="card-body p-5">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="card-title text-sm">{{.Title}}</h3>
+          <span class="text-xs text-base-content/50">{{.Size}} bytes &middot; {{.Panels}} panels &middot; {{len .AllDashboards}} dashboards</span>
+        </div>
+
+        <!-- Toolbar: search + type filters + zoom -->
+        <div class="flex flex-wrap gap-2 mb-3 items-center">
+          <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-48" id="panel-search" oninput="applyPreviewFilters()">
+          <div class="flex flex-wrap gap-1" id="type-filters"></div>
+          <div class="flex-1"></div>
+          <label class="flex items-center gap-1 cursor-pointer">
+            <span class="text-[0.65rem] text-base-content/40">compact</span>
+            <input type="checkbox" class="toggle toggle-xs toggle-primary" id="compact-toggle" onchange="toggleCompactMode(this.checked)">
+          </label>
+          <div class="zoom-control">
+            <span class="zoom-label" id="zoom-label">1x</span>
+            <input type="range" min="0.5" max="2" step="0.1" value="1" id="zoom-slider" oninput="setPreviewZoom(this.value)">
+          </div>
+        </div>
+
+        <!-- Stats bar -->
+        <div class="preview-stats mb-3" id="preview-stats"></div>
+
+        <!-- Combined panel data for client-side drawer -->
+        <script id="panel-data" type="application/json">[]</script>
+
+        <!-- All dashboards stacked -->
+        <div class="preview-sections" id="preview-sections">
+          {{range .AllDashboards}}
+          <!-- Dashboard separator -->
+          <div class="preview-dashboard-header" id="dash-{{.UID}}" data-dashboard-uid="{{.UID}}">
+            <div class="flex justify-between items-center px-3 py-2 bg-primary/10 border border-primary/20 rounded-lg mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-bold text-primary">{{.Title}}</span>
+                <span class="badge badge-xs badge-ghost">{{.Panels}} panels</span>
+                <span class="badge badge-xs badge-ghost">{{.Size}} bytes</span>
+              </div>
+              <span class="text-xs text-base-content/40 font-mono">{{.UID}}</span>
+            </div>
+            {{if .Variables}}
+            <div class="flex flex-wrap gap-2 mb-3 items-center">
+              <span class="text-[0.65rem] text-base-content/40 uppercase tracking-wider">variables</span>
+              {{range .Variables}}
+              <div class="variable-badge" title="{{if eq .Type "query"}}query: {{.Query}}{{else if eq .Type "custom"}}values: {{.Values}}{{else if eq .Type "datasource"}}type: {{.Values}}{{else if eq .Type "interval"}}values: {{.Values}}{{else}}{{.Type}}{{end}}">
+                <span class="variable-badge-name">{{.Name}}</span>
+                <span class="variable-badge-type">{{.Type}}</span>
+                {{if .Multi}}<span class="variable-badge-flag">multi</span>{{end}}
+                {{if .IncludeAll}}<span class="variable-badge-flag">all</span>{{end}}
+              </div>
+              {{end}}
+            </div>
+            {{end}}
+          </div>
+          {{$currentSection := ""}}
+          {{$sectionOpen := false}}
+          {{range .PanelInfos}}
+          {{if eq .Type "row"}}
+          {{if $sectionOpen}}</div></div>{{end}}
+          <div class="preview-section" id="section-wrap-{{.Y}}" data-section-y="{{.Y}}">
+            <div class="preview-section-header" onclick="toggleSectionCollapse(this.parentElement)">
+              <span class="section-toggle">&#9660;</span>
+              <span class="section-title">{{.Title}}</span>
+              <span class="section-panel-count" data-section-y="{{.Y}}"></span>
+              <span class="section-ds-tags" data-section-y="{{.Y}}"></span>
+            </div>
+            <div class="preview-section-grid" data-section-y="{{.Y}}">
+          {{$sectionOpen = true}}
+          {{$currentSection = .Title}}
+          {{else}}
+          <div class="preview-panel type-{{.Type}}{{if le .W 4}} panel-narrow{{end}}{{if ge .W 20}} panel-wide{{end}}"
+               data-panel-id="{{.ID}}" data-panel-title="{{.Title}}" data-panel-type="{{.Type}}" data-section-y="{{.SectionY}}"
+               data-panel-w="{{.W}}" data-panel-h="{{.H}}"
+               onclick="openPanelDetail({{.ID}})">
+            <div class="panel-card-header">
+              <span class="panel-type-badge">{{.Type | upper}}</span>
+              {{if .Datasource}}<span class="panel-ds-tag">{{.Datasource}}</span>{{end}}
+              <span class="panel-dims">{{.W}}&times;{{.H}}</span>
+            </div>
+            <div class="panel-card-title">{{.Title}}</div>
+            {{if .Unit}}<div class="panel-card-unit">{{.Unit}}</div>{{end}}
+            {{if .Queries}}
+            <div class="panel-card-queries">
+              {{range .Queries}}
+              <div class="panel-card-query">{{.Expr}}</div>
+              {{end}}
+            </div>
+            {{end}}
+            {{if .Thresholds}}
+            <div class="panel-card-thresholds">
+              {{range .Thresholds}}
+              <span class="threshold-dot" style="background:{{.Color}}" title="{{.Value}}"></span>
+              {{end}}
+            </div>
+            {{end}}
+          </div>
+          {{end}}
+          {{end}}
+          {{if $sectionOpen}}</div></div>{{end}}
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel detail drawer (right side, client-rendered) -->
+  <div id="panel-detail-drawer" class="panel-detail-drawer" style="display:none">
+    <div id="panel-detail-content"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Merge all dashboard panel data for the drawer
+  var allPanelData = [];
+  {{range .AllDashboards}}
+  try { var _d = JSON.parse({{.PanelInfosJSON}}); allPanelData = allPanelData.concat(_d); } catch(e) {}
+  {{end}}
+  window._panelData = allPanelData;
+  var dataEl = document.getElementById('panel-data');
+  if (dataEl) dataEl.textContent = JSON.stringify(allPanelData);
+
+  // Build type filter buttons and stats
+  var types = {};
+  var totalPanels = 0;
+  document.querySelectorAll('.preview-panel[data-panel-type]').forEach(function(el) {
+    types[el.dataset.panelType] = (types[el.dataset.panelType] || 0) + 1;
+    totalPanels++;
+  });
+
+  var filterContainer = document.getElementById('type-filters');
+  if (filterContainer) {
+    Object.keys(types).sort().forEach(function(t) {
+      var btn = document.createElement('button');
+      btn.className = 'badge badge-xs badge-outline cursor-pointer type-filter-btn type-filter-' + t;
+      btn.textContent = types[t] + ' ' + t;
+      btn.dataset.type = t;
+      btn.onclick = function() { toggleTypeFilter(t, this); };
+      filterContainer.appendChild(btn);
+    });
+  }
+
+  var statsEl = document.getElementById('preview-stats');
+  if (statsEl && totalPanels > 0) {
+    var sections = document.querySelectorAll('.preview-section').length;
+    var dashCount = document.querySelectorAll('.preview-dashboard-header').length;
+    statsEl.textContent = totalPanels + ' panels in ' + sections + ' sections across ' + dashCount + ' dashboards';
+  }
+
+  // Section nav sidebar (include dashboard headers)
+  var navEl = document.getElementById('section-nav');
+  var dashHeaders = document.querySelectorAll('.preview-dashboard-header');
+  if (navEl && dashHeaders.length > 0) {
+    dashHeaders.forEach(function(dh) {
+      var dashLink = document.createElement('a');
+      dashLink.className = 'section-nav-link section-nav-dash';
+      dashLink.href = '#' + dh.id;
+      dashLink.textContent = dh.querySelector('.text-primary').textContent;
+      dashLink.onclick = function(e) {
+        e.preventDefault();
+        dh.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelectorAll('.section-nav-link').forEach(function(l) { l.classList.remove('active'); });
+        dashLink.classList.add('active');
+      };
+      navEl.appendChild(dashLink);
+
+      // Add section links under this dashboard
+      var nextEl = dh.nextElementSibling;
+      while (nextEl && !nextEl.classList.contains('preview-dashboard-header')) {
+        if (nextEl.classList.contains('preview-section')) {
+          var header = nextEl.querySelector('.preview-section-header');
+          if (header) {
+            var link = document.createElement('a');
+            link.className = 'section-nav-link';
+            link.href = '#' + nextEl.id;
+            link.textContent = header.querySelector('.section-title').textContent;
+            link.style.paddingLeft = '1.25rem';
+            link.style.fontSize = '0.65rem';
+            var section = nextEl;
+            link.onclick = function(e) {
+              e.preventDefault();
+              section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              document.querySelectorAll('.section-nav-link').forEach(function(l) { l.classList.remove('active'); });
+              link.classList.add('active');
+            };
+            navEl.appendChild(link);
+          }
+        }
+        nextEl = nextEl.nextElementSibling;
+      }
+    });
+  } else if (navEl) {
+    navEl.style.display = 'none';
+  }
+
+  // Section panel counts + datasource tags
+  document.querySelectorAll('.preview-section').forEach(function(section) {
+    var sectionY = section.dataset.sectionY;
+    var panels = section.querySelectorAll('.preview-panel');
+    var countBadge = section.querySelector('.section-panel-count');
+    if (countBadge) countBadge.textContent = panels.length + ' panels';
+
+    var dsTagsEl = section.querySelector('.section-ds-tags');
+    if (dsTagsEl) {
+      var dsMap = {};
+      allPanelData.forEach(function(p) {
+        if (String(p.SectionY) === sectionY && p.Datasource) {
+          dsMap[p.Datasource] = true;
+        }
+      });
+      Object.keys(dsMap).forEach(function(ds) {
+        var tag = document.createElement('span');
+        tag.className = 'section-ds-badge';
+        tag.textContent = ds;
+        dsTagsEl.appendChild(tag);
+      });
+    }
+  });
+
+  // Apply flex sizing to section grids
+  document.querySelectorAll('.preview-section-grid').forEach(function(grid) {
+    var panels = grid.querySelectorAll('.preview-panel');
+    panels.forEach(function(el) {
+      var w = parseInt(el.dataset.panelW) || 12;
+      el.style.flex = '0 0 calc(' + ((w / 24) * 100).toFixed(2) + '% - 8px)';
+      el.style.maxWidth = 'calc(' + ((w / 24) * 100).toFixed(2) + '% - 8px)';
+    });
+  });
+
+  var savedZoom = localStorage.getItem('preview-zoom');
+  if (savedZoom) setPreviewZoom(savedZoom);
+
+  var isCompact = localStorage.getItem('preview-compact') === 'true';
+  if (isCompact) {
+    var toggle = document.getElementById('compact-toggle');
+    if (toggle) { toggle.checked = true; toggleCompactMode(true); }
+  }
+
+  // Render Grafana-like panel visuals
+  if (typeof renderGrafanaPanels === 'function') renderGrafanaPanels();
+})();
+</script>
 {{else}}
+<!-- Single dashboard mode -->
 <div class="flex gap-4">
   <!-- Section nav sidebar -->
   <div class="section-nav" id="section-nav"></div>
@@ -16,10 +277,40 @@
           <span class="text-xs text-base-content/50">{{.Size}} bytes &middot; {{.Panels}} panels</span>
         </div>
 
+        {{if .NavLinks}}
+        <div class="flex flex-wrap gap-1.5 mb-3">
+          {{range .NavLinks}}
+          <a class="badge badge-sm badge-outline gap-1 cursor-pointer hover:badge-primary transition-colors"
+             hx-get="/api/preview?uid={{.UID}}"
+             hx-target="#preview-result"
+             hx-swap="innerHTML"
+             title="{{.Tooltip}}">
+            {{if .Icon}}<span class="text-[0.6rem]">{{.Icon}}</span>{{end}}
+            {{.Title}}
+          </a>
+          {{end}}
+        </div>
+        {{end}}
+
         <div role="tablist" class="tabs tabs-bordered mb-4">
           <button role="tab" class="tab tab-active preview-tab-btn" data-tab="visual" onclick="togglePreviewTab('visual')">visual</button>
           <button role="tab" class="tab preview-tab-btn" data-tab="json" onclick="togglePreviewTab('json')">JSON</button>
         </div>
+
+        {{if .Variables}}
+        <!-- Variable bar -->
+        <div class="flex flex-wrap gap-2 mb-4 items-center">
+          <span class="text-[0.65rem] text-base-content/40 uppercase tracking-wider">variables</span>
+          {{range .Variables}}
+          <div class="variable-badge" title="{{if eq .Type "query"}}query: {{.Query}}{{else if eq .Type "custom"}}values: {{.Values}}{{else if eq .Type "datasource"}}type: {{.Values}}{{else if eq .Type "interval"}}values: {{.Values}}{{else}}{{.Type}}{{end}}">
+            <span class="variable-badge-name">{{.Name}}</span>
+            <span class="variable-badge-type">{{.Type}}</span>
+            {{if .Multi}}<span class="variable-badge-flag">multi</span>{{end}}
+            {{if .IncludeAll}}<span class="variable-badge-flag">all</span>{{end}}
+          </div>
+          {{end}}
+        </div>
+        {{end}}
 
         <div class="preview-tab-content" data-tab="visual" style="display:block">
           {{if .PanelInfos}}
@@ -28,6 +319,10 @@
             <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-48" id="panel-search" oninput="applyPreviewFilters()">
             <div class="flex flex-wrap gap-1" id="type-filters"></div>
             <div class="flex-1"></div>
+            <label class="flex items-center gap-1 cursor-pointer">
+              <span class="text-[0.65rem] text-base-content/40">compact</span>
+              <input type="checkbox" class="toggle toggle-xs toggle-primary" id="compact-toggle" onchange="toggleCompactMode(this.checked)">
+            </label>
             <div class="zoom-control">
               <span class="zoom-label" id="zoom-label">1x</span>
               <input type="range" min="0.5" max="2" step="0.1" value="1" id="zoom-slider" oninput="setPreviewZoom(this.value)">
@@ -40,27 +335,53 @@
           <!-- Panel data for client-side drawer -->
           <script id="panel-data" type="application/json">{{.PanelInfosJSON}}</script>
 
-          <div class="preview-grid" data-uid="{{$.UID}}" id="preview-grid">
+          <!-- Sections rendered as separate grids -->
+          <div class="preview-sections" id="preview-sections">
+            {{$currentSection := ""}}
+            {{$sectionOpen := false}}
             {{range .PanelInfos}}
             {{if eq .Type "row"}}
-            <div class="preview-row" id="section-{{.Y}}" data-section-y="{{.Y}}" style="grid-row: {{add .Y 1}};" onclick="toggleRowCollapse(this)">
-              <span class="row-toggle">&#9660;</span>
-              {{.Title}}
-              <span class="row-panel-count"></span>
-            </div>
-            {{else}}
-            <div class="preview-panel type-{{.Type}}" style="grid-column: {{add .X 1}} / span {{.W}}; grid-row: {{add .Y 1}} / span {{.H}};"
-                 data-panel-id="{{.ID}}" data-panel-title="{{.Title}}" data-panel-type="{{.Type}}" data-section-y="{{.SectionY}}"
-                 onclick="openPanelDetail({{.ID}})">
-              <div class="panel-header">
-                <span class="panel-type-badge">{{.Type}}</span>
-                <span class="panel-dims">{{.W}}x{{.H}}</span>
+            {{if $sectionOpen}}</div></div>{{end}}
+            <div class="preview-section" id="section-wrap-{{.Y}}" data-section-y="{{.Y}}">
+              <div class="preview-section-header" onclick="toggleSectionCollapse(this.parentElement)">
+                <span class="section-toggle">&#9660;</span>
+                <span class="section-title">{{.Title}}</span>
+                <span class="section-panel-count" data-section-y="{{.Y}}"></span>
+                <span class="section-ds-tags" data-section-y="{{.Y}}"></span>
               </div>
-              <div class="panel-title">{{.Title}}</div>
-              {{if .Queries}}<div class="panel-query-hint">{{(index .Queries 0).Expr}}</div>{{end}}
+              <div class="preview-section-grid" data-section-y="{{.Y}}">
+            {{$sectionOpen = true}}
+            {{$currentSection = .Title}}
+            {{else}}
+            <div class="preview-panel type-{{.Type}}{{if le .W 4}} panel-narrow{{end}}{{if ge .W 20}} panel-wide{{end}}"
+                 data-panel-id="{{.ID}}" data-panel-title="{{.Title}}" data-panel-type="{{.Type}}" data-section-y="{{.SectionY}}"
+                 data-panel-w="{{.W}}" data-panel-h="{{.H}}"
+                 onclick="openPanelDetail({{.ID}})">
+              <div class="panel-card-header">
+                <span class="panel-type-badge">{{.Type | upper}}</span>
+                {{if .Datasource}}<span class="panel-ds-tag">{{.Datasource}}</span>{{end}}
+                <span class="panel-dims">{{.W}}&times;{{.H}}</span>
+              </div>
+              <div class="panel-card-title">{{.Title}}</div>
+              {{if .Unit}}<div class="panel-card-unit">{{.Unit}}</div>{{end}}
+              {{if .Queries}}
+              <div class="panel-card-queries">
+                {{range .Queries}}
+                <div class="panel-card-query">{{.Expr}}</div>
+                {{end}}
+              </div>
+              {{end}}
+              {{if .Thresholds}}
+              <div class="panel-card-thresholds">
+                {{range .Thresholds}}
+                <span class="threshold-dot" style="background:{{.Color}}" title="{{.Value}}"></span>
+                {{end}}
+              </div>
+              {{end}}
             </div>
             {{end}}
             {{end}}
+            {{if $sectionOpen}}</div></div>{{end}}
           </div>
           {{else}}
           <div class="text-center py-6 text-base-content/50"><p>no panels found</p></div>
@@ -89,6 +410,7 @@
   // Build type filter buttons and stats from panel data
   var types = {};
   var totalPanels = 0;
+  var dsSets = {};
   document.querySelectorAll('.preview-panel[data-panel-type]').forEach(function(el) {
     types[el.dataset.panelType] = (types[el.dataset.panelType] || 0) + 1;
     totalPanels++;
@@ -109,22 +431,23 @@
   // Stats bar
   var statsEl = document.getElementById('preview-stats');
   if (statsEl && totalPanels > 0) {
-    var rows = document.querySelectorAll('.preview-row').length;
-    statsEl.textContent = totalPanels + ' panels in ' + rows + ' sections';
+    var sections = document.querySelectorAll('.preview-section').length;
+    statsEl.textContent = totalPanels + ' panels in ' + sections + ' sections';
   }
 
   // Section nav sidebar
   var navEl = document.getElementById('section-nav');
-  var rowEls = document.querySelectorAll('.preview-row');
-  if (navEl && rowEls.length > 0) {
-    rowEls.forEach(function(row) {
+  var sectionEls = document.querySelectorAll('.preview-section-header');
+  if (navEl && sectionEls.length > 0) {
+    sectionEls.forEach(function(header) {
+      var section = header.parentElement;
       var link = document.createElement('a');
       link.className = 'section-nav-link';
-      link.href = '#' + row.id;
-      link.textContent = row.textContent.trim();
+      link.href = '#' + section.id;
+      link.textContent = header.querySelector('.section-title').textContent;
       link.onclick = function(e) {
         e.preventDefault();
-        row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
         document.querySelectorAll('.section-nav-link').forEach(function(l) { l.classList.remove('active'); });
         link.classList.add('active');
       };
@@ -134,12 +457,30 @@
     navEl.style.display = 'none';
   }
 
-  // Row panel counts
-  rowEls.forEach(function(row) {
-    var sectionY = row.dataset.sectionY;
-    var count = document.querySelectorAll('.preview-panel[data-section-y="' + sectionY + '"]').length;
-    var badge = row.querySelector('.row-panel-count');
-    if (badge) badge.textContent = count + ' panels';
+  // Section panel counts + datasource tags
+  document.querySelectorAll('.preview-section').forEach(function(section) {
+    var sectionY = section.dataset.sectionY;
+    var panels = section.querySelectorAll('.preview-panel');
+    var countBadge = section.querySelector('.section-panel-count');
+    if (countBadge) countBadge.textContent = panels.length + ' panels';
+
+    // Collect unique datasources in section
+    var dsTagsEl = section.querySelector('.section-ds-tags');
+    if (dsTagsEl) {
+      var dsMap = {};
+      var panelData = window._panelData || [];
+      panelData.forEach(function(p) {
+        if (String(p.SectionY) === sectionY && p.Datasource) {
+          dsMap[p.Datasource] = true;
+        }
+      });
+      Object.keys(dsMap).forEach(function(ds) {
+        var tag = document.createElement('span');
+        tag.className = 'section-ds-badge';
+        tag.textContent = ds;
+        dsTagsEl.appendChild(tag);
+      });
+    }
   });
 
   // Parse and store panel data for client-side drawer
@@ -148,9 +489,29 @@
     try { window._panelData = JSON.parse(dataEl.textContent); } catch(e) { window._panelData = []; }
   }
 
+  // Apply flex sizing to section grids
+  document.querySelectorAll('.preview-section-grid').forEach(function(grid) {
+    var panels = grid.querySelectorAll('.preview-panel');
+    panels.forEach(function(el) {
+      var w = parseInt(el.dataset.panelW) || 12;
+      el.style.flex = '0 0 calc(' + ((w / 24) * 100).toFixed(2) + '% - 8px)';
+      el.style.maxWidth = 'calc(' + ((w / 24) * 100).toFixed(2) + '% - 8px)';
+    });
+  });
+
   // Restore zoom from localStorage
   var savedZoom = localStorage.getItem('preview-zoom');
   if (savedZoom) setPreviewZoom(savedZoom);
+
+  // Restore compact mode
+  var isCompact = localStorage.getItem('preview-compact') === 'true';
+  if (isCompact) {
+    var toggle = document.getElementById('compact-toggle');
+    if (toggle) { toggle.checked = true; toggleCompactMode(true); }
+  }
+
+  // Render Grafana-like panel visuals
+  if (typeof renderGrafanaPanels === 'function') renderGrafanaPanels();
 })();
 </script>
 {{end}}

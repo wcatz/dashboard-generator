@@ -252,8 +252,8 @@ func generateDashboards(cfg *config.Config, push bool) error {
 			return fmt.Errorf("building dashboard '%s': %w", name, err)
 		}
 
-		filename := dbCfg.Filename
-		if filename == "" {
+		filename := filepath.Base(dbCfg.Filename)
+		if filename == "" || filename == "." {
 			filename = name + ".json"
 		}
 		fpath := filepath.Join(outDir, filename)

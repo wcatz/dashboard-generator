@@ -1,0 +1,10 @@
+{{if .Error}}
+<span class="text-xs text-error">{{.Error}}</span>
+{{else}}
+<div class="flex flex-wrap gap-1">
+  {{range .Values}}
+  <span class="badge badge-xs badge-outline">{{.}}</span>
+  {{end}}
+  {{if gt .Total 100}}<span class="text-xs text-base-content/40">+{{.Total}} total</span>{{end}}
+</div>
+{{end}}

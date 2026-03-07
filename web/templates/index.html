@@ -2,6 +2,16 @@
 <h1 class="text-xl font-bold mb-1">dashboards</h1>
 <p class="text-sm text-base-content/50 mb-6">{{.ConfigPath}}</p>
 
+{{if .Warnings}}
+<div class="mb-4">
+  {{range .Warnings}}
+  <div class="alert alert-warning text-sm py-2 mb-1">
+    <span>{{.}}</span>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
 <div class="flex flex-wrap gap-4 mb-6">
   <div class="bg-base-100 rounded-lg border border-base-content/10 flex-1 min-w-[130px] p-4">
     <div class="text-[0.65rem] uppercase tracking-wider text-base-content/50 font-semibold">dashboards</div>
