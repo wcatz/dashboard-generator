@@ -10,7 +10,7 @@ Hand-editing Grafana JSON is painful. Clicking through the UI doesn't scale. Thi
 
 ## Features
 
-- **14 panel types**: stat, gauge, timeseries, bargauge, heatmap, histogram, table, piechart, state-timeline, status-history, text, logs, row, comparison
+- **16 panel types**: stat, gauge, timeseries, bargauge, heatmap, histogram, table, piechart, state-timeline, status-history, text, logs, row, comparison, alertlist, dashlist
 - **Auto-layout engine**: panels flow left-to-right across a 24-unit grid, wrapping automatically
 - **Navigation links**: every dashboard links to every other dashboard in the set
 - **Reference system**: reusable colors (`$green`), thresholds (`$percent_usage`), selectors (`${by_ns}`), and constants (`${rate_interval}`)
