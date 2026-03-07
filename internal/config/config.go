@@ -116,7 +116,8 @@ func (g GeneratorSettings) ResolvedAnthropicAPIKey() string {
 
 // String returns a safe representation with secrets masked.
 func (g GeneratorSettings) String() string {
-	masked := g
+	type noStringer GeneratorSettings
+	masked := noStringer(g)
 	if masked.AnthropicAPIKey != "" {
 		masked.AnthropicAPIKey = "***"
 	}
