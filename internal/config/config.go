@@ -98,6 +98,7 @@ type VariableDef struct {
 // GeneratorSettings holds global generator config.
 type GeneratorSettings struct {
 	SchemaVersion   int               `yaml:"schema_version"`
+	PluginVersion   string            `yaml:"plugin_version"` // Grafana plugin version (default: 11.2.0)
 	OutputDir       string            `yaml:"output_dir"`
 	Refresh         string            `yaml:"refresh"`
 	TimeRange       map[string]string `yaml:"time_range"`
@@ -122,6 +123,14 @@ func (g GeneratorSettings) String() string {
 		masked.AnthropicAPIKey = "***"
 	}
 	return fmt.Sprintf("%+v", masked)
+}
+
+// GetPluginVersion returns the plugin version, defaulting to 11.2.0 if not set.
+func (g GeneratorSettings) GetPluginVersion() string {
+	if g.PluginVersion != "" {
+		return g.PluginVersion
+	}
+	return "11.2.0"
 }
 
 // DiscoveryConfig holds metric discovery settings.
