@@ -280,6 +280,7 @@ func TestNewAIClient_DefaultModel(t *testing.T) {
 }
 
 func TestNewAIClient_NotAvailable(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "") // ensure env var doesn't leak into test
 	cfg := &config.Config{}
 
 	client := NewAIClient(cfg)
@@ -290,6 +291,7 @@ func TestNewAIClient_NotAvailable(t *testing.T) {
 }
 
 func TestIsAIAvailable(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "") // ensure env var doesn't leak into test
 	cfg := &config.Config{}
 	if IsAIAvailable(cfg) {
 		t.Error("expected not available without key")

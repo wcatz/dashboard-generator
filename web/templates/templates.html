@@ -1,0 +1,80 @@
+{{define "content"}}
+<h1 class="text-xl font-bold mb-1">config templates</h1>
+<p class="text-sm text-base-content/50 mb-6">create new configs from starter templates</p>
+
+<div class="alert alert-info mb-4">
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+  <div>
+    <div class="font-bold">Quick Start</div>
+    <div class="text-sm">Choose a template, preview it, then create a new config file or load it as your active config.</div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <!-- Template selection -->
+  <div class="lg:col-span-1">
+    <div class="card bg-base-100 border border-base-content/10">
+      <div class="card-body p-4">
+        <h2 class="card-title text-base mb-3">available templates</h2>
+        
+        <div class="space-y-3">
+          {{range $category, $templates := .Categories}}
+          <div>
+            <div class="text-xs font-semibold text-base-content/60 uppercase mb-1">{{$category}}</div>
+            {{range $templates}}
+            <button 
+              class="btn btn-sm btn-ghost w-full justify-start mb-1 template-btn"
+              hx-get="/api/template/preview?name={{.Name}}"
+              hx-target="#template-preview"
+              hx-indicator="#preview-spinner"
+              onclick="document.querySelectorAll('.template-btn').forEach(b => b.classList.remove('btn-active')); this.classList.add('btn-active');">
+              {{.Name}}
+            </button>
+            {{end}}
+          </div>
+          {{end}}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Current config info -->
+    <div class="card bg-base-100 border border-base-content/10 mt-4">
+      <div class="card-body p-4">
+        <h2 class="card-title text-base mb-2">current config</h2>
+        <div class="text-xs">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-base-content/60">path:</span>
+            <code class="text-xs">{{.ConfigPath}}</code>
+          </div>
+          <div class="alert alert-warning text-xs mt-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <span>"Load Template" will overwrite this file!</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Preview and actions -->
+  <div class="lg:col-span-2">
+    <div class="card bg-base-100 border border-base-content/10">
+      <div class="card-body p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="card-title text-base">template preview</h2>
+          <span id="preview-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+        </div>
+        
+        <div id="template-preview" class="min-h-[400px]">
+          <div class="text-center py-12 text-base-content/50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-3 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <p>select a template to preview</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{end}}

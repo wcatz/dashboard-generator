@@ -8,11 +8,11 @@ import (
 
 func TestFilterMetricInfoMap(t *testing.T) {
 	m := map[string]generator.MetricInfo{
-		"node_cpu_seconds_total":           {Type: "counter", Help: "CPU seconds"},
-		"node_memory_MemTotal_bytes":       {Type: "gauge", Help: "Total memory"},
-		"node_disk_read_bytes_total":       {Type: "counter", Help: "Disk reads"},
-		"process_cpu_seconds_total":        {Type: "counter", Help: "Process CPU"},
-		"go_goroutines":                    {Type: "gauge", Help: "Goroutines"},
+		"node_cpu_seconds_total":     {Type: "counter", Help: "CPU seconds"},
+		"node_memory_MemTotal_bytes": {Type: "gauge", Help: "Total memory"},
+		"node_disk_read_bytes_total": {Type: "counter", Help: "Disk reads"},
+		"process_cpu_seconds_total":  {Type: "counter", Help: "Process CPU"},
+		"go_goroutines":              {Type: "gauge", Help: "Goroutines"},
 	}
 
 	t.Run("include node_* only", func(t *testing.T) {

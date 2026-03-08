@@ -2,9 +2,11 @@ package server
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
+	"github.com/wcatz/dashboard-generator/internal/config"
 	"github.com/wcatz/dashboard-generator/internal/generator"
 )
 
@@ -232,7 +234,6 @@ func extractNavLinks(dashboard map[string]interface{}) []NavLink {
 	return links
 }
 
-
 func filterMetricInfoMap(m map[string]generator.MetricInfo, patterns []string) map[string]generator.MetricInfo {
 	keys := make(map[string]bool)
 	for k := range m {
@@ -259,7 +260,7 @@ func filterByType(m map[string]generator.MetricInfo, mtype string) map[string]ge
 func buildJobLabels(job generator.JobSummary) []labelSummary {
 	// Collect all label keys and their values across targets
 	labelValues := make(map[string]map[string]bool) // label → set of values
-	labelCount := make(map[string]int)               // label → targets that have it
+	labelCount := make(map[string]int)              // label → targets that have it
 	for _, t := range job.Targets {
 		for k, v := range t.Labels {
 			if k == "__name__" {
@@ -322,4 +323,167 @@ func validateFilename(filename string) error {
 		return fmt.Errorf("filename cannot contain null bytes")
 	}
 	return nil
+}
+
+// enrichVariablesWithValues fetches actual values for variables from Prometheus or config.
+func (s *Server) enrichVariablesWithValues(varInfos []VariableInfo) []VariableInfo {
+	cfg := s.Config()
+
+	for i := range varInfos {
+		vi := &varInfos[i]
+
+		// Set label (defaults to name if not set)
+		if vi.Label == "" {
+			vi.Label = vi.Name
+		}
+
+		// Fetch sample values based on variable type
+		switch vi.Type {
+		case "query":
+			vi.SampleValues = s.fetchQueryVariableValues(vi, cfg)
+		case "custom":
+			vi.SampleValues = parseCustomValues(vi.Values)
+		case "interval":
+			vi.SampleValues = parseCustomValues(vi.Values)
+		case "datasource":
+			vi.SampleValues = s.getDatasourceNames()
+		default:
+			vi.SampleValues = []string{}
+		}
+
+		// Limit to 100 values to avoid UI performance issues
+		if len(vi.SampleValues) > 100 {
+			vi.SampleValues = vi.SampleValues[:100]
+		}
+	}
+
+	return varInfos
+}
+
+// fetchQueryVariableValues queries Prometheus for variable values with caching.
+func (s *Server) fetchQueryVariableValues(vi *VariableInfo, cfg *config.Config) []string {
+	if vi.Query == "" {
+		return []string{}
+	}
+
+	// Prefer the variable's own datasource; fall back to the default
+	dsName := vi.Datasource
+	if dsName == "" {
+		dsName = s.getDefaultDatasourceName(cfg)
+	}
+	// Validate the chosen datasource exists; fall back to default if not
+	if _, ok := cfg.Datasources[dsName]; !ok {
+		dsName = s.getDefaultDatasourceName(cfg)
+	}
+	if dsName == "" {
+		return []string{}
+	}
+
+	cacheKey := fmt.Sprintf("%s:query:%s", dsName, vi.Query)
+	if cached, ok := s.variableCache.Get(cacheKey); ok {
+		return cached
+	}
+
+	label := extractLabelFromQuery(vi.Query)
+	if label == "" {
+		return []string{}
+	}
+
+	discovery := generator.NewMetricDiscovery(cfg)
+	values, err := discovery.FetchLabelValues(dsName, label)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error fetching variable values for %s: %v\n", vi.Name, err)
+		return []string{}
+	}
+
+	s.variableCache.Set(cacheKey, values)
+	return values
+}
+
+// getDefaultDatasourceName returns the name of the default datasource.
+func (s *Server) getDefaultDatasourceName(cfg *config.Config) string {
+	// First, look for explicitly marked default
+	for name, ds := range cfg.Datasources {
+		if ds.IsDefault {
+			return name
+		}
+	}
+
+	// Fallback: return first datasource name
+	for name := range cfg.Datasources {
+		return name
+	}
+
+	return ""
+}
+
+// extractLabelFromQuery parses Grafana label_values() queries.
+// Examples:
+//
+//	"label_values(namespace)" -> "namespace"
+//	"label_values(kube_pod_info, namespace)" -> "namespace"
+//	"query_result(up)" -> ""
+func extractLabelFromQuery(query string) string {
+	query = strings.TrimSpace(query)
+	if !strings.HasPrefix(query, "label_values(") || !strings.HasSuffix(query, ")") {
+		return ""
+	}
+	inner := query[len("label_values(") : len(query)-1]
+
+	// Find the last top-level comma (not inside braces or quotes)
+	depth := 0
+	inQuote := false
+	lastComma := -1
+	for i, ch := range inner {
+		switch ch {
+		case '"', '\'':
+			inQuote = !inQuote
+		case '{':
+			if !inQuote {
+				depth++
+			}
+		case '}':
+			if !inQuote {
+				depth--
+			}
+		case ',':
+			if !inQuote && depth == 0 {
+				lastComma = i
+			}
+		}
+	}
+
+	if lastComma == -1 {
+		// label_values(label)
+		return strings.TrimSpace(inner)
+	}
+	// label_values(metric{...}, label)
+	return strings.TrimSpace(inner[lastComma+1:])
+}
+
+// parseCustomValues splits comma-separated values.
+func parseCustomValues(values string) []string {
+	if values == "" {
+		return []string{}
+	}
+	parts := strings.Split(values, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// getDatasourceNames returns all datasource names from config.
+func (s *Server) getDatasourceNames() []string {
+	cfg := s.Config()
+	names := make([]string, 0, len(cfg.Datasources))
+	for name := range cfg.Datasources {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }

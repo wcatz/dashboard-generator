@@ -1,0 +1,74 @@
+<div>
+  <!-- Template info -->
+  <div class="mb-4 p-3 bg-base-200 rounded-lg">
+    <div class="flex items-start justify-between">
+      <div>
+        <h3 class="font-bold text-base">{{.Template.Name}}</h3>
+        <p class="text-sm text-base-content/70 mt-1">{{.Template.Description}}</p>
+        <div class="badge badge-sm badge-outline mt-2">{{.Template.Category}}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex gap-2 mb-4">
+    <!-- Create new file -->
+    <div class="flex-1">
+      <form hx-post="/api/template/create" hx-target="#create-result" hx-indicator="#create-spinner">
+        <input type="hidden" name="template" value="{{.Template.Name}}">
+        <div class="join w-full">
+          <input 
+            type="text" 
+            name="path" 
+            placeholder="e.g. my-config.yaml" 
+            class="input input-sm input-bordered join-item flex-1 w-full"
+            value="new-config.yaml">
+          <button type="submit" class="btn btn-sm btn-primary join-item">
+            create file <span id="create-spinner" class="htmx-indicator ml-1"><span class="spinner spinner-sm"></span></span>
+          </button>
+        </div>
+        <label class="label cursor-pointer justify-start gap-2 py-1">
+          <input type="checkbox" name="overwrite" value="true" class="checkbox checkbox-xs">
+          <span class="label-text text-xs">overwrite if exists</span>
+        </label>
+      </form>
+    </div>
+
+    <!-- Load as active config -->
+    <div>
+      <button 
+        class="btn btn-sm btn-warning"
+        hx-post="/api/template/load"
+        hx-vals='{"template": "{{.Template.Name}}"}'
+        hx-confirm="This will replace your current config. Continue?"
+        hx-target="#load-result">
+        load template
+      </button>
+    </div>
+  </div>
+
+  <!-- Result messages -->
+  <div id="create-result" class="mb-4"></div>
+  <div id="load-result" class="mb-4"></div>
+
+  <!-- YAML preview -->
+  <div class="mockup-code text-xs max-h-[500px] overflow-y-auto">
+    <pre><code class="language-yaml">{{.Template.Content}}</code></pre>
+  </div>
+
+  <!-- Copy button -->
+  <div class="mt-3 flex justify-end gap-2">
+    <button 
+      class="btn btn-sm btn-ghost"
+      onclick="(function(btn){ var code = btn.parentElement.previousElementSibling.querySelector('code'); if(!code) return; navigator.clipboard.writeText(code.textContent).then(function(){ btn.textContent='✓ copied'; setTimeout(function(){ btn.textContent='copy yaml'; }, 1000); }); })(this)">
+      copy yaml
+    </button>
+  </div>
+</div>
+
+<script>
+  // Apply syntax highlighting
+  document.querySelectorAll('pre code').forEach((block) => {
+    hljs.highlightElement(block);
+  });
+</script>

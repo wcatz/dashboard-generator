@@ -10,6 +10,9 @@ gen-*.json
 # Test coverage
 coverage.out
 
+# Log files
+*.log
+
 # Client configs (may contain tokens/secrets)
 configs/
 !configs/.gitkeep

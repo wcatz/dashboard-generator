@@ -777,6 +777,53 @@
   font-weight: 500;
 }
 
+/* ── Variable controls (Interactive Grafana-like dropdowns) ── */
+.variable-controls {
+  border-top: 1px solid oklch(var(--bc) / 0.1);
+  background: oklch(var(--b3) / 0.5);
+  backdrop-filter: blur(8px);
+}
+
+.variable-controls select {
+  min-width: 10rem;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+  transition: all 0.2s ease;
+}
+
+.variable-controls select:focus {
+  outline: 2px solid oklch(var(--p));
+  outline-offset: 2px;
+  border-color: oklch(var(--p));
+}
+
+.variable-controls select[multiple] {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(var(--bc) / 0.3) oklch(var(--b2));
+}
+
+.variable-controls select[multiple]::-webkit-scrollbar {
+  width: 6px;
+}
+
+.variable-controls select[multiple]::-webkit-scrollbar-track {
+  background: oklch(var(--b2));
+  border-radius: 3px;
+}
+
+.variable-controls select[multiple]::-webkit-scrollbar-thumb {
+  background: oklch(var(--bc) / 0.3);
+  border-radius: 3px;
+}
+
+.variable-controls select[multiple]::-webkit-scrollbar-thumb:hover {
+  background: oklch(var(--bc) / 0.5);
+}
+
+.variable-controls .label-text {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
 /* ── All dashboards mode — dashboard header nav ── */
 .section-nav-link.section-nav-dash {
   font-weight: 700;

@@ -96,10 +96,10 @@ func TestTimeseriesPanel(t *testing.T) {
 	pf := NewPanelFactory(cfg, idGen)
 
 	panel := pf.Timeseries(map[string]interface{}{
-		"title":      "cpu usage",
-		"query":      "rate(cpu[${rate_interval}])",
-		"unit":       "percent",
-		"stack":      "normal",
+		"title":        "cpu usage",
+		"query":        "rate(cpu[${rate_interval}])",
+		"unit":         "percent",
+		"stack":        "normal",
 		"fill_opacity": 20,
 	}, 0, 0)
 

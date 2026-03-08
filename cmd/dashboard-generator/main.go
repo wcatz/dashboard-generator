@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/wcatz/dashboard-generator/internal/config"
@@ -34,6 +35,9 @@ var (
 	dryRun          bool
 	verbose         bool
 	servePort       int
+	outputFormat    string
+	k8sNamespace    string
+	grafanaFolder   string
 )
 
 func main() {
@@ -53,6 +57,9 @@ func main() {
 	genCmd.Flags().StringVar(&outputDir, "output-dir", "", "override output directory")
 	genCmd.Flags().BoolVar(&dryRun, "dry-run", false, "generate to memory only")
 	genCmd.Flags().BoolVar(&verbose, "verbose", false, "print panel details")
+	genCmd.Flags().StringVar(&outputFormat, "format", "json", "output format: json, grafana-yaml, configmap (comma-separated for multiple)")
+	genCmd.Flags().StringVar(&k8sNamespace, "k8s-namespace", "monitoring", "Kubernetes namespace for YAML outputs")
+	genCmd.Flags().StringVar(&grafanaFolder, "grafana-folder", "", "Grafana folder for dashboards")
 	_ = genCmd.MarkFlagRequired("config")
 
 	discoverCmd := &cobra.Command{
@@ -98,6 +105,29 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+func parseOutputFormats(formatStr string) []generator.OutputFormat {
+	if formatStr == "" {
+		formatStr = "json"
+	}
+	parts := strings.Split(formatStr, ",")
+	formats := make([]generator.OutputFormat, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		switch p {
+		case "json":
+			formats = append(formats, generator.FormatJSON)
+		case "grafana-yaml":
+			formats = append(formats, generator.FormatGrafanaYAML)
+		case "configmap":
+			formats = append(formats, generator.FormatConfigMap)
+		}
+	}
+	if len(formats) == 0 {
+		formats = []generator.OutputFormat{generator.FormatJSON}
+	}
+	return formats
 }
 
 func loadConfig() (*config.Config, error) {
@@ -247,6 +277,24 @@ func generateDashboards(cfg *config.Config, push bool) error {
 		}
 	}
 
+	// parse output formats
+	formats := parseOutputFormats(outputFormat)
+
+	// determine default namespace and folder
+	defaultNamespace := k8sNamespace
+	defaultFolder := grafanaFolder
+	if defaultFolder == "" {
+		// use first tag as folder, if any
+		if len(dashboards) > 0 {
+			for _, dbCfg := range dashboards {
+				if len(dbCfg.Tags) > 0 {
+					defaultFolder = dbCfg.Tags[0]
+					break
+				}
+			}
+		}
+	}
+
 	// generate dashboards
 	totalSize := 0
 	totalPanels := 0
@@ -259,13 +307,43 @@ func generateDashboards(cfg *config.Config, push bool) error {
 			return fmt.Errorf("building dashboard '%s': %w", name, err)
 		}
 
-		filename := filepath.Base(dbCfg.Filename)
-		if filename == "" || filename == "." {
-			filename = name + ".json"
+		// determine output path base (without extension)
+		basePath := filepath.Join(outDir, name)
+		if dbCfg.Filename != "" {
+			filename := filepath.Base(dbCfg.Filename)
+			if filename != "" && filename != "." {
+				// remove extension if present
+				ext := filepath.Ext(filename)
+				if ext != "" {
+					filename = filename[:len(filename)-len(ext)]
+				}
+				basePath = filepath.Join(outDir, filename)
+			}
 		}
-		fpath := filepath.Join(outDir, filename)
 
-		size, err := generator.WriteDashboard(dashboard, fpath, dryRun)
+		// determine namespace and folder for this dashboard
+		namespace := defaultNamespace
+		folder := defaultFolder
+		if dbCfg.K8sNamespace != "" {
+			namespace = dbCfg.K8sNamespace
+		}
+		if dbCfg.GrafanaFolder != "" {
+			folder = dbCfg.GrafanaFolder
+		} else if folder == "" && len(dbCfg.Tags) > 0 {
+			// use first tag as folder if not set
+			folder = dbCfg.Tags[0]
+		}
+
+		// write dashboard in all requested formats
+		var size int
+		if len(formats) == 1 && formats[0] == generator.FormatJSON {
+			// backward compat: single JSON output
+			size, err = generator.WriteDashboard(dashboard, basePath+".json", dryRun)
+		} else {
+			// multi-format output
+			err = generator.WriteDashboardMultiFormat(dashboard, basePath, formats, namespace, folder, dryRun)
+			size = 0 // size reporting not accurate for multi-format
+		}
 		if err != nil {
 			return err
 		}

@@ -41,7 +41,7 @@ func TestVariableDelete(t *testing.T) {
 
 		w = doPost(t, srv, "/api/variable/delete", "name=to_delete")
 		assertStatus(t, w, 200)
-		assertContains(t, w, "deleted")
+		assertContains(t, w, "var-count") // response is OOB swap with updated count, not a "deleted" confirmation
 	})
 
 	t.Run("missing name", func(t *testing.T) {

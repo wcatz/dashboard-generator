@@ -97,7 +97,6 @@ func TestIndexNotFoundPath(t *testing.T) {
 	assertStatus(t, w, http.StatusNotFound)
 }
 
-
 func TestHandleDatasources(t *testing.T) {
 	srv, _ := newTestServer(t)
 	w := doGet(t, srv, "/datasources")

@@ -12,7 +12,7 @@
 
 generator:
    schema_version: 39
-   plugin_version: "11.2.0"  # Grafana plugin version (default: 11.2.0)
+   plugin_version: "11.2.0" # Grafana plugin version (default: 11.2.0)
    output_dir: "."
    refresh: "30s"
    time_range:
@@ -22,6 +22,14 @@ generator:
    graph_tooltip: 1 # 0=default, 1=shared crosshair, 2=shared tooltip
    live_now: true
    timezone: ""
+   # Kubernetes output settings (optional)
+   kubernetes:
+      namespace: monitoring # default K8s namespace for CRD outputs
+      grafana_folder: Generated # default Grafana folder name
+      output_formats: # formats to generate (default: [json])
+         - json # classic Grafana JSON
+         # - grafana-yaml           # Grafana Operator CRD v1beta1
+         # - configmap              # Kubernetes ConfigMap
 
 # ─── Datasources ─────────────────────────────────────────────────────────────
 # Define any number of datasources. 'url' is only used for metric discovery.

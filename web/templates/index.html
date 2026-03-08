@@ -45,8 +45,20 @@
 
 <div class="flex justify-between items-center mb-4">
   <h2 class="text-lg font-semibold">dashboard list</h2>
-  <div class="flex gap-2">
-    <button class="btn btn-sm btn-primary" hx-post="/api/generate" hx-target="#generate-result" hx-indicator="#gen-spinner" hx-disabled-elt="this">
+  <div class="flex gap-2 items-center">
+    <!-- Format selector -->
+    <select id="output-format" name="output-format" class="select select-sm select-bordered">
+      <option value="json" selected>JSON</option>
+      <option value="grafana-yaml">Grafana YAML (CRD)</option>
+      <option value="configmap">ConfigMap</option>
+      <option value="json,grafana-yaml">JSON + YAML</option>
+    </select>
+    <button class="btn btn-sm btn-primary" 
+            hx-post="/api/generate" 
+            hx-target="#generate-result" 
+            hx-indicator="#gen-spinner" 
+            hx-disabled-elt="this"
+            hx-include="#output-format">
       generate all <span id="gen-spinner" class="htmx-indicator"><span class="spinner"></span></span>
     </button>
     {{if .GrafanaURL}}
@@ -54,7 +66,6 @@
       push all to grafana <span id="push-spinner" class="htmx-indicator"><span class="spinner"></span></span>
     </button>
     {{end}}
-  </div>
 </div>
 
 <div id="generate-result"></div>
@@ -76,7 +87,12 @@
         </div>
       </div>
       <div class="flex gap-2 shrink-0">
-        <button class="btn btn-xs btn-outline" hx-post="/api/generate?dashboard={{.UID}}" hx-target="#generate-result" hx-indicator="#gen-spinner" hx-disabled-elt="this">generate</button>
+        <button class="btn btn-xs btn-outline" 
+                hx-post="/api/generate?dashboard={{.UID}}" 
+                hx-target="#generate-result" 
+                hx-indicator="#gen-spinner" 
+                hx-disabled-elt="this"
+                hx-include="#output-format">generate</button>
         {{if $.GrafanaURL}}
         <button class="btn btn-xs btn-outline" hx-post="/api/push?dashboard={{.UID}}" hx-target="#push-result" hx-indicator="#push-spinner" hx-disabled-elt="this">push</button>
         {{end}}

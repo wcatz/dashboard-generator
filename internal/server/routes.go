@@ -17,6 +17,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/preview", s.handlePreview)
 	s.mux.HandleFunc("/profiles", s.handleProfiles)
 	s.mux.HandleFunc("/settings", s.handleSettings)
+	s.mux.HandleFunc("/templates", s.handleTemplatesPage)
 
 	// API endpoints (HTMX)
 	s.mux.HandleFunc("/api/push", s.handlePush)
@@ -35,6 +36,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/metrics/compare", s.handleMetricsCompare)
 	s.mux.HandleFunc("/api/metrics/snippet", s.handleMetricsSnippet)
 	s.mux.HandleFunc("/api/metrics/ai-suggest", s.handleAISuggest)
+	s.mux.HandleFunc("/api/metrics/ai-suggest-bulk", s.handleAISuggestBulk)
 	s.mux.HandleFunc("/api/metrics/comparison-snippet", s.handleComparisonSnippet)
 	s.mux.HandleFunc("/api/config/reload", s.handleConfigReload)
 	s.mux.HandleFunc("/api/config/save", s.handleConfigSave)
@@ -49,4 +51,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/labels/values", s.handleLabelValues)
 	s.mux.HandleFunc("/api/variable/add", s.handleVariableAdd)
 	s.mux.HandleFunc("/api/variable/delete", s.handleVariableDelete)
+	s.mux.HandleFunc("/api/template/preview", s.handleTemplatePreview)
+	s.mux.HandleFunc("/api/template/create", s.handleTemplateCreate)
+	s.mux.HandleFunc("/api/template/load", s.handleTemplateLoad)
 }

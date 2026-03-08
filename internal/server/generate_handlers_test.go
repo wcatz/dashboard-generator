@@ -18,8 +18,8 @@ func TestGenerate(t *testing.T) {
 	t.Run("POST generates all dashboards", func(t *testing.T) {
 		w := doPost(t, srv, "/api/generate", "")
 		assertStatus(t, w, 200)
-		assertContains(t, w, "test-overview.json")
-		assertContains(t, w, "test-network.json")
+		assertContains(t, w, "test-overview")
+		assertContains(t, w, "test-network")
 	})
 
 	t.Run("GET returns 405", func(t *testing.T) {
@@ -33,8 +33,8 @@ func TestGenerateSingleDashboard(t *testing.T) {
 
 	w := doPost(t, srv, "/api/generate?dashboard=test-overview", "")
 	assertStatus(t, w, 200)
-	assertContains(t, w, "test-overview.json")
-	assertNotContains(t, w, "test-network.json")
+	assertContains(t, w, "test-overview")
+	assertNotContains(t, w, "test-network")
 }
 
 func TestPushNoGrafanaURL(t *testing.T) {
@@ -51,7 +51,6 @@ func TestPushNoGrafanaURL(t *testing.T) {
 		assertStatus(t, w, 405)
 	})
 }
-
 
 func TestPushWithMockGrafana(t *testing.T) {
 	// Create a mock Grafana server that accepts dashboard pushes

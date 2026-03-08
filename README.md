@@ -199,6 +199,21 @@ Published to `wcatz/dashboard-generator` on Docker Hub.
 | `0.1` | git tag `v0.1.x` |
 | `0` | git tag `v0.x.x` |
 
+## Development
+
+This project includes comprehensive development skills for common workflows:
+
+- **[add-panel-type](.omp/skills/add-panel-type/SKILL.md)** - Add new Grafana panel types
+- **[web-ui-feature](.omp/skills/web-ui-feature/SKILL.md)** - Add web UI pages and features
+- **[test-coverage](.omp/skills/test-coverage/SKILL.md)** - Improve test coverage
+- **[config-schema](.omp/skills/config-schema/SKILL.md)** - Modify YAML config schema
+- **[prometheus-debug](.omp/skills/prometheus-debug/SKILL.md)** - Debug datasource issues
+- **[dashboard-validation](.omp/skills/dashboard-validation/SKILL.md)** - Validate dashboard JSON
+- **[deploy](.omp/skills/deploy/SKILL.md)** - Build, tag, release, deploy
+
+See [.omp/skills/README.md](.omp/skills/README.md) for complete documentation.
+
+
 ## Releasing
 
 ```bash

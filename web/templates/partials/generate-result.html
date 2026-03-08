@@ -9,7 +9,17 @@
     {{range .Results}}
     <div class="flex items-center gap-2 text-sm">
       <span class="text-success">&#10003;</span>
-      {{.Filename}}: {{.Panels}} panels, {{.Size}} bytes
+      <span class="font-semibold">{{.Name}}</span>: {{.Panels}} panels
+      {{if gt (len .Formats) 0}}
+      <span class="text-base-content/50">&middot;</span>
+      {{range $i, $fmt := .Formats}}
+        {{if $i}}, {{end}}
+        <span class="badge badge-xs badge-outline">{{$fmt}}</span>
+      {{end}}
+      {{end}}
+      {{if gt .Size 0}}
+      <span class="text-base-content/50">&middot; {{.Size}} bytes</span>
+      {{end}}
     </div>
     {{end}}
   </div>

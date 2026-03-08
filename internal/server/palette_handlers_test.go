@@ -140,7 +140,6 @@ func TestPaletteActivate(t *testing.T) {
 	}
 }
 
-
 func TestHandlePaletteColorRename(t *testing.T) {
 	srv, _ := newTestServer(t)
 
@@ -224,7 +223,6 @@ func TestHandlePaletteActivateNotFound(t *testing.T) {
 	assertStatus(t, rec, 200)
 	assertContains(t, rec, "not found")
 }
-
 
 func TestHandlePaletteDeleteSuccess(t *testing.T) {
 	srv, _ := newTestServer(t)

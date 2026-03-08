@@ -269,7 +269,6 @@ func TestDiscoveryAuthEnvVar(t *testing.T) {
 	}
 }
 
-
 func TestFetchMetadata(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/metadata" {
@@ -278,7 +277,7 @@ func TestFetchMetadata(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"status": "success",
 			"data": map[string]interface{}{
-				"up": []map[string]string{{"type": "gauge", "help": "Whether target is up", "unit": ""}},
+				"up":                     []map[string]string{{"type": "gauge", "help": "Whether target is up", "unit": ""}},
 				"node_cpu_seconds_total": []map[string]string{{"type": "counter", "help": "CPU seconds", "unit": ""}},
 			},
 		})
