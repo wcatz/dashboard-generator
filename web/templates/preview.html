@@ -2,6 +2,14 @@
 <h1 class="text-xl font-bold mb-1">preview</h1>
 <p class="text-sm text-base-content/50 mb-6">visual layout and JSON output</p>
 
+<div class="alert alert-info mb-4">
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+  <div>
+    <div class="font-bold">Phase 1: Interactive Variable Dropdowns</div>
+    <div class="text-sm">This page shows live variable controls with Prometheus data. Looking for <strong>AI panel generation</strong>? Go to <a href="/metrics" class="link link-primary">Metrics ⚡</a></div>
+  </div>
+</div>
+
 <div class="card bg-base-100 border border-base-content/10 mb-4">
   <div class="card-body p-5">
     <form hx-get="/api/preview" hx-target="#preview-result" hx-indicator="#preview-spinner">

@@ -493,7 +493,6 @@ dashboards: {}
 	}
 }
 
-
 const editorTestYAML = `
 datasources:
   primary:

@@ -399,8 +399,8 @@ func (s *Server) handleLabelsDiscover(w http.ResponseWriter, r *http.Request) {
 	disc := generator.NewMetricDiscovery(cfg)
 
 	type labelInfo struct {
-		Name       string
-		Sources    []string
+		Name    string
+		Sources []string
 	}
 
 	// Collect datasources that have URLs

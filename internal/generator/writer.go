@@ -12,6 +12,15 @@ import (
 	"time"
 )
 
+// OutputFormat specifies the dashboard output format
+type OutputFormat string
+
+const (
+	FormatJSON        OutputFormat = "json"         // Classic Grafana JSON
+	FormatGrafanaYAML OutputFormat = "grafana-yaml" // Grafana Operator CRD
+	FormatConfigMap   OutputFormat = "configmap"    // Kubernetes ConfigMap
+)
+
 // WriteDashboard writes a dashboard to JSON file, returning the size.
 func WriteDashboard(dashboard map[string]interface{}, fpath string, dryRun bool) (int, error) {
 	data, err := json.MarshalIndent(dashboard, "", "  ")
@@ -35,6 +44,59 @@ func WriteDashboard(dashboard map[string]interface{}, fpath string, dryRun bool)
 
 	fmt.Printf("  %s: %d panels, %s bytes\n", filename, panelCount, formatSize(size))
 	return size, nil
+}
+
+// WriteDashboardMultiFormat writes a dashboard in multiple formats
+func WriteDashboardMultiFormat(dashboard map[string]interface{}, basePath string, formats []OutputFormat, namespace string, folder string, dryRun bool) error {
+	for _, format := range formats {
+		var outputPath string
+		var err error
+
+		switch format {
+		case FormatJSON:
+			// Default JSON output
+			outputPath = basePath
+			if filepath.Ext(outputPath) != ".json" {
+				outputPath = basePath + ".json"
+			}
+			_, err = WriteDashboard(dashboard, outputPath, dryRun)
+
+		case FormatGrafanaYAML:
+			// Grafana Operator CRD YAML
+			outputPath = changeExt(basePath, ".grafana.yaml")
+			if !dryRun {
+				err = WriteGrafanaYAML(dashboard, outputPath, namespace, folder)
+			}
+			if err == nil {
+				fmt.Printf("  %s (Grafana CRD)\n", filepath.Base(outputPath))
+			}
+
+		case FormatConfigMap:
+			// Kubernetes ConfigMap YAML
+			outputPath = changeExt(basePath, ".configmap.yaml")
+			if !dryRun {
+				err = WriteConfigMap(dashboard, outputPath, namespace)
+			}
+			if err == nil {
+				fmt.Printf("  %s (ConfigMap)\n", filepath.Base(outputPath))
+			}
+		}
+
+		if err != nil {
+			return fmt.Errorf("writing %s format: %w", format, err)
+		}
+	}
+
+	return nil
+}
+
+// changeExt changes file extension
+func changeExt(path string, newExt string) string {
+	ext := filepath.Ext(path)
+	if ext != "" {
+		path = path[:len(path)-len(ext)]
+	}
+	return path + newExt
 }
 
 func countPanels(dashboard map[string]interface{}) int {

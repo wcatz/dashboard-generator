@@ -61,19 +61,32 @@
               <span class="text-xs text-base-content/40 font-mono">{{.UID}}</span>
             </div>
             {{if .Variables}}
-            <div class="flex flex-wrap gap-2 mb-3 items-center">
-              <span class="text-[0.65rem] text-base-content/40 uppercase tracking-wider">variables</span>
+            <!-- Interactive variable controls - Grafana-like -->
+            <div class="variable-controls flex flex-wrap gap-2 mb-3 p-3 bg-base-300/50 rounded-lg border-t border-base-content/10">
+              <span class="text-[0.65rem] text-base-content/40 uppercase tracking-wider self-center">variables:</span>
               {{range .Variables}}
-              <div class="variable-badge" title="{{if eq .Type "query"}}query: {{.Query}}{{else if eq .Type "custom"}}values: {{.Values}}{{else if eq .Type "datasource"}}type: {{.Values}}{{else if eq .Type "interval"}}values: {{.Values}}{{else}}{{.Type}}{{end}}">
-                <span class="variable-badge-name">{{.Name}}</span>
-                <span class="variable-badge-type">{{.Type}}</span>
-                {{if .Multi}}<span class="variable-badge-flag">multi</span>{{end}}
-                {{if .IncludeAll}}<span class="variable-badge-flag">all</span>{{end}}
+              <div class="form-control">
+                <label class="label py-0 pb-1">
+                  <span class="label-text text-[0.65rem] font-medium opacity-60">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</span>
+                </label>
+                <select class="select select-bordered select-sm w-40 font-mono text-xs bg-base-200 hover:bg-base-300 focus:bg-base-100"
+                        data-variable="{{.Name}}"
+                        {{if .Multi}}multiple size="3"{{end}}>
+                  {{if and (not .Multi) .IncludeAll}}
+                  <option value="$__all" selected>All</option>
+                  {{end}}
+                  {{if .SampleValues}}
+                    {{range .SampleValues}}
+                    <option value="{{.}}">{{.}}</option>
+                    {{end}}
+                  {{else}}
+                    <option disabled>No values available</option>
+                  {{end}}
+                </select>
               </div>
               {{end}}
             </div>
             {{end}}
-          </div>
           {{$currentSection := ""}}
           {{$sectionOpen := false}}
           {{range .PanelInfos}}

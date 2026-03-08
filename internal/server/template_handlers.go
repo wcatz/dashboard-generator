@@ -1,0 +1,157 @@
+package server
+
+import (
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+)
+
+// handleTemplatesPage renders the config templates page
+func (s *Server) handleTemplatesPage(w http.ResponseWriter, r *http.Request) {
+	templates := GetConfigTemplates()
+	
+	// Group templates by category
+	categories := make(map[string][]ConfigTemplate)
+	for _, t := range templates {
+		categories[t.Category] = append(categories[t.Category], t)
+	}
+	
+	data := map[string]interface{}{
+		"Templates":  templates,
+		"Categories": categories,
+		"ConfigPath": s.ConfigPath(),
+	}
+	
+	
+	s.renderPage(w, "templates.html", data)
+}
+
+// handleTemplatePreview returns the content of a template
+func (s *Server) handleTemplatePreview(w http.ResponseWriter, r *http.Request) {
+	templateName := r.URL.Query().Get("name")
+	if templateName == "" {
+		http.Error(w, "template name required", http.StatusBadRequest)
+		return
+	}
+	
+	template, err := GetTemplateByName(templateName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	
+	// Return as YAML with syntax highlighting
+	data := map[string]interface{}{
+		"Template": template,
+	}
+	
+	
+	s.renderPartial(w, "template-preview.html", data)
+}
+
+// handleTemplateCreate creates a new config file from a template
+func (s *Server) handleTemplateCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	templateName := r.FormValue("template")
+	outputPath := r.FormValue("path")
+	overwrite := r.FormValue("overwrite") == "true"
+	
+	if templateName == "" {
+		http.Error(w, "template name required", http.StatusBadRequest)
+		return
+	}
+	
+	if outputPath == "" {
+		http.Error(w, "output path required", http.StatusBadRequest)
+		return
+	}
+	
+	// Get template
+	template, err := GetTemplateByName(templateName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	
+	// Check if file exists
+	if _, err := os.Stat(outputPath); err == nil && !overwrite {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusConflict)
+		fmt.Fprintf(w, `<div class="alert alert-warning">
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+			<span>File already exists: %s. Use overwrite option to replace.</span>
+		</div>`, outputPath)
+		return
+	}
+	
+	// Create directory if needed
+	dir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		http.Error(w, fmt.Sprintf("failed to create directory: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	// Write template content
+	if err := os.WriteFile(outputPath, []byte(template.Content), 0644); err != nil {
+		http.Error(w, fmt.Sprintf("failed to write file: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	// Success response
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `<div class="alert alert-success">
+		<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+		<div>
+			<div class="font-bold">Config created successfully!</div>
+			<div class="text-sm">Saved to: %s</div>
+			<div class="mt-2">
+				<a href="/editor?config=%s" class="btn btn-sm btn-primary">Edit Config</a>
+				<button onclick="location.reload()" class="btn btn-sm btn-ghost">Create Another</button>
+			</div>
+		</div>
+	</div>`, outputPath, outputPath)
+}
+
+// handleTemplateLoad loads a template as the active config
+func (s *Server) handleTemplateLoad(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	templateName := r.FormValue("template")
+	if templateName == "" {
+		http.Error(w, "template name required", http.StatusBadRequest)
+		return
+	}
+	
+	template, err := GetTemplateByName(templateName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	
+	// Write to current config path
+	if err := os.WriteFile(s.ConfigPath(), []byte(template.Content), 0644); err != nil {
+		http.Error(w, fmt.Sprintf("failed to write config: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	// Reload config
+	if err := s.ReloadConfig(); err != nil {
+		http.Error(w, fmt.Sprintf("failed to reload config: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	// Success response with redirect
+	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("HX-Redirect", "/")
+	fmt.Fprintf(w, `<div class="alert alert-success">
+		<span>Config loaded from template: %s. Redirecting...</span>
+	</div>`, template.Name)
+}

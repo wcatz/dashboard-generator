@@ -2,6 +2,7 @@ package generator
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/wcatz/dashboard-generator/internal/config"
 )
@@ -44,7 +45,20 @@ func (db *DashboardBuilder) BuildNavigationLinks(dashboards map[string]config.Da
 func (db *DashboardBuilder) BuildVariable(name string) (map[string]interface{}, error) {
 	v, ok := db.Config.GetVariableDef(name)
 	if !ok {
-		return nil, fmt.Errorf("variable '%s' not defined in config", name)
+		// Log warning but create a placeholder variable instead of failing
+		log.Printf("WARNING: variable '%s' not defined in config - creating placeholder\n", name)
+		// Create a minimal placeholder variable
+		return map[string]interface{}{
+			"name":  name,
+			"label": name,
+			"type":  "constant",
+			"hide":  2,
+			"query": name,
+			"current": map[string]interface{}{
+				"text":  "(undefined)",
+				"value": "",
+			},
+		}, nil
 	}
 
 	vtype := v.Type
@@ -84,21 +98,21 @@ func (db *DashboardBuilder) BuildVariable(name string) (map[string]interface{}, 
 	}
 
 	varDef := map[string]interface{}{
-		"current":    current,
-		"datasource": map[string]interface{}{"type": ds.Type, "uid": ds.UID},
-		"definition": query,
-		"hide":       hide,
-		"includeAll": v.IncludeAll,
-		"label":      label,
-		"multi":      v.Multi,
-		"name":       name,
-		"options":    []interface{}{},
-		"query":      map[string]interface{}{"query": query, "refId": "StandardVariableQuery"},
-		"refresh":    refresh,
-		"regex":      v.Regex,
+		"current":     current,
+		"datasource":  map[string]interface{}{"type": ds.Type, "uid": ds.UID},
+		"definition":  query,
+		"hide":        hide,
+		"includeAll":  v.IncludeAll,
+		"label":       label,
+		"multi":       v.Multi,
+		"name":        name,
+		"options":     []interface{}{},
+		"query":       map[string]interface{}{"query": query, "refId": "StandardVariableQuery"},
+		"refresh":     refresh,
+		"regex":       v.Regex,
 		"skipUrlSync": false,
-		"sort":       sort,
-		"type":       vtype,
+		"sort":        sort,
+		"type":        vtype,
 	}
 
 	if v.AllValue != "" {

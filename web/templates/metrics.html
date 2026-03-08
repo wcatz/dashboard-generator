@@ -2,12 +2,24 @@
 <h1 class="text-xl font-bold mb-1">metric browser</h1>
 <p class="text-sm text-base-content/50 mb-6">browse and search metrics from connected datasources</p>
 
+<div class="alert alert-success mb-4">
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+  <div>
+    <div class="font-bold">⚡ Phase 2: AI Panel Generation Available Here!</div>
+    <div class="text-sm">Click <strong>⚡ lightning icons</strong> next to metrics for instant AI-generated panel YAML. Or select multiple metrics and use <strong>"AI generate section"</strong> for bulk generation.</div>
+  </div>
+</div>
+
 <div class="card bg-base-100 border border-base-content/10 mb-4">
   <div class="card-body p-5">
-    <div class="mb-3">
+    <div class="mb-3 flex gap-4">
       <label class="flex items-center gap-2 cursor-pointer text-sm">
         <input type="checkbox" id="compare-toggle" class="toggle toggle-sm toggle-primary">
         comparison mode
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer text-sm">
+        <input type="checkbox" id="hide-k8s-toggle" class="toggle toggle-sm toggle-accent">
+        hide kubernetes metrics
       </label>
     </div>
 
@@ -65,4 +77,192 @@
   </div>
   {{end}}
 </div>
+
+<!-- AI Suggestion Modal -->
+<dialog id="ai_suggestion_modal" class="modal">
+  <div class="modal-box max-w-4xl">
+    <form method="dialog">
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+    </form>
+    <h3 class="font-bold text-lg mb-3">AI Panel Suggestion</h3>
+    <div id="ai-suggestion-modal-content">
+      <div class="flex items-center justify-center py-8">
+        <div class="loading loading-spinner loading-lg text-primary"></div>
+      </div>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
+
+<script>
+// Hide Kubernetes metrics filter
+const k8sPatterns = [
+  'kube_', 'container_', 'kubelet_', 'apiserver_', 'etcd_', 'coredns_',
+  'scheduler_', 'controller_manager_', 'kube_state_metrics_', 'node_namespace_pod_',
+  'namespace_', 'pod_', 'deployment_', 'daemonset_', 'statefulset_', 'replicaset_',
+  'service_', 'endpoint_', 'ingress_', 'persistentvolume_', 'storageclass_'
+];
+
+function isK8sMetric(metricName) {
+  return k8sPatterns.some(pattern => metricName.startsWith(pattern));
+}
+
+// Apply K8s filter to metrics
+function applyK8sFilter() {
+  const toggle = document.getElementById('hide-k8s-toggle');
+  if (!toggle || !toggle.checked) return;
+  
+  const metrics = document.querySelectorAll('.metric-item');
+  let hiddenCount = 0;
+  
+  metrics.forEach(item => {
+    const metricName = item.dataset.metricName || item.querySelector('.metric-checkbox')?.value || '';
+    if (isK8sMetric(metricName)) {
+      item.style.display = 'none';
+      hiddenCount++;
+    } else {
+      item.style.display = '';
+    }
+  });
+  
+  return hiddenCount;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const toggle = document.getElementById('hide-k8s-toggle');
+  if (!toggle) return;
+  
+  toggle.addEventListener('change', function() {
+    const hiddenCount = applyK8sFilter();
+    
+    // Show toast notification
+    if (toggle.checked && hiddenCount > 0) {
+      showToast(`Hidden ${hiddenCount} Kubernetes metrics`, 'info');
+    }
+  });
+});
+
+// Helper to show toast notifications
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-top toast-end';
+  const alertClass = type === 'info' ? 'alert-info' : 'alert-success';
+  toast.innerHTML = `
+    <div class="alert ${alertClass}">
+      <span>${message}</span>
+    </div>
+  `;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2000);
+}
+
+// Track selected metrics count
+document.addEventListener('htmx:afterSettle', function() {
+  const checkboxes = document.querySelectorAll('.metric-checkbox');
+  const countSpan = document.getElementById('selected-count');
+  const bulkBtn = document.getElementById('bulk-ai-btn');
+  
+  if (checkboxes.length > 0) {
+    checkboxes.forEach(cb => {
+      cb.addEventListener('change', function() {
+        const checked = document.querySelectorAll('.metric-checkbox:checked').length;
+        if (countSpan) countSpan.textContent = checked;
+        if (bulkBtn) bulkBtn.disabled = checked === 0;
+      });
+    });
+  }
+  
+  // Reapply K8s filter after metrics are loaded
+  applyK8sFilter();
+  }
+});
+
+// Single metric AI suggestion
+function suggestSingleMetric(name, type, help) {
+  const modal = document.getElementById('ai_suggestion_modal');
+  const content = document.getElementById('ai-suggestion-modal-content');
+  
+  // Show loading state
+  content.innerHTML = `
+    <div class=\"flex items-center justify-center py-8\">
+      <div class=\"loading loading-spinner loading-lg text-primary\"></div>
+      <span class=\"ml-3 text-sm\">Generating panel suggestion...</span>
+    </div>
+  `;
+  
+  // Open modal
+  modal.showModal();
+  
+  // Fetch AI suggestion via HTMX
+  htmx.ajax('POST', '/api/metrics/ai-suggest', {
+    target: '#ai-suggestion-modal-content',
+    swap: 'innerHTML',
+    values: {
+      metric: name,
+      type: type,
+      help: help
+    }
+  });
+}
+
+// Bulk AI section generation
+function generateBulkAISuggestion() {
+  const checked = document.querySelectorAll('.metric-checkbox:checked');
+  if (checked.length === 0) {
+    alert('Please select at least one metric');
+    return;
+  }
+  
+  const metrics = Array.from(checked).map(cb => ({
+    name: cb.value,
+    type: cb.dataset.type || '',
+    help: cb.dataset.help || ''
+  }));
+  
+  const modal = document.getElementById('ai_suggestion_modal');
+  const content = document.getElementById('ai-suggestion-modal-content');
+  
+  // Show loading state
+  content.innerHTML = `
+    <div class=\"flex items-center justify-center py-8\">
+      <div class=\"loading loading-spinner loading-lg text-primary\"></div>
+      <span class=\"ml-3 text-sm\">Generating dashboard section from ${metrics.length} metrics...</span>
+    </div>
+  `;
+  
+  // Open modal
+  modal.showModal();
+  
+  // Fetch AI suggestion via HTMX
+  htmx.ajax('POST', '/api/metrics/ai-suggest-bulk', {
+    target: '#ai-suggestion-modal-content',
+    swap: 'innerHTML',
+    values: {
+      metrics: JSON.stringify(metrics)
+    }
+  });
+}
+
+// Copy AI-generated YAML to clipboard
+function copyAISuggestion() {
+  const yamlEl = document.getElementById('ai-yaml-output');
+  if (!yamlEl) return;
+  
+  const yaml = yamlEl.textContent;
+  navigator.clipboard.writeText(yaml).then(() => {
+    // Show success toast
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-top toast-end';
+    toast.innerHTML = `
+      <div class=\"alert alert-success\">
+        <span>YAML copied to clipboard!</span>
+      </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+  });
+}
+</script>
 {{end}}

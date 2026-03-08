@@ -97,17 +97,25 @@ type VariableDef struct {
 
 // GeneratorSettings holds global generator config.
 type GeneratorSettings struct {
-	SchemaVersion   int               `yaml:"schema_version"`
-	PluginVersion   string            `yaml:"plugin_version"` // Grafana plugin version (default: 11.2.0)
-	OutputDir       string            `yaml:"output_dir"`
-	Refresh         string            `yaml:"refresh"`
-	TimeRange       map[string]string `yaml:"time_range"`
-	Editable        *bool             `yaml:"editable"`
-	GraphTooltip    int               `yaml:"graph_tooltip"`
-	LiveNow         *bool             `yaml:"live_now"`
-	Timezone        string            `yaml:"timezone"`
-	AnthropicAPIKey string            `yaml:"anthropic_api_key"` // prefer ANTHROPIC_API_KEY env var
-	AnthropicModel  string            `yaml:"anthropic_model"`
+	SchemaVersion   int                `yaml:"schema_version"`
+	PluginVersion   string             `yaml:"plugin_version"` // Grafana plugin version (default: 11.2.0)
+	OutputDir       string             `yaml:"output_dir"`
+	Refresh         string             `yaml:"refresh"`
+	TimeRange       map[string]string  `yaml:"time_range"`
+	Editable        *bool              `yaml:"editable"`
+	GraphTooltip    int                `yaml:"graph_tooltip"`
+	LiveNow         *bool              `yaml:"live_now"`
+	Timezone        string             `yaml:"timezone"`
+	Kubernetes      KubernetesSettings `yaml:"kubernetes"`        // K8s output settings
+	AnthropicAPIKey string             `yaml:"anthropic_api_key"` // prefer ANTHROPIC_API_KEY env var
+	AnthropicModel  string             `yaml:"anthropic_model"`
+}
+
+// KubernetesSettings holds K8s output configuration
+type KubernetesSettings struct {
+	Namespace     string   `yaml:"namespace"`      // default K8s namespace for CRDs
+	GrafanaFolder string   `yaml:"grafana_folder"` // default Grafana folder
+	OutputFormats []string `yaml:"output_formats"` // e.g., ["json", "grafana-yaml"]
 }
 
 // ResolvedAnthropicAPIKey returns the API key, resolving $ENV_VAR references.
@@ -135,10 +143,10 @@ func (g GeneratorSettings) GetPluginVersion() string {
 
 // DiscoveryConfig holds metric discovery settings.
 type DiscoveryConfig struct {
-	Enabled         bool     `yaml:"enabled"`
-	Sources         []string `yaml:"sources"`
-	IncludePatterns []string `yaml:"include_patterns"`
-	ExcludePatterns []string `yaml:"exclude_patterns"`
+	Enabled         bool              `yaml:"enabled"`
+	Sources         []string          `yaml:"sources"`
+	IncludePatterns []string          `yaml:"include_patterns"`
+	ExcludePatterns []string          `yaml:"exclude_patterns"`
 	AutoPanels      map[string]string `yaml:"auto_panels"`
 }
 
@@ -157,29 +165,31 @@ type SectionConfig struct {
 
 // DashboardConfig is a single dashboard definition.
 type DashboardConfig struct {
-	UID         string          `yaml:"uid"`
-	Title       string          `yaml:"title"`
-	Filename    string          `yaml:"filename"`
-	Tags        []string        `yaml:"tags"`
-	Icon        string          `yaml:"icon"`
-	Description string          `yaml:"description"`
-	Variables   []string        `yaml:"variables"`
-	Sections    []SectionConfig `yaml:"sections"`
+	UID           string          `yaml:"uid"`
+	Title         string          `yaml:"title"`
+	Filename      string          `yaml:"filename"`
+	Tags          []string        `yaml:"tags"`
+	Icon          string          `yaml:"icon"`
+	Description   string          `yaml:"description"`
+	Variables     []string        `yaml:"variables"`
+	Sections      []SectionConfig `yaml:"sections"`
+	K8sNamespace  string          `yaml:"k8s_namespace,omitempty"`  // override default namespace
+	GrafanaFolder string          `yaml:"grafana_folder,omitempty"` // override default folder
 }
 
 // Config holds the entire YAML configuration.
 type Config struct {
-	Generator   GeneratorSettings          `yaml:"generator"`
-	Datasources map[string]DatasourceDef   `yaml:"datasources"`
-	Palettes    map[string]map[string]string `yaml:"palettes"`
-	ActivePalette string                   `yaml:"active_palette"`
-	Thresholds  map[string][]ThresholdStep `yaml:"thresholds"`
-	Selectors   map[string]string          `yaml:"selectors"`
-	Variables   map[string]VariableDef     `yaml:"variables"`
-	Constants   map[string]string          `yaml:"constants"`
-	Discovery   DiscoveryConfig            `yaml:"discovery"`
-	Profiles    map[string]ProfileDef      `yaml:"profiles"`
-	Dashboards  map[string]DashboardConfig `yaml:"dashboards"`
+	Generator     GeneratorSettings            `yaml:"generator"`
+	Datasources   map[string]DatasourceDef     `yaml:"datasources"`
+	Palettes      map[string]map[string]string `yaml:"palettes"`
+	ActivePalette string                       `yaml:"active_palette"`
+	Thresholds    map[string][]ThresholdStep   `yaml:"thresholds"`
+	Selectors     map[string]string            `yaml:"selectors"`
+	Variables     map[string]VariableDef       `yaml:"variables"`
+	Constants     map[string]string            `yaml:"constants"`
+	Discovery     DiscoveryConfig              `yaml:"discovery"`
+	Profiles      map[string]ProfileDef        `yaml:"profiles"`
+	Dashboards    map[string]DashboardConfig   `yaml:"dashboards"`
 
 	Warnings []string `yaml:"-"`
 

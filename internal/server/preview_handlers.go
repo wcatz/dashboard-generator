@@ -60,13 +60,13 @@ func (s *Server) handlePreviewAPI(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.renderPartial(w, "preview-result.html", map[string]interface{}{
-			"UID":            "all",
-			"Title":          "all dashboards",
-			"Size":           totalSize,
-			"Panels":         totalPanels,
-			"AllDashboards":  allDashboards,
-			"IsAll":          true,
-			"Errors":         previewErrors,
+			"UID":           "all",
+			"Title":         "all dashboards",
+			"Size":          totalSize,
+			"Panels":        totalPanels,
+			"AllDashboards": allDashboards,
+			"IsAll":         true,
+			"Errors":        previewErrors,
 		})
 		return
 	}
@@ -116,6 +116,7 @@ func (s *Server) buildVariableInfos(cfg *config.Config, varNames []string) []Var
 		}
 		vi := VariableInfo{
 			Name:       name,
+			Label:      vDef.Label,
 			Type:       vDef.Type,
 			Multi:      vDef.Multi,
 			IncludeAll: vDef.IncludeAll,
@@ -130,9 +131,10 @@ func (s *Server) buildVariableInfos(cfg *config.Config, varNames []string) []Var
 		}
 		infos = append(infos, vi)
 	}
-	return infos
-}
 
+	// Enrich with actual values from Prometheus/config
+	return s.enrichVariablesWithValues(infos)
+}
 
 func (s *Server) generatePreview(uid string) (jsonStr string, title string, size int, panels int, panelInfos []PanelInfo, navLinks []NavLink, err error) {
 	cfg := s.Config()

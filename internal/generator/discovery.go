@@ -961,4 +961,3 @@ func sortedKeys[V any](m map[string]V) []string {
 func sortedMetricKeys(m map[string]MetricInfo) []string {
 	return sortedKeys(m)
 }
-

@@ -7,13 +7,13 @@
   <div class="card-body p-5">
     <div class="flex justify-between items-center mb-3">
       <h3 class="card-title text-sm">defined variables</h3>
-      <span class="text-xs text-base-content/50">{{len .Variables}} variables</span>
+      <span class="text-xs text-base-content/50" id="var-count">{{len .Variables}} variables</span>
     </div>
 
     {{if .Variables}}
     <div class="space-y-2" id="variables-list">
       {{range .Variables}}
-      <div class="flex items-center justify-between p-3 bg-base-200 border border-base-content/10 rounded-lg hover:border-base-content/20 transition-colors gap-3">
+      <div class="flex items-center justify-between p-3 bg-base-200 border border-base-content/10 rounded-lg hover:border-base-content/20 transition-colors gap-3" id="var-{{.Name}}">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-mono font-semibold text-sm">${{.Name}}</span>
@@ -31,10 +31,9 @@
         <button class="btn btn-ghost btn-xs text-error"
                 hx-post="/api/variable/delete"
                 hx-vals='{"name": "{{.Name}}"}'
-                hx-target="#var-add-result"
-                hx-swap="innerHTML"
-                hx-confirm="delete variable '{{.Name}}'?"
-                hx-on::after-request="setTimeout(function(){location.reload()}, 500)">
+                hx-target="#var-{{.Name}}"
+                hx-swap="outerHTML"
+                hx-confirm="delete variable '{{.Name}}'?">
           delete
         </button>
       </div>

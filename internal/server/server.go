@@ -11,7 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
+	"time"
 	"github.com/wcatz/dashboard-generator/internal/config"
 )
 
@@ -22,16 +22,16 @@ var funcMap = template.FuncMap{
 
 // Server holds the HTTP server state and config.
 type Server struct {
-	cfg        *config.Config
-	cfgPath    string
-	grafanaURL string
-	mu         sync.RWMutex
-	webFS      fs.FS
-	partials   *template.Template
-	staticFS   http.FileSystem
-	mux        *http.ServeMux
+	cfg           *config.Config
+	cfgPath       string
+	grafanaURL    string
+	mu            sync.RWMutex
+	webFS         fs.FS
+	partials      *template.Template
+	staticFS      http.FileSystem
+	mux           *http.ServeMux
+	variableCache *VariableCache
 }
-
 // New creates a new Server with the given embedded filesystem, config path, and optional Grafana URL.
 func New(webFS fs.FS, cfgPath string, grafanaURL string) (*Server, error) {
 	cfg, err := config.Load(cfgPath, nil)
@@ -40,13 +40,13 @@ func New(webFS fs.FS, cfgPath string, grafanaURL string) (*Server, error) {
 	}
 
 	s := &Server{
-		cfg:        cfg,
-		cfgPath:    cfgPath,
-		grafanaURL: grafanaURL,
-		webFS:      webFS,
-		mux:        http.NewServeMux(),
+		cfg:           cfg,
+		cfgPath:       cfgPath,
+		grafanaURL:    grafanaURL,
+		webFS:         webFS,
+		mux:           http.NewServeMux(),
+		variableCache: NewVariableCache(5 * time.Minute),
 	}
-
 	if err := s.loadTemplates(); err != nil {
 		return nil, fmt.Errorf("loading templates: %w", err)
 	}

@@ -184,10 +184,13 @@ func TestBuildVariable(t *testing.T) {
 		t.Error("interval variable should not have datasource")
 	}
 
-	// Test missing variable
-	_, err = builder.BuildVariable("nonexistent")
-	if err == nil {
-		t.Error("expected error for nonexistent variable")
+	// Test missing variable — current behavior: creates placeholder, does not error
+	result, err := builder.BuildVariable("nonexistent")
+	if err != nil {
+		t.Errorf("expected no error for nonexistent variable (creates placeholder), got: %v", err)
+	}
+	if result == nil {
+		t.Error("expected placeholder variable to be returned for nonexistent variable")
 	}
 }
 

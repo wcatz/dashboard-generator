@@ -212,8 +212,12 @@ func (s *Server) handleVariableDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.renderPartial(w, "variable-result.html", map[string]interface{}{
-		"Success": fmt.Sprintf("variable '%s' deleted", name),
-		"Name":    name,
-	})
+	// Get updated count
+	cfg := s.Config()
+	count := len(cfg.Variables)
+	
+	// Return empty main swap (deletes the element) + OOB swap for count
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `<span class="text-xs text-base-content/50" id="var-count" hx-swap-oob="true">%d variables</span>`, count)
 }
