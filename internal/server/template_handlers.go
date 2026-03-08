@@ -2,9 +2,12 @@ package server
 
 import (
 	"fmt"
+	"html"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // handleTemplatesPage renders the config templates page
@@ -70,6 +73,13 @@ func (s *Server) handleTemplateCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "output path required", http.StatusBadRequest)
 		return
 	}
+
+	// Reject path traversal attempts
+	clean := filepath.Clean(outputPath)
+	if strings.Contains(clean, "..") {
+		http.Error(w, "invalid output path", http.StatusBadRequest)
+		return
+	}
 	
 	// Get template
 	template, err := GetTemplateByName(templateName)
@@ -85,7 +95,7 @@ func (s *Server) handleTemplateCreate(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `<div class="alert alert-warning">
 			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
 			<span>File already exists: %s. Use overwrite option to replace.</span>
-		</div>`, outputPath)
+		</div>`, html.EscapeString(outputPath))
 		return
 	}
 	
@@ -114,7 +124,7 @@ func (s *Server) handleTemplateCreate(w http.ResponseWriter, r *http.Request) {
 				<button onclick="location.reload()" class="btn btn-sm btn-ghost">Create Another</button>
 			</div>
 		</div>
-	</div>`, outputPath, outputPath)
+	</div>`, html.EscapeString(outputPath), url.QueryEscape(outputPath))
 }
 
 // handleTemplateLoad loads a template as the active config

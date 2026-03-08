@@ -72,7 +72,7 @@
                 <select class="select select-bordered select-sm w-40 font-mono text-xs bg-base-200 hover:bg-base-300 focus:bg-base-100"
                         data-variable="{{.Name}}"
                         {{if .Multi}}multiple size="3"{{end}}>
-                  {{if and (not .Multi) .IncludeAll}}
+                  {{if .IncludeAll}}
                   <option value="$__all" selected>All</option>
                   {{end}}
                   {{if .SampleValues}}

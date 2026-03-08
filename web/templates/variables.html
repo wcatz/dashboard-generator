@@ -13,7 +13,8 @@
     {{if .Variables}}
     <div class="space-y-2" id="variables-list">
       {{range .Variables}}
-      <div class="flex items-center justify-between p-3 bg-base-200 border border-base-content/10 rounded-lg hover:border-base-content/20 transition-colors gap-3" id="var-{{.Name}}">
+      <div id="var-{{.Name}}">
+      <div class="flex items-center justify-between p-3 bg-base-200 border border-base-content/10 rounded-lg hover:border-base-content/20 transition-colors gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-mono font-semibold text-sm">${{.Name}}</span>
@@ -42,6 +43,7 @@
         {{range .ChainsFrom}}<span>{{.}}</span> <span class="opacity-40">&rarr;</span> {{end}}<span class="text-accent">{{.Name}}</span>
       </div>
       {{end}}
+      </div>
       {{end}}
     </div>
     {{else}}

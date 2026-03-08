@@ -124,6 +124,7 @@ func (s *Server) buildVariableInfos(cfg *config.Config, varNames []string) []Var
 		switch vDef.Type {
 		case "query":
 			vi.Query = vDef.Query
+			vi.Datasource = vDef.Datasource
 		case "custom", "interval":
 			vi.Values = vDef.Values
 		case "datasource":

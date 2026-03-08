@@ -366,28 +366,29 @@ func (s *Server) fetchQueryVariableValues(vi *VariableInfo, cfg *config.Config) 
 		return []string{}
 	}
 
-	// Find the default datasource name
-	dsName := s.getDefaultDatasourceName(cfg)
+	// Prefer the variable's own datasource; fall back to the default
+	dsName := vi.Datasource
+	if dsName == "" {
+		dsName = s.getDefaultDatasourceName(cfg)
+	}
+	// Validate the chosen datasource exists; fall back to default if not
+	if _, ok := cfg.Datasources[dsName]; !ok {
+		dsName = s.getDefaultDatasourceName(cfg)
+	}
 	if dsName == "" {
 		return []string{}
 	}
 
-	// Build cache key
 	cacheKey := fmt.Sprintf("%s:query:%s", dsName, vi.Query)
-
-	// Check cache first
 	if cached, ok := s.variableCache.Get(cacheKey); ok {
 		return cached
 	}
 
-	// Parse query to extract label name
-	// Supports: "label_values(label)" or "label_values(metric, label)"
 	label := extractLabelFromQuery(vi.Query)
 	if label == "" {
 		return []string{}
 	}
 
-	// Fetch from Prometheus
 	discovery := generator.NewMetricDiscovery(cfg)
 	values, err := discovery.FetchLabelValues(dsName, label)
 	if err != nil {
@@ -395,7 +396,6 @@ func (s *Server) fetchQueryVariableValues(vi *VariableInfo, cfg *config.Config) 
 		return []string{}
 	}
 
-	// Cache the result
 	s.variableCache.Set(cacheKey, values)
 	return values
 }
@@ -425,24 +425,40 @@ func (s *Server) getDefaultDatasourceName(cfg *config.Config) string {
 //	"query_result(up)" -> ""
 func extractLabelFromQuery(query string) string {
 	query = strings.TrimSpace(query)
+	if !strings.HasPrefix(query, "label_values(") || !strings.HasSuffix(query, ")") {
+		return ""
+	}
+	inner := query[len("label_values(") : len(query)-1]
 
-	// Match label_values(label) or label_values(metric, label)
-	if strings.HasPrefix(query, "label_values(") && strings.HasSuffix(query, ")") {
-		inner := strings.TrimPrefix(query, "label_values(")
-		inner = strings.TrimSuffix(inner, ")")
-
-		// Split by comma to handle both forms
-		parts := strings.Split(inner, ",")
-		if len(parts) == 1 {
-			// label_values(label)
-			return strings.TrimSpace(parts[0])
-		} else if len(parts) == 2 {
-			// label_values(metric, label)
-			return strings.TrimSpace(parts[1])
+	// Find the last top-level comma (not inside braces or quotes)
+	depth := 0
+	inQuote := false
+	lastComma := -1
+	for i, ch := range inner {
+		switch ch {
+		case '"', '\'':
+			inQuote = !inQuote
+		case '{':
+			if !inQuote {
+				depth++
+			}
+		case '}':
+			if !inQuote {
+				depth--
+			}
+		case ',':
+			if !inQuote && depth == 0 {
+				lastComma = i
+			}
 		}
 	}
 
-	return ""
+	if lastComma == -1 {
+		// label_values(label)
+		return strings.TrimSpace(inner)
+	}
+	// label_values(metric{...}, label)
+	return strings.TrimSpace(inner[lastComma+1:])
 }
 
 // parseCustomValues splits comma-separated values.

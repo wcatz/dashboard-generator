@@ -93,6 +93,7 @@ func (s *Server) ReloadConfig() error {
 	s.mu.Lock()
 	s.cfg = cfg
 	s.mu.Unlock()
+	s.variableCache.Clear() // invalidate stale variable values after config change
 	return nil
 }
 

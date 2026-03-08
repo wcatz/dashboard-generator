@@ -27,7 +27,10 @@ fi
 
 # Load environment variables
 echo "Loading environment variables from .env..."
-export $(grep -v '^#' .env | grep -v '^$' | xargs)
+set -a
+# shellcheck disable=SC1091
+. .env
+set +a
 
 # Check for required binary
 if [ ! -f ./dashboard-generator ]; then

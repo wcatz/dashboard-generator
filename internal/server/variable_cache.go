@@ -38,7 +38,10 @@ func (vc *VariableCache) Get(key string) ([]string, bool) {
 	if !ok || time.Now().After(entry.ExpiresAt) {
 		return nil, false
 	}
-	return entry.Values, true
+	// Return a copy to prevent callers from mutating cached data
+	result := make([]string, len(entry.Values))
+	copy(result, entry.Values)
+	return result, true
 }
 
 // Set stores values in the cache with the configured TTL.
@@ -46,8 +49,11 @@ func (vc *VariableCache) Set(key string, values []string) {
 	vc.mu.Lock()
 	defer vc.mu.Unlock()
 	
+	// Store a copy to prevent external mutations from affecting cached data
+	stored := make([]string, len(values))
+	copy(stored, values)
 	vc.cache[key] = VariableCacheEntry{
-		Values:    values,
+		Values:    stored,
 		ExpiresAt: time.Now().Add(vc.ttl),
 	}
 }

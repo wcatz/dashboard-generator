@@ -60,7 +60,7 @@
   <div class="mt-3 flex justify-end gap-2">
     <button 
       class="btn btn-sm btn-ghost"
-      onclick="navigator.clipboard.writeText(this.previousElementSibling.querySelector('code').textContent); this.textContent='✓ copied'; setTimeout(() => this.textContent='copy yaml', 1000)">
+      onclick="(function(btn){ var code = btn.parentElement.previousElementSibling.querySelector('code'); if(!code) return; navigator.clipboard.writeText(code.textContent).then(function(){ btn.textContent='✓ copied'; setTimeout(function(){ btn.textContent='copy yaml'; }, 1000); }); })(this)">
       copy yaml
     </button>
   </div>

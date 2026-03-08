@@ -54,6 +54,7 @@ type VariableInfo struct {
 	SampleValues []string // Actual values for dropdowns
 	Multi        bool
 	IncludeAll   bool
+	Datasource   string // datasource name for query variables
 }
 // PreviewDashboard holds a single dashboard's preview data for multi-dashboard rendering.
 type PreviewDashboard struct {

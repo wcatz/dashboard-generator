@@ -112,21 +112,21 @@ function isK8sMetric(metricName) {
 // Apply K8s filter to metrics
 function applyK8sFilter() {
   const toggle = document.getElementById('hide-k8s-toggle');
-  if (!toggle || !toggle.checked) return;
-  
+  if (!toggle) return;
+
   const metrics = document.querySelectorAll('.metric-item');
   let hiddenCount = 0;
-  
+
   metrics.forEach(item => {
     const metricName = item.dataset.metricName || item.querySelector('.metric-checkbox')?.value || '';
-    if (isK8sMetric(metricName)) {
+    if (toggle.checked && isK8sMetric(metricName)) {
       item.style.display = 'none';
       hiddenCount++;
     } else {
       item.style.display = '';
     }
   });
-  
+
   return hiddenCount;
 }
 
@@ -176,7 +176,6 @@ document.addEventListener('htmx:afterSettle', function() {
   
   // Reapply K8s filter after metrics are loaded
   applyK8sFilter();
-  }
 });
 
 // Single metric AI suggestion
