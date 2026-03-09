@@ -77,12 +77,12 @@ func (s *Server) handleVariables(w http.ResponseWriter, r *http.Request) {
 	sort.Strings(dsNames)
 
 	s.renderPage(w, "variables.html", map[string]interface{}{
-		"Title":          "variables",
-		"Active":         "variables",
-		"ConfigPath":     s.ConfigPath(),
-		"GrafanaURL":     s.GrafanaURL(),
-		"Variables":      vars,
-		"UsedBy":         usedBy,
+		"Title":           "variables",
+		"Active":          "variables",
+		"ConfigPath":      s.ConfigPath(),
+		"GrafanaURL":      s.GrafanaURL(),
+		"Variables":       vars,
+		"UsedBy":          usedBy,
 		"DatasourceNames": dsNames,
 	})
 }
@@ -185,6 +185,100 @@ func (s *Server) handleVariableAdd(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleBulkVariableAdd adds multiple variables in one request with per-variable feedback.
+func (s *Server) handleBulkVariableAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
+
+	// Parse parallel arrays from form data
+	names := r.Form["name"]
+	queries := r.Form["query"]
+	datasources := r.Form["datasource"]
+	multis := r.Form["multi"]
+	includeAlls := r.Form["include_all"]
+
+	if len(names) == 0 {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<div class="text-error text-sm">no variables provided</div>`)
+		return
+	}
+
+	type result struct {
+		Name    string
+		Success bool
+		Error   string
+	}
+
+	nameRegex := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+	editor := config.NewYAMLEditor(s.ConfigPath())
+	var results []result
+	anySuccess := false
+
+	for i, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			results = append(results, result{Name: "(empty)", Error: "name required"})
+			continue
+		}
+		if !nameRegex.MatchString(name) {
+			results = append(results, result{Name: name, Error: "invalid name"})
+			continue
+		}
+
+		query := ""
+		if i < len(queries) {
+			query = queries[i]
+		}
+		ds := ""
+		if i < len(datasources) {
+			ds = datasources[i]
+		}
+		multi := false
+		if i < len(multis) {
+			multi = multis[i] == "true"
+		}
+		includeAll := false
+		if i < len(includeAlls) {
+			includeAll = includeAlls[i] == "true"
+		}
+
+		v := config.VariableDef{
+			Type:       "query",
+			Datasource: ds,
+			Query:      query,
+			Multi:      multi,
+			IncludeAll: includeAll,
+			Refresh:    2,
+			Sort:       1,
+		}
+
+		if err := editor.AddVariable(name, v); err != nil {
+			results = append(results, result{Name: name, Error: err.Error()})
+		} else {
+			results = append(results, result{Name: name, Success: true})
+			anySuccess = true
+		}
+	}
+
+	if anySuccess {
+		if err := s.ReloadConfig(); err != nil {
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprintf(w, `<div class="text-warning text-sm">variables saved but reload failed: %s</div>`, err.Error())
+			return
+		}
+	}
+
+	s.renderPartial(w, "bulk-variable-result.html", map[string]interface{}{
+		"Results": results,
+	})
+}
+
 // handleVariableDelete removes a variable from the config.
 func (s *Server) handleVariableDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -215,7 +309,7 @@ func (s *Server) handleVariableDelete(w http.ResponseWriter, r *http.Request) {
 	// Get updated count
 	cfg := s.Config()
 	count := len(cfg.Variables)
-	
+
 	// Return empty main swap (deletes the element) + OOB swap for count
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)

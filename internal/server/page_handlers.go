@@ -117,12 +117,14 @@ func (s *Server) handleEditor(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		content = fmt.Sprintf("# error reading config: %v", err)
 	}
+	cfg := s.Config()
 	s.renderPage(w, "editor.html", map[string]interface{}{
 		"Title":      "editor",
 		"Active":     "editor",
 		"ConfigPath": s.ConfigPath(),
 		"GrafanaURL": s.GrafanaURL(),
 		"Content":    content,
+		"Warnings":   cfg.Warnings,
 	})
 }
 

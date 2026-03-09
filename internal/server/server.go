@@ -3,16 +3,16 @@ package server
 import (
 	"bytes"
 	"fmt"
+	"github.com/wcatz/dashboard-generator/internal/config"
 	"html/template"
 	"io/fs"
 	"log"
-	"strings"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
-	"github.com/wcatz/dashboard-generator/internal/config"
 )
 
 var funcMap = template.FuncMap{
@@ -32,6 +32,7 @@ type Server struct {
 	mux           *http.ServeMux
 	variableCache *VariableCache
 }
+
 // New creates a new Server with the given embedded filesystem, config path, and optional Grafana URL.
 func New(webFS fs.FS, cfgPath string, grafanaURL string) (*Server, error) {
 	cfg, err := config.Load(cfgPath, nil)
@@ -82,6 +83,47 @@ func (s *Server) pageTemplate(page string) (*template.Template, error) {
 		"templates/layout.html",
 		"templates/"+page,
 	)
+}
+
+// BackupConfig creates a timestamped backup of the current config file.
+// Keeps the last 5 backups and deletes older ones.
+// Returns the backup file path on success.
+func (s *Server) BackupConfig() (string, error) {
+	data, err := os.ReadFile(s.cfgPath)
+	if err != nil {
+		return "", fmt.Errorf("reading config for backup: %w", err)
+	}
+
+	bakPath := fmt.Sprintf("%s.%s.bak", s.cfgPath, time.Now().Format("20060102-150405"))
+	if err := os.WriteFile(bakPath, data, 0640); err != nil {
+		return "", fmt.Errorf("writing backup: %w", err)
+	}
+
+	// Clean old backups, keep last 5
+	s.pruneBackups(5)
+
+	return bakPath, nil
+}
+
+// ListBackups returns available backup file paths, newest first.
+func (s *Server) ListBackups() []string {
+	pattern := s.cfgPath + ".*.bak"
+	matches, _ := filepath.Glob(pattern)
+	// Sort descending (newest first) — glob returns sorted ascending, so reverse
+	for i, j := 0, len(matches)-1; i < j; i, j = i+1, j-1 {
+		matches[i], matches[j] = matches[j], matches[i]
+	}
+	return matches
+}
+
+func (s *Server) pruneBackups(keep int) {
+	backups := s.ListBackups()
+	if len(backups) <= keep {
+		return
+	}
+	for _, old := range backups[keep:] {
+		os.Remove(old)
+	}
 }
 
 // ReloadConfig reloads the YAML config from disk.

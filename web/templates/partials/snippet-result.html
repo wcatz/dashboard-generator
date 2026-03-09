@@ -13,7 +13,36 @@
       {{range .Hints}}<div>{{.}}</div>{{end}}
     </div>
     {{end}}
+    {{if .Dashboards}}
+    <div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-content/10">
+      <select id="snippet-insert-dashboard" class="select select-bordered select-xs">
+        <option value="">insert into...</option>
+        {{range .Dashboards}}<option value="{{.}}">{{.}}</option>{{end}}
+      </select>
+      <button class="btn btn-xs btn-success gap-1" onclick="insertSnippet()">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+        Insert
+      </button>
+      <span id="snippet-insert-status" class="text-xs"></span>
+      <span class="flex-1"></span>
+      <span class="text-xs text-base-content/40">or paste into <a href="/editor" class="link link-primary">config editor</a></span>
+    </div>
+    <script>
+    function insertSnippet() {
+      var db = document.getElementById('snippet-insert-dashboard');
+      if (!db || !db.value) { showToast('select a dashboard first', 'warning'); return; }
+      var yaml = document.getElementById('yaml-snippet');
+      if (!yaml) return;
+      htmx.ajax('POST', '/api/config/insert-section', {
+        target: '#snippet-insert-status',
+        swap: 'innerHTML',
+        values: { dashboard: db.value, yaml_snippet: yaml.textContent }
+      });
+    }
+    </script>
+    {{else}}
     <p class="text-xs text-base-content/40 mt-2">paste into a dashboard sections array in the <a href="/editor" class="link link-primary">config editor</a></p>
+    {{end}}
   </div>
 </div>
 {{end}}

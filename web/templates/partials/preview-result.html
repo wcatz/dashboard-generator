@@ -308,6 +308,9 @@
         <div role="tablist" class="tabs tabs-bordered mb-4">
           <button role="tab" class="tab tab-active preview-tab-btn" data-tab="visual" onclick="togglePreviewTab('visual')">visual</button>
           <button role="tab" class="tab preview-tab-btn" data-tab="json" onclick="togglePreviewTab('json')">JSON</button>
+          {{if .GrafanaURL}}
+          <button role="tab" class="tab preview-tab-btn" data-tab="live" onclick="togglePreviewTab('live')">live</button>
+          {{end}}
         </div>
 
         {{if .Variables}}
@@ -408,6 +411,27 @@
           </div>
           <pre class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[600px]"><code id="json-output" class="language-json hljs-auto">{{.JSON}}</code></pre>
         </div>
+
+        {{if .GrafanaURL}}
+        <div class="preview-tab-content" data-tab="live" style="display:none">
+          <div class="flex items-center gap-2 mb-3">
+            <button class="btn btn-sm btn-primary"
+                    hx-post="/api/preview/live?uid={{.UID}}"
+                    hx-target="#live-preview-content"
+                    hx-swap="innerHTML"
+                    hx-indicator="#live-spinner">
+              push preview to Grafana <span id="live-spinner" class="htmx-indicator"><span class="loading loading-spinner loading-xs"></span></span>
+            </button>
+            <span class="text-xs text-base-content/50">pushes a temporary <code>{{.UID}}-preview</code> dashboard</span>
+          </div>
+          <div id="live-preview-content">
+            <div class="text-center py-12 text-base-content/50">
+              <p>click "push preview to Grafana" to see the live dashboard</p>
+              <p class="text-xs mt-1">requires a running Grafana instance at {{.GrafanaURL}}</p>
+            </div>
+          </div>
+        </div>
+        {{end}}
       </div>
     </div>
   </div>
