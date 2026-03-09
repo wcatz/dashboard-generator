@@ -19,6 +19,10 @@ generator:
     from: "now-30m"
     to: "now"
   editable: true
+  # Live preview requires a Grafana instance with:
+  #   grafana_url: "http://your-grafana:3000"  # or use --grafana-url flag / GRAFANA_URL env
+  #   grafana_token: "$GRAFANA_TOKEN"           # or use --grafana-token flag / GRAFANA_TOKEN env
+  # Grafana must have: security.allow_embedding=true, auth.anonymous.enabled=true (org_role: Viewer)
   graph_tooltip: 1 # 0=default, 1=shared crosshair, 2=shared tooltip
   live_now: true
   timezone: ""
