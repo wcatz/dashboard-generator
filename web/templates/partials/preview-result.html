@@ -310,6 +310,8 @@
           <button role="tab" class="tab preview-tab-btn" data-tab="json" onclick="togglePreviewTab('json')">JSON</button>
           {{if .GrafanaURL}}
           <button role="tab" class="tab preview-tab-btn" data-tab="live" onclick="togglePreviewTab('live')">live</button>
+          {{else}}
+          <span class="tab text-base-content/30 cursor-not-allowed tooltip tooltip-bottom" data-tip="set generator.grafana_url or --grafana-url to enable">live</span>
           {{end}}
         </div>
 

@@ -124,7 +124,7 @@ func newTestServer(t *testing.T) (*Server, string) {
 		t.Fatalf("creating web FS: %v", err)
 	}
 
-	srv, err := New(webFS, cfgPath, "")
+	srv, err := New(webFS, cfgPath, "", "")
 	if err != nil {
 		t.Fatalf("creating test server: %v", err)
 	}

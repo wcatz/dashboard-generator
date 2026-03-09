@@ -25,6 +25,7 @@ type Server struct {
 	cfg           *config.Config
 	cfgPath       string
 	grafanaURL    string
+	grafanaToken  string
 	mu            sync.RWMutex
 	webFS         fs.FS
 	partials      *template.Template
@@ -33,8 +34,8 @@ type Server struct {
 	variableCache *VariableCache
 }
 
-// New creates a new Server with the given embedded filesystem, config path, and optional Grafana URL.
-func New(webFS fs.FS, cfgPath string, grafanaURL string) (*Server, error) {
+// New creates a new Server with the given embedded filesystem, config path, and optional Grafana URL/token.
+func New(webFS fs.FS, cfgPath string, grafanaURL string, grafanaToken string) (*Server, error) {
 	cfg, err := config.Load(cfgPath, nil)
 	if err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
@@ -44,6 +45,7 @@ func New(webFS fs.FS, cfgPath string, grafanaURL string) (*Server, error) {
 		cfg:           cfg,
 		cfgPath:       cfgPath,
 		grafanaURL:    grafanaURL,
+		grafanaToken:  grafanaToken,
 		webFS:         webFS,
 		mux:           http.NewServeMux(),
 		variableCache: NewVariableCache(5 * time.Minute),
@@ -151,6 +153,11 @@ func (s *Server) GrafanaURL() string {
 	return s.grafanaURL
 }
 
+// GrafanaToken returns the configured Grafana API token (empty if not set).
+func (s *Server) GrafanaToken() string {
+	return s.grafanaToken
+}
+
 // ConfigPath returns the absolute path to the config file.
 func (s *Server) ConfigPath() string {
 	abs, err := filepath.Abs(s.cfgPath)
@@ -179,7 +186,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-	w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net")
+	csp := "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net"
+	if s.grafanaURL != "" {
+		csp += "; frame-src " + s.grafanaURL
+	}
+	w.Header().Set("Content-Security-Policy", csp)
 
 	// CSRF protection: reject state-changing requests from foreign origins
 	if r.Method == http.MethodPost {

@@ -267,7 +267,7 @@ func (s *Server) handleLivePreview(w http.ResponseWriter, r *http.Request) {
 	dashboard["uid"] = previewUID
 
 	// Push to Grafana
-	if err := generator.PushToGrafana(dashboard, grafanaURL, "", "", ""); err != nil {
+	if err := generator.PushToGrafana(dashboard, grafanaURL, "", "", s.GrafanaToken()); err != nil {
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprintf(w, `<div class="alert alert-error text-sm">push failed: %s</div>`, err.Error())
 		return

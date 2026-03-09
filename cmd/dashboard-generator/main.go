@@ -98,6 +98,7 @@ func main() {
 	serveCmd.Flags().StringVar(&cfgFile, "config", "", "path to YAML config file (required)")
 	serveCmd.Flags().IntVar(&servePort, "port", 8080, "HTTP server port")
 	serveCmd.Flags().StringVar(&grafanaURL, "grafana-url", "", "Grafana URL for push (or set GRAFANA_URL env)")
+	serveCmd.Flags().StringVar(&grafanaToken, "grafana-token", "", "Grafana API token (or set GRAFANA_TOKEN env)")
 	_ = serveCmd.MarkFlagRequired("config")
 
 	rootCmd.AddCommand(genCmd, discoverCmd, pushCmd, serveCmd)
@@ -177,7 +178,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 	if gURL == "" {
 		gURL = os.Getenv("GRAFANA_URL")
 	}
-	srv, err := server.New(web.EmbeddedFS, cfgFile, gURL)
+	gToken := grafanaToken
+	if gToken == "" {
+		gToken = os.Getenv("GRAFANA_TOKEN")
+	}
+	srv, err := server.New(web.EmbeddedFS, cfgFile, gURL, gToken)
 	if err != nil {
 		return err
 	}
