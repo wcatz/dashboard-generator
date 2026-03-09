@@ -8,6 +8,10 @@ import (
 
 func (s *Server) handlePalettes(w http.ResponseWriter, r *http.Request) {
 	cfg := s.Config()
+	resolvedThresholds := make(map[string][]config.ThresholdStep)
+	for name := range cfg.Thresholds {
+		resolvedThresholds[name] = cfg.GetThresholds(name)
+	}
 	s.renderPage(w, "palettes.html", map[string]interface{}{
 		"Title":         "palettes",
 		"Active":        "palettes",
@@ -15,7 +19,7 @@ func (s *Server) handlePalettes(w http.ResponseWriter, r *http.Request) {
 		"GrafanaURL":    s.GrafanaURL(),
 		"Palettes":      cfg.Palettes,
 		"ActivePalette": cfg.ActivePalette,
-		"Thresholds":    cfg.Thresholds,
+		"Thresholds":    resolvedThresholds,
 	})
 }
 
@@ -166,9 +170,13 @@ func (s *Server) handlePaletteActivate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) renderPaletteCards(w http.ResponseWriter) {
 	cfg := s.Config()
+	resolvedThresholds := make(map[string][]config.ThresholdStep)
+	for name := range cfg.Thresholds {
+		resolvedThresholds[name] = cfg.GetThresholds(name)
+	}
 	s.renderPartial(w, "palette-result.html", map[string]interface{}{
 		"Palettes":      cfg.Palettes,
 		"ActivePalette": cfg.ActivePalette,
-		"Thresholds":    cfg.Thresholds,
+		"Thresholds":    resolvedThresholds,
 	})
 }

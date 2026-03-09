@@ -1175,3 +1175,75 @@ func TestGetDefaultDatasourceEmpty(t *testing.T) {
 		t.Errorf("expected fallback {prometheus, prometheus}, got {%s, %s}", ds.Type, ds.UID)
 	}
 }
+
+
+// TestTimeRangeMap verifies scalar shorthand, map form, null, and invalid YAML.
+func TestTimeRangeMap(t *testing.T) {
+	tmpl := func(tr string) string {
+		return "generator:\n  time_range: " + tr + "\n"
+	}
+	tmplBlock := func(block string) string {
+		return "generator:\n  time_range:\n" + block + "\n"
+	}
+
+	t.Run("scalar 1h", func(t *testing.T) {
+		cfg, err := LoadFromBytes([]byte(tmpl("1h")))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		tr := cfg.GetGenerator().TimeRange
+		if tr["from"] != "now-1h" || tr["to"] != "now" {
+			t.Errorf("scalar 1h: got %v, want {from:now-1h to:now}", tr)
+		}
+	})
+
+	t.Run("scalar 6h", func(t *testing.T) {
+		cfg, err := LoadFromBytes([]byte(tmpl("6h")))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		tr := cfg.GetGenerator().TimeRange
+		if tr["from"] != "now-6h" || tr["to"] != "now" {
+			t.Errorf("scalar 6h: got %v, want {from:now-6h to:now}", tr)
+		}
+	})
+
+	t.Run("map form", func(t *testing.T) {
+		yaml := tmplBlock("    from: \"now-3h\"\n    to: \"now\"")
+		cfg, err := LoadFromBytes([]byte(yaml))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		tr := cfg.GetGenerator().TimeRange
+		if tr["from"] != "now-3h" || tr["to"] != "now" {
+			t.Errorf("map form: got %v, want {from:now-3h to:now}", tr)
+		}
+	})
+
+	t.Run("null value", func(t *testing.T) {
+		cfg, err := LoadFromBytes([]byte("generator:\n  time_range: ~\n"))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.GetGenerator().TimeRange != nil {
+			t.Errorf("null: expected nil TimeRange, got %v", cfg.GetGenerator().TimeRange)
+		}
+	})
+
+	t.Run("empty string", func(t *testing.T) {
+		cfg, err := LoadFromBytes([]byte(tmpl("\"\"")))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if cfg.GetGenerator().TimeRange != nil {
+			t.Errorf("empty string: expected nil TimeRange, got %v", cfg.GetGenerator().TimeRange)
+		}
+	})
+
+	t.Run("invalid kind (sequence)", func(t *testing.T) {
+		_, err := LoadFromBytes([]byte("generator:\n  time_range:\n    - foo\n"))
+		if err == nil {
+			t.Error("expected error for sequence time_range, got nil")
+		}
+	})
+}

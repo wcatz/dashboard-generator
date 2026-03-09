@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/wcatz/dashboard-generator/internal/config"
 )
 
 // handleTemplatesPage renders the config templates page
@@ -21,6 +23,8 @@ func (s *Server) handleTemplatesPage(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	data := map[string]interface{}{
+		"Title":      "templates",
+		"Active":     "templates",
 		"Templates":  templates,
 		"Categories": categories,
 		"ConfigPath": s.ConfigPath(),
@@ -147,6 +151,18 @@ func (s *Server) handleTemplateLoad(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	// Write to current config path
+	// Validate the template can be parsed BEFORE writing to disk,
+	// to avoid corrupting the active config file on a bad template.
+	if _, err := config.LoadFromBytes([]byte(template.Content)); err != nil {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w,
+			`<div class="alert alert-error"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>template validation failed: %s</span></div>`,
+			html.EscapeString(err.Error()),
+		)
+		return
+	}
+
 	if err := os.WriteFile(s.ConfigPath(), []byte(template.Content), 0644); err != nil {
 		http.Error(w, fmt.Sprintf("failed to write config: %v", err), http.StatusInternalServerError)
 		return

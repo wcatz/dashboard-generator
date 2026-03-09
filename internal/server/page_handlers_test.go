@@ -63,6 +63,11 @@ func TestPageHandlers(t *testing.T) {
 			route:    "/settings",
 			contains: []string{"settings", "30s"},
 		},
+		{
+			name:     "templates",
+			route:    "/templates",
+			contains: []string{"templates", "Minimal"},
+		},
 	}
 
 	for _, tt := range tests {

@@ -2,13 +2,15 @@
 <h1 class="text-xl font-bold mb-1">metric browser</h1>
 <p class="text-sm text-base-content/50 mb-6">browse and search metrics from connected datasources</p>
 
-<div class="alert alert-success mb-4">
+{{if .AIEnabled}}
+<div class="alert alert-info mb-4">
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
   <div>
-    <div class="font-bold">⚡ Phase 2: AI Panel Generation Available Here!</div>
-    <div class="text-sm">Click <strong>⚡ lightning icons</strong> next to metrics for instant AI-generated panel YAML. Or select multiple metrics and use <strong>"AI generate section"</strong> for bulk generation.</div>
+    <div class="font-bold">AI panel generation enabled</div>
+    <div class="text-sm">browse metrics below, then click the <strong>&#9889; yellow bolt</strong> next to any result for an AI-generated panel YAML. select multiple and use <strong>AI generate section</strong> for a full dashboard section.</div>
   </div>
 </div>
+{{end}}
 
 <div class="card bg-base-100 border border-base-content/10 mb-4">
   <div class="card-body p-5">
@@ -69,6 +71,7 @@
   {{if .HasDatasources}}
   <div class="text-center py-12 text-base-content/50">
     <p>select a datasource and click browse</p>
+    {{if .AIEnabled}}<p class="text-xs mt-2 text-warning/70">&#9889; AI suggestions will appear next to each metric after browsing</p>{{end}}
   </div>
   {{else}}
   <div class="text-center py-12 text-base-content/50">

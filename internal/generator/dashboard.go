@@ -292,7 +292,7 @@ func (db *DashboardBuilder) Build(dbCfg config.DashboardConfig, navLinks []inter
 	}
 	timeRange := gen.TimeRange
 	if timeRange == nil {
-		timeRange = map[string]string{"from": "now-30m", "to": "now"}
+		timeRange = config.TimeRangeMap{"from": "now-30m", "to": "now"}
 	}
 	graphTooltip := gen.GraphTooltip
 	if graphTooltip == 0 {

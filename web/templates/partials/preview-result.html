@@ -28,7 +28,7 @@
 
         <!-- Toolbar: search + type filters + zoom -->
         <div class="flex flex-wrap gap-2 mb-3 items-center">
-          <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-48" id="panel-search" oninput="applyPreviewFilters()">
+          <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-full sm:w-48" id="panel-search" oninput="applyPreviewFilters()">
           <div class="flex flex-wrap gap-1" id="type-filters"></div>
           <div class="flex-1"></div>
           <label class="flex items-center gap-1 cursor-pointer">
@@ -329,7 +329,7 @@
           {{if .PanelInfos}}
           <!-- Toolbar: search + type filters + zoom + stats -->
           <div class="flex flex-wrap gap-2 mb-3 items-center">
-            <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-48" id="panel-search" oninput="applyPreviewFilters()">
+            <input type="text" placeholder="search panels..." class="input input-bordered input-xs w-full sm:w-48" id="panel-search" oninput="applyPreviewFilters()">
             <div class="flex flex-wrap gap-1" id="type-filters"></div>
             <div class="flex-1"></div>
             <label class="flex items-center gap-1 cursor-pointer">

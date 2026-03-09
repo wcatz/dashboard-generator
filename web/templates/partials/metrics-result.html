@@ -27,9 +27,9 @@
           {{if $.AIEnabled}}
           <!-- AI suggest button for single metric -->
           <button type="button"
-                  class="btn btn-xs btn-ghost btn-circle opacity-60 hover:opacity-100"
-                  title="AI suggest panel for this metric"
-                  onclick="suggestSingleMetric('{{.Name}}', '{{.Type}}', '{{.Help}}')"
+                  class="btn btn-xs btn-ghost btn-circle text-warning"
+                  title="AI: suggest panel for this metric"
+                  onclick="suggestSingleMetric('{{.Name}}', '{{.Type}}', '{{.Help}}');event.preventDefault()"
                   data-metric="{{.Name}}"
                   data-type="{{.Type}}"
                   data-help="{{.Help}}">

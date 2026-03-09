@@ -25,6 +25,7 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		"Datasources":    cfg.Datasources,
 		"HasDatasources": hasDatasources,
 		"Filter":         "",
+		"AIEnabled":      generator.IsAIAvailable(cfg),
 	})
 }
 

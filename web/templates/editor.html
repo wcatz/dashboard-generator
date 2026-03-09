@@ -4,9 +4,9 @@
 
 <div class="card bg-base-100 border border-base-content/10">
   <div class="card-body p-5">
-    <div class="flex justify-between items-center mb-3">
-      <h3 class="card-title text-sm">{{.ConfigPath}}</h3>
-      <div class="flex gap-2">
+    <div class="flex flex-wrap justify-between items-start gap-2 mb-3">
+      <h3 class="card-title text-sm min-w-0 break-all">{{.ConfigPath}}</h3>
+      <div class="flex gap-2 shrink-0">
         <button class="btn btn-xs btn-outline" id="reload-btn" hx-post="/api/config/reload" hx-target="#editor-status" hx-disabled-elt="this">reload</button>
         <button class="btn btn-xs btn-primary" id="save-btn" hx-post="/api/config/save" hx-target="#editor-status" hx-disabled-elt="this">save</button>
       </div>

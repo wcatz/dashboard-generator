@@ -95,13 +95,39 @@ type VariableDef struct {
 	} `yaml:"default"`
 }
 
+// TimeRangeMap is a map[string]string that also accepts a scalar YAML shorthand
+// (e.g. "1h" → {from: "now-1h", to: "now"}) so both forms are valid in config.
+type TimeRangeMap map[string]string
+
+// UnmarshalYAML implements yaml.Unmarshaler so that a scalar like "1h" is
+// treated as {from: "now-1h", to: "now"}, while a mapping is decoded normally.
+func (t *TimeRangeMap) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.ScalarNode:
+		if value.Tag == "!!null" || value.Value == "" {
+			*t = nil
+			return nil
+		}
+		*t = TimeRangeMap{"from": "now-" + value.Value, "to": "now"}
+		return nil
+	case yaml.MappingNode:
+		var m map[string]string
+		if err := value.Decode(&m); err != nil {
+			return err
+		}
+		*t = TimeRangeMap(m)
+		return nil
+	}
+	return fmt.Errorf("cannot unmarshal time_range: unexpected YAML kind")
+}
+
 // GeneratorSettings holds global generator config.
 type GeneratorSettings struct {
 	SchemaVersion   int                `yaml:"schema_version"`
 	PluginVersion   string             `yaml:"plugin_version"` // Grafana plugin version (default: 11.2.0)
 	OutputDir       string             `yaml:"output_dir"`
 	Refresh         string             `yaml:"refresh"`
-	TimeRange       map[string]string  `yaml:"time_range"`
+	TimeRange       TimeRangeMap       `yaml:"time_range"`
 	Editable        *bool              `yaml:"editable"`
 	GraphTooltip    int                `yaml:"graph_tooltip"`
 	LiveNow         *bool              `yaml:"live_now"`
