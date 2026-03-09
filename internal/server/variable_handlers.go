@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"html"
 	"net/http"
 	"regexp"
 	"sort"
@@ -269,7 +270,7 @@ func (s *Server) handleBulkVariableAdd(w http.ResponseWriter, r *http.Request) {
 	if anySuccess {
 		if err := s.ReloadConfig(); err != nil {
 			w.Header().Set("Content-Type", "text/html")
-			fmt.Fprintf(w, `<div class="text-warning text-sm">variables saved but reload failed: %s</div>`, err.Error())
+			fmt.Fprintf(w, `<div class="text-warning text-sm">variables saved but reload failed: %s</div>`, html.EscapeString(err.Error()))
 			return
 		}
 	}

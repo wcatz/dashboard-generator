@@ -8,6 +8,7 @@ import (
 
 	"github.com/wcatz/dashboard-generator/internal/config"
 	"github.com/wcatz/dashboard-generator/internal/generator"
+	"gopkg.in/yaml.v3"
 )
 
 func (s *Server) handleComparePage(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +79,11 @@ func (s *Server) handleCompareGenerate(w http.ResponseWriter, r *http.Request) {
 	// Get metadata from first datasource
 	cfg := s.Config()
 	disc := generator.NewMetricDiscovery(cfg)
-	meta, _ := disc.FetchMetadata(dsList[0])
+	meta, err := disc.FetchMetadata(dsList[0])
+	if err != nil {
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "failed to fetch metadata: " + err.Error()})
+		return
+	}
 	opts := generator.BuildSuggestOptions(cfg)
 
 	metricInfos := make(map[string]generator.MetricInfo)
@@ -95,13 +100,25 @@ func (s *Server) handleCompareGenerate(w http.ResponseWriter, r *http.Request) {
 	// Build UID
 	uid := "gen-" + strings.ReplaceAll(name, " ", "-")
 
-	// Build the full dashboard YAML
-	var lines []string
-	lines = append(lines, fmt.Sprintf("  uid: %s", uid))
-	lines = append(lines, fmt.Sprintf("  title: %s", title))
-	lines = append(lines, fmt.Sprintf("  filename: %s.json", uid))
+	// Build the full dashboard YAML using yaml.Marshal for safe value encoding
+	dashDoc := map[string]interface{}{
+		"uid":      uid,
+		"title":    title,
+		"filename": uid + ".json",
+	}
 	if len(tags) > 0 {
-		lines = append(lines, fmt.Sprintf("  tags: [%s]", strings.Join(tags, ", ")))
+		dashDoc["tags"] = tags
+	}
+	docBytes, err := yaml.Marshal(dashDoc)
+	if err != nil {
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "failed to marshal dashboard: " + err.Error()})
+		return
+	}
+
+	// Indent the marshaled YAML by 2 spaces to match editor expectations, then append sections
+	var lines []string
+	for _, line := range strings.Split(strings.TrimRight(string(docBytes), "\n"), "\n") {
+		lines = append(lines, "  "+line)
 	}
 	lines = append(lines, "  sections:")
 	lines = append(lines, sectionYAML)

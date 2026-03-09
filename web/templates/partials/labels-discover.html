@@ -113,13 +113,45 @@ function showVariablePreview() {
     var label = cb.dataset.label;
     var ds = cb.dataset.ds;
     var tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td><input type="checkbox" checked class="checkbox checkbox-xs checkbox-primary var-preview-check"></td>' +
-      '<td><input type="text" class="input input-xs input-bordered font-mono w-full var-name" value="' + label + '"></td>' +
-      '<td><input type="text" class="input input-xs input-bordered w-full var-ds" value="' + ds + '"></td>' +
-      '<td><input type="text" class="input input-xs input-bordered font-mono w-full var-query" value="label_values(' + label + ')"></td>' +
-      '<td><input type="checkbox" checked class="checkbox checkbox-xs checkbox-primary var-multi"></td>' +
-      '<td><input type="checkbox" checked class="checkbox checkbox-xs checkbox-primary var-include-all"></td>';
+
+    var td1 = document.createElement('td');
+    var chk = document.createElement('input');
+    chk.type = 'checkbox'; chk.checked = true;
+    chk.className = 'checkbox checkbox-xs checkbox-primary var-preview-check';
+    td1.appendChild(chk);
+
+    var td2 = document.createElement('td');
+    var nameInput = document.createElement('input');
+    nameInput.type = 'text'; nameInput.className = 'input input-xs input-bordered font-mono w-full var-name';
+    nameInput.value = label;
+    td2.appendChild(nameInput);
+
+    var td3 = document.createElement('td');
+    var dsInput = document.createElement('input');
+    dsInput.type = 'text'; dsInput.className = 'input input-xs input-bordered w-full var-ds';
+    dsInput.value = ds;
+    td3.appendChild(dsInput);
+
+    var td4 = document.createElement('td');
+    var queryInput = document.createElement('input');
+    queryInput.type = 'text'; queryInput.className = 'input input-xs input-bordered font-mono w-full var-query';
+    queryInput.value = 'label_values(' + label + ')';
+    td4.appendChild(queryInput);
+
+    var td5 = document.createElement('td');
+    var multiChk = document.createElement('input');
+    multiChk.type = 'checkbox'; multiChk.checked = true;
+    multiChk.className = 'checkbox checkbox-xs checkbox-primary var-multi';
+    td5.appendChild(multiChk);
+
+    var td6 = document.createElement('td');
+    var allChk = document.createElement('input');
+    allChk.type = 'checkbox'; allChk.checked = true;
+    allChk.className = 'checkbox checkbox-xs checkbox-primary var-include-all';
+    td6.appendChild(allChk);
+
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+    tr.appendChild(td4); tr.appendChild(td5); tr.appendChild(td6);
     rows.appendChild(tr);
   });
 

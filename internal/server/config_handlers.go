@@ -90,6 +90,11 @@ func (s *Server) handleInsertSection(w http.ResponseWriter, r *http.Request) {
 	// Validate the snippet parses as valid YAML
 	sectionYAML := []byte(snippet)
 
+	// Backup before modifying config
+	if _, err := s.BackupConfig(); err != nil {
+		log.Printf("backup warning: %v", err)
+	}
+
 	editor := config.NewYAMLEditor(s.ConfigPath())
 	if err := editor.AppendSection(dashboard, sectionYAML); err != nil {
 		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "insert failed: " + err.Error()})

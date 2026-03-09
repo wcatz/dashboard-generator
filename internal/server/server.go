@@ -96,7 +96,7 @@ func (s *Server) BackupConfig() (string, error) {
 		return "", fmt.Errorf("reading config for backup: %w", err)
 	}
 
-	bakPath := fmt.Sprintf("%s.%s.bak", s.cfgPath, time.Now().Format("20060102-150405"))
+	bakPath := fmt.Sprintf("%s.%s.bak", s.cfgPath, time.Now().Format("20060102-150405.000"))
 	if err := os.WriteFile(bakPath, data, 0640); err != nil {
 		return "", fmt.Errorf("writing backup: %w", err)
 	}

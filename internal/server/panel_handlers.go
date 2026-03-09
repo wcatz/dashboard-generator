@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"html"
 	"net/http"
 	"sort"
 	"strconv"
@@ -196,9 +197,9 @@ func (s *Server) handlePanelPreviewYAML(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	yaml := strings.Join(lines, "\n")
+	yamlStr := strings.Join(lines, "\n")
 	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, `<pre class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[500px]"><code class="language-yaml" id="panel-yaml-output">%s</code></pre>`, yaml)
+	fmt.Fprintf(w, `<pre class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[500px]"><code class="language-yaml" id="panel-yaml-output">%s</code></pre>`, html.EscapeString(yamlStr))
 }
 
 // handleInsertPanel inserts a panel into a specific section of a dashboard.

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"net/http"
 
@@ -229,7 +230,7 @@ func (s *Server) handleLivePreview(w http.ResponseWriter, r *http.Request) {
 	dashboards, err := cfg.GetDashboards("")
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<div class="alert alert-error text-sm">%s</div>`, err.Error())
+		fmt.Fprintf(w, `<div class="alert alert-error text-sm">%s</div>`, html.EscapeString(err.Error()))
 		return
 	}
 	order, _ := cfg.GetDashboardOrder("")
@@ -245,7 +246,7 @@ func (s *Server) handleLivePreview(w http.ResponseWriter, r *http.Request) {
 	}
 	if !found {
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<div class="alert alert-error text-sm">dashboard '%s' not found</div>`, uid)
+		fmt.Fprintf(w, `<div class="alert alert-error text-sm">dashboard '%s' not found</div>`, html.EscapeString(uid))
 		return
 	}
 
@@ -258,7 +259,7 @@ func (s *Server) handleLivePreview(w http.ResponseWriter, r *http.Request) {
 	dashboard, err := builder.Build(dbCfg, grafanaNavLinks, nil)
 	if err != nil {
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<div class="alert alert-error text-sm">build failed: %s</div>`, err.Error())
+		fmt.Fprintf(w, `<div class="alert alert-error text-sm">build failed: %s</div>`, html.EscapeString(err.Error()))
 		return
 	}
 
@@ -269,7 +270,7 @@ func (s *Server) handleLivePreview(w http.ResponseWriter, r *http.Request) {
 	// Push to Grafana
 	if err := generator.PushToGrafana(dashboard, grafanaURL, "", "", s.GrafanaToken()); err != nil {
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<div class="alert alert-error text-sm">push failed: %s</div>`, err.Error())
+		fmt.Fprintf(w, `<div class="alert alert-error text-sm">push failed: %s</div>`, html.EscapeString(err.Error()))
 		return
 	}
 
@@ -284,5 +285,5 @@ func (s *Server) handleLivePreview(w http.ResponseWriter, r *http.Request) {
   <div class="flex gap-2 text-xs">
     <a href="%s/d/%s" target="_blank" class="link link-primary">open in Grafana</a>
   </div>
-</div>`, iframeURL, grafanaURL, previewUID)
+</div>`, html.EscapeString(iframeURL), html.EscapeString(grafanaURL), html.EscapeString(previewUID))
 }

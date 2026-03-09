@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const dsSelect = document.getElementById('ds-select');
   if (dsSelect) {
     dsSelect.addEventListener('change', function() {
-      var form = document.getElementById('browse-form');
+      const form = document.getElementById('browse-form');
       if (form) htmx.trigger(form, 'submit');
     });
   }

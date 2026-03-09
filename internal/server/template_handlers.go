@@ -168,7 +168,8 @@ func (s *Server) handleTemplateMerge(w http.ResponseWriter, r *http.Request) {
 
 	// Backup before merging
 	if _, err := s.BackupConfig(); err != nil {
-		log.Printf("backup warning: %v", err)
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "backup failed, aborting merge: " + err.Error()})
+		return
 	}
 
 	editor := config.NewYAMLEditor(s.ConfigPath())
@@ -240,7 +241,8 @@ func (s *Server) handleTemplateMerge(w http.ResponseWriter, r *http.Request) {
 
 	// Reload after merge
 	if err := s.ReloadConfig(); err != nil {
-		log.Printf("reload after merge warning: %v", err)
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "merge completed but reload failed: " + err.Error()})
+		return
 	}
 
 	msg := fmt.Sprintf("merged: %d added, %d skipped", len(added), len(skipped))

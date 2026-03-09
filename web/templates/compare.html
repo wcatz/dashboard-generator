@@ -82,10 +82,13 @@ function fetchSharedMetrics() {
   var dsList = getSelectedDatasources();
   if (dsList.length < 2) return;
 
-  // Use first two for the comparison endpoint
+  // Send all selected datasources
   var params = new URLSearchParams();
   params.set('datasource', dsList[0]);
   params.set('datasource_b', dsList[1]);
+  for (var i = 2; i < dsList.length; i++) {
+    params.append('datasource_extra', dsList[i]);
+  }
 
   htmx.ajax('GET', '/api/metrics/compare?' + params.toString(), {
     target: '#shared-metrics-area',

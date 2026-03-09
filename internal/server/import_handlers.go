@@ -2,10 +2,11 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 func (s *Server) handleImportPage(w http.ResponseWriter, r *http.Request) {
@@ -16,12 +17,6 @@ func (s *Server) handleImportPage(w http.ResponseWriter, r *http.Request) {
 		dsNames = append(dsNames, name)
 	}
 	sort.Strings(dsNames)
-
-	// Build UID-to-name map for auto-mapping
-	uidToName := make(map[string]string)
-	for name, ds := range cfg.Datasources {
-		uidToName[ds.UID] = name
-	}
 
 	dashboards, _ := cfg.GetDashboardOrder("")
 
@@ -73,104 +68,127 @@ func (s *Server) handleImportParse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate config YAML from parsed info
-	yaml := reversePanelToYAML(info, uidToName)
+	yamlStr := reversePanelToYAML(info, uidToName)
 
 	s.renderPartial(w, "import-result.html", map[string]interface{}{
 		"Panel": info,
-		"YAML":  yaml,
+		"YAML":  yamlStr,
 	})
 }
 
 // reversePanelToYAML converts a PanelInfo back to config YAML string.
+// Uses yaml.Marshal on a structured map to avoid YAML injection from untrusted values.
 func reversePanelToYAML(info PanelInfo, uidToName map[string]string) string {
-	var lines []string
+	panel := yaml.Node{Kind: yaml.MappingNode}
+	addField := func(key string, value interface{}) {
+		panel.Content = append(panel.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: key},
+			marshalValueNode(value),
+		)
+	}
 
-	lines = append(lines, fmt.Sprintf("- type: %s", info.Type))
+	addField("type", info.Type)
 	if info.Title != "" {
-		lines = append(lines, fmt.Sprintf("  title: \"%s\"", info.Title))
+		addField("title", info.Title)
 	}
 
 	// Queries
 	if len(info.Queries) == 1 {
 		q := info.Queries[0]
 		if q.Expr != "" {
-			lines = append(lines, fmt.Sprintf("  query: '%s'", q.Expr))
+			addField("query", q.Expr)
 		}
 		if q.Legend != "" {
-			lines = append(lines, fmt.Sprintf("  legend: \"%s\"", q.Legend))
+			addField("legend", q.Legend)
 		}
 	} else if len(info.Queries) > 1 {
-		lines = append(lines, "  targets:")
+		var targets []map[string]string
 		for _, q := range info.Queries {
-			lines = append(lines, fmt.Sprintf("    - query: '%s'", q.Expr))
+			t := map[string]string{"query": q.Expr}
 			if q.Legend != "" {
-				lines = append(lines, fmt.Sprintf("      legend: \"%s\"", q.Legend))
+				t["legend"] = q.Legend
 			}
 			ds := resolveDatasource(q.Datasource, uidToName)
 			if ds != "" {
-				lines = append(lines, fmt.Sprintf("      datasource: %s", ds))
+				t["datasource"] = ds
 			}
+			targets = append(targets, t)
 		}
+		addField("targets", targets)
 	}
 
 	// Datasource
 	ds := resolveDatasource(info.Datasource, uidToName)
 	if ds != "" {
-		lines = append(lines, fmt.Sprintf("  datasource: %s", ds))
+		addField("datasource", ds)
 	}
 
 	// Unit
 	if info.Unit != "" && info.Unit != "none" {
-		lines = append(lines, fmt.Sprintf("  unit: %s", info.Unit))
+		addField("unit", info.Unit)
 	}
 
 	// Description
 	if info.Description != "" {
-		desc := strings.ReplaceAll(info.Description, "\"", "\\\"")
-		lines = append(lines, fmt.Sprintf("  description: \"%s\"", desc))
+		addField("description", info.Description)
 	}
 
 	// Size
 	if info.W > 0 {
-		lines = append(lines, fmt.Sprintf("  width: %d", info.W))
+		addField("width", info.W)
 	}
 	if info.H > 0 {
-		lines = append(lines, fmt.Sprintf("  height: %d", info.H))
+		addField("height", info.H)
 	}
 
 	// Type-specific options
 	if info.ColorMode != "" {
-		lines = append(lines, fmt.Sprintf("  color_mode: %s", info.ColorMode))
+		addField("color_mode", info.ColorMode)
 	}
 	if info.DrawStyle != "" {
-		lines = append(lines, fmt.Sprintf("  draw_style: %s", info.DrawStyle))
+		addField("draw_style", info.DrawStyle)
 	}
 	if info.FillOpacity > 0 {
-		lines = append(lines, fmt.Sprintf("  fill_opacity: %d", info.FillOpacity))
+		addField("fill_opacity", info.FillOpacity)
 	}
 	if info.StackMode != "" && info.StackMode != "none" {
-		lines = append(lines, fmt.Sprintf("  stack: %s", info.StackMode))
+		addField("stack", info.StackMode)
 	}
 	if info.GraphMode != "" {
-		lines = append(lines, fmt.Sprintf("  graph_mode: %s", info.GraphMode))
+		addField("graph_mode", info.GraphMode)
 	}
 	if info.TextMode != "" {
-		lines = append(lines, fmt.Sprintf("  text_mode: %s", info.TextMode))
+		addField("text_mode", info.TextMode)
 	}
 	if info.PieType != "" {
-		lines = append(lines, fmt.Sprintf("  pie_type: %s", info.PieType))
+		addField("pie_type", info.PieType)
 	}
 	if info.GaugeMin != 0 {
-		lines = append(lines, fmt.Sprintf("  min: %g", info.GaugeMin))
+		addField("min", info.GaugeMin)
 	}
 	if info.GaugeMax != 0 {
-		lines = append(lines, fmt.Sprintf("  max: %g", info.GaugeMax))
+		addField("max", info.GaugeMax)
 	}
 	if info.TextContent != "" {
-		lines = append(lines, fmt.Sprintf("  content: |\n    %s", strings.ReplaceAll(info.TextContent, "\n", "\n    ")))
+		addField("content", info.TextContent)
 	}
 
-	return strings.Join(lines, "\n")
+	// Wrap in a sequence node to produce "- type: ..." format
+	seq := yaml.Node{Kind: yaml.SequenceNode, Content: []*yaml.Node{&panel}}
+	out, err := yaml.Marshal(&seq)
+	if err != nil {
+		return "# error marshaling panel YAML"
+	}
+	return strings.TrimRight(string(out), "\n")
+}
+
+// marshalValueNode converts a Go value to a yaml.Node.
+func marshalValueNode(v interface{}) *yaml.Node {
+	var node yaml.Node
+	if err := node.Encode(v); err != nil {
+		return &yaml.Node{Kind: yaml.ScalarNode, Value: ""}
+	}
+	return &node
 }
 
 func resolveDatasource(uid string, uidToName map[string]string) string {

@@ -64,8 +64,9 @@ func TestAppendSection(t *testing.T) {
 			wantErr:   "not found",
 		},
 		{
-			name:      "error on no dashboards section",
-			config:    `generator:\n  schema_version: 39`,
+			name: "error on no dashboards section",
+			config: `generator:
+  schema_version: 39`,
 			dashboard: "overview",
 			section:   `- title: test`,
 			wantErr:   "no dashboards section",
@@ -161,8 +162,9 @@ func TestAddDashboard(t *testing.T) {
 			wantIn: "gen-comparison",
 		},
 		{
-			name:   "add when no dashboards section",
-			config: `generator:\n  schema_version: 39`,
+			name: "add when no dashboards section",
+			config: `generator:
+  schema_version: 39`,
 			dbName: "first",
 			dbYAML: `  uid: gen-first
   title: first dashboard
