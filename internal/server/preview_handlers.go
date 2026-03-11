@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"net/http"
 
@@ -102,6 +103,7 @@ func (s *Server) handlePreviewAPI(w http.ResponseWriter, r *http.Request) {
 		"PanelInfosJSON": template.JS(panelJSON),
 		"Variables":      varInfos,
 		"NavLinks":       previewNavLinks,
+		"GrafanaURL":     s.GrafanaURL(),
 	})
 }
 
@@ -200,4 +202,88 @@ func (s *Server) generatePreview(uid string) (jsonStr string, title string, size
 	parsedNavLinks := extractNavLinks(dashboard)
 
 	return string(data), dbCfg.Title, len(data), len(panelList), pInfos, parsedNavLinks, nil
+}
+
+// handleLivePreview pushes a dashboard to Grafana as a temporary preview and returns the iframe URL.
+func (s *Server) handleLivePreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	grafanaURL := s.GrafanaURL()
+	if grafanaURL == "" {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<div class="alert alert-error text-sm">no Grafana URL configured</div>`)
+		return
+	}
+
+	uid := r.URL.Query().Get("uid")
+	if uid == "" {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<div class="alert alert-error text-sm">no dashboard UID provided</div>`)
+		return
+	}
+
+	// Generate the dashboard JSON
+	cfg := s.Config()
+	dashboards, err := cfg.GetDashboards("")
+	if err != nil {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `<div class="alert alert-error text-sm">%s</div>`, html.EscapeString(err.Error()))
+		return
+	}
+	order, _ := cfg.GetDashboardOrder("")
+
+	var dbCfg config.DashboardConfig
+	var found bool
+	for _, db := range dashboards {
+		if db.UID == uid {
+			dbCfg = db
+			found = true
+			break
+		}
+	}
+	if !found {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `<div class="alert alert-error text-sm">dashboard '%s' not found</div>`, html.EscapeString(uid))
+		return
+	}
+
+	idGen := generator.NewIDGenerator()
+	panelFactory := generator.NewPanelFactory(cfg, idGen)
+	layoutEngine := generator.NewLayoutEngine()
+	builder := generator.NewDashboardBuilder(cfg, panelFactory, layoutEngine)
+	grafanaNavLinks := builder.BuildNavigationLinks(dashboards, order)
+
+	dashboard, err := builder.Build(dbCfg, grafanaNavLinks, nil)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `<div class="alert alert-error text-sm">build failed: %s</div>`, html.EscapeString(err.Error()))
+		return
+	}
+
+	// Override UID for preview
+	previewUID := uid + "-preview"
+	dashboard["uid"] = previewUID
+
+	// Push to Grafana
+	if err := generator.PushToGrafana(dashboard, grafanaURL, "", "", s.GrafanaToken()); err != nil {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, `<div class="alert alert-error text-sm">push failed: %s</div>`, html.EscapeString(err.Error()))
+		return
+	}
+
+	// Return iframe HTML
+	iframeURL := fmt.Sprintf("%s/d/%s?orgId=1&kiosk", grafanaURL, previewUID)
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `<div class="space-y-2">
+  <div class="alert alert-success text-sm py-2">
+    <span>pushed preview dashboard to Grafana</span>
+  </div>
+  <iframe src="%s" class="w-full rounded-lg border border-base-content/10" style="height: 80vh;" loading="lazy"></iframe>
+  <div class="flex gap-2 text-xs">
+    <a href="%s/d/%s" target="_blank" class="link link-primary">open in Grafana</a>
+  </div>
+</div>`, html.EscapeString(iframeURL), html.EscapeString(grafanaURL), html.EscapeString(previewUID))
 }

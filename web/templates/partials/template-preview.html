@@ -36,7 +36,7 @@
 
     <!-- Load as active config -->
     <div>
-      <button 
+      <button
         class="btn btn-sm btn-warning"
         hx-post="/api/template/load"
         hx-vals='{"template": "{{.Template.Name}}"}'
@@ -45,6 +45,29 @@
         load template
       </button>
     </div>
+  </div>
+
+  <!-- Merge into existing config -->
+  <div class="mb-4 p-3 bg-base-200/50 rounded-lg border border-base-content/10">
+    <h4 class="text-sm font-semibold mb-2">merge into current config</h4>
+    <p class="text-xs text-base-content/50 mb-2">selectively import sections without replacing your entire config</p>
+    <div class="flex flex-wrap gap-3 items-center">
+      <label class="flex items-center gap-1.5 cursor-pointer">
+        <input type="checkbox" value="datasources" class="checkbox checkbox-xs checkbox-primary merge-section">
+        <span class="text-xs">datasources</span>
+      </label>
+      <label class="flex items-center gap-1.5 cursor-pointer">
+        <input type="checkbox" value="variables" class="checkbox checkbox-xs checkbox-primary merge-section">
+        <span class="text-xs">variables</span>
+      </label>
+      <label class="flex items-center gap-1.5 cursor-pointer">
+        <input type="checkbox" value="palettes" class="checkbox checkbox-xs checkbox-primary merge-section">
+        <span class="text-xs">palettes</span>
+      </label>
+      <div class="flex-1"></div>
+      <button class="btn btn-xs btn-success" onclick="mergeTemplate('{{.Template.Name}}')">merge selected</button>
+    </div>
+    <div id="merge-result" class="mt-2"></div>
   </div>
 
   <!-- Result messages -->
@@ -71,4 +94,15 @@
   document.querySelectorAll('pre code').forEach((block) => {
     hljs.highlightElement(block);
   });
+
+  function mergeTemplate(templateName) {
+    var checked = document.querySelectorAll('.merge-section:checked');
+    if (checked.length === 0) { showToast('select at least one section', 'warning'); return; }
+    var form = new FormData();
+    form.append('template', templateName);
+    checked.forEach(function(cb) { form.append('sections', cb.value); });
+    fetch('/api/template/merge', { method: 'POST', body: form })
+      .then(function(r) { return r.text(); })
+      .then(function(html) { document.getElementById('merge-result').innerHTML = html; });
+  }
 </script>

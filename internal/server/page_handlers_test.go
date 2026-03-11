@@ -66,7 +66,7 @@ func TestPageHandlers(t *testing.T) {
 		{
 			name:     "templates",
 			route:    "/templates",
-			contains: []string{"templates", "Minimal"},
+			contains: []string{"starters", "Blank"},
 		},
 	}
 

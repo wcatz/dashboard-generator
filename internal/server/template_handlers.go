@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"html"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,22 +16,23 @@ import (
 // handleTemplatesPage renders the config templates page
 func (s *Server) handleTemplatesPage(w http.ResponseWriter, r *http.Request) {
 	templates := GetConfigTemplates()
-	
+
 	// Group templates by category
 	categories := make(map[string][]ConfigTemplate)
 	for _, t := range templates {
 		categories[t.Category] = append(categories[t.Category], t)
 	}
-	
+
 	data := map[string]interface{}{
-		"Title":      "templates",
-		"Active":     "templates",
-		"Templates":  templates,
-		"Categories": categories,
-		"ConfigPath": s.ConfigPath(),
+		"Title":        "starters",
+		"Active":       "templates",
+		"Templates":    templates,
+		"Categories":   categories,
+		"ConfigPath":   s.ConfigPath(),
+		"ActiveConfig": s.ActiveConfigName(),
+		"ConfigDir":    s.ConfigDir(),
 	}
-	
-	
+
 	s.renderPage(w, "templates.html", data)
 }
 
@@ -41,19 +43,18 @@ func (s *Server) handleTemplatePreview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "template name required", http.StatusBadRequest)
 		return
 	}
-	
+
 	template, err := GetTemplateByName(templateName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	
+
 	// Return as YAML with syntax highlighting
 	data := map[string]interface{}{
 		"Template": template,
 	}
-	
-	
+
 	s.renderPartial(w, "template-preview.html", data)
 }
 
@@ -63,16 +64,16 @@ func (s *Server) handleTemplateCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	templateName := r.FormValue("template")
 	outputPath := r.FormValue("path")
 	overwrite := r.FormValue("overwrite") == "true"
-	
+
 	if templateName == "" {
 		http.Error(w, "template name required", http.StatusBadRequest)
 		return
 	}
-	
+
 	if outputPath == "" {
 		http.Error(w, "output path required", http.StatusBadRequest)
 		return
@@ -84,14 +85,14 @@ func (s *Server) handleTemplateCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid output path", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Get template
 	template, err := GetTemplateByName(templateName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	
+
 	// Check if file exists
 	if _, err := os.Stat(outputPath); err == nil && !overwrite {
 		w.Header().Set("Content-Type", "text/html")
@@ -102,20 +103,20 @@ func (s *Server) handleTemplateCreate(w http.ResponseWriter, r *http.Request) {
 		</div>`, html.EscapeString(outputPath))
 		return
 	}
-	
+
 	// Create directory if needed
 	dir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		http.Error(w, fmt.Sprintf("failed to create directory: %v", err), http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Write template content
 	if err := os.WriteFile(outputPath, []byte(template.Content), 0644); err != nil {
 		http.Error(w, fmt.Sprintf("failed to write file: %v", err), http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Success response
 	w.Header().Set("Content-Type", "text/html")
 	fmt.Fprintf(w, `<div class="alert alert-success">
@@ -131,25 +132,151 @@ func (s *Server) handleTemplateCreate(w http.ResponseWriter, r *http.Request) {
 	</div>`, html.EscapeString(outputPath), url.QueryEscape(outputPath))
 }
 
+// handleTemplateMerge selectively merges sections from a template into the current config.
+func (s *Server) handleTemplateMerge(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
+
+	templateName := r.FormValue("template")
+	sections := r.Form["sections"]
+
+	if templateName == "" {
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "template name required"})
+		return
+	}
+	if len(sections) == 0 {
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "select at least one section to merge"})
+		return
+	}
+
+	tmpl, err := GetTemplateByName(templateName)
+	if err != nil {
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": err.Error()})
+		return
+	}
+
+	// Parse template content
+	tmplCfg, err := config.LoadFromBytes([]byte(tmpl.Content))
+	if err != nil {
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "template parse error: " + err.Error()})
+		return
+	}
+
+	// Backup before merging
+	if _, err := s.BackupConfig(); err != nil {
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "backup failed, aborting merge: " + err.Error()})
+		return
+	}
+
+	editor := config.NewYAMLEditor(s.ConfigPath())
+	currentCfg := s.Config()
+
+	var added []string
+	var skipped []string
+
+	sectionSet := make(map[string]bool)
+	for _, sec := range sections {
+		sectionSet[sec] = true
+	}
+
+	// Merge datasources
+	if sectionSet["datasources"] {
+		for name, ds := range tmplCfg.Datasources {
+			if _, exists := currentCfg.Datasources[name]; exists {
+				skipped = append(skipped, "datasource '"+name+"' (exists)")
+				continue
+			}
+			if err := editor.AddDatasource(name, ds); err != nil {
+				skipped = append(skipped, "datasource '"+name+"' ("+err.Error()+")")
+			} else {
+				added = append(added, "datasource '"+name+"'")
+			}
+		}
+	}
+
+	// Merge variables
+	if sectionSet["variables"] {
+		for name, v := range tmplCfg.Variables {
+			if _, exists := currentCfg.Variables[name]; exists {
+				skipped = append(skipped, "variable '"+name+"' (exists)")
+				continue
+			}
+			if err := editor.AddVariable(name, v); err != nil {
+				skipped = append(skipped, "variable '"+name+"' ("+err.Error()+")")
+			} else {
+				added = append(added, "variable '"+name+"'")
+			}
+		}
+	}
+
+	// Merge palettes
+	if sectionSet["palettes"] {
+		for name := range tmplCfg.Palettes {
+			if _, exists := currentCfg.Palettes[name]; exists {
+				skipped = append(skipped, "palette '"+name+"' (exists)")
+				continue
+			}
+			if err := editor.AddPalette(name); err != nil {
+				skipped = append(skipped, "palette '"+name+"' ("+err.Error()+")")
+			} else {
+				added = append(added, "palette '"+name+"'")
+				// Add colors
+				for color, hex := range tmplCfg.Palettes[name] {
+					if err := editor.SetPaletteColor(name, color, hex); err != nil {
+						log.Printf("palette color warning: %v", err)
+					}
+				}
+			}
+		}
+	}
+
+	if len(added) == 0 && len(skipped) == 0 {
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Message": "nothing to merge"})
+		return
+	}
+
+	// Reload after merge
+	if err := s.ReloadConfig(); err != nil {
+		s.renderPartial(w, "config-status.html", map[string]interface{}{"Error": "merge completed but reload failed: " + err.Error()})
+		return
+	}
+
+	msg := fmt.Sprintf("merged: %d added, %d skipped", len(added), len(skipped))
+	if len(added) > 0 {
+		msg += " | added: " + strings.Join(added, ", ")
+	}
+	if len(skipped) > 0 {
+		msg += " | skipped: " + strings.Join(skipped, ", ")
+	}
+
+	s.renderPartial(w, "config-status.html", map[string]interface{}{"Message": msg})
+}
+
 // handleTemplateLoad loads a template as the active config
 func (s *Server) handleTemplateLoad(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	templateName := r.FormValue("template")
 	if templateName == "" {
 		http.Error(w, "template name required", http.StatusBadRequest)
 		return
 	}
-	
+
 	template, err := GetTemplateByName(templateName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	
+
 	// Write to current config path
 	// Validate the template can be parsed BEFORE writing to disk,
 	// to avoid corrupting the active config file on a bad template.
@@ -163,17 +290,22 @@ func (s *Server) handleTemplateLoad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Backup before overwriting
+	if _, err := s.BackupConfig(); err != nil {
+		log.Printf("backup warning: %v", err)
+	}
+
 	if err := os.WriteFile(s.ConfigPath(), []byte(template.Content), 0644); err != nil {
 		http.Error(w, fmt.Sprintf("failed to write config: %v", err), http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Reload config
 	if err := s.ReloadConfig(); err != nil {
 		http.Error(w, fmt.Sprintf("failed to reload config: %v", err), http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Success response with redirect
 	w.Header().Set("Content-Type", "text/html")
 	w.Header().Set("HX-Redirect", "/")

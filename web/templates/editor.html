@@ -2,6 +2,16 @@
 <h1 class="text-xl font-bold mb-1">config editor</h1>
 <p class="text-sm text-base-content/50 mb-6">edit your YAML configuration</p>
 
+{{if .Warnings}}
+<div class="mb-4">
+  {{range .Warnings}}
+  <div class="alert alert-warning text-sm py-2 mb-1">
+    <span>{{.}}</span>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
 <div class="card bg-base-100 border border-base-content/10">
   <div class="card-body p-5">
     <div class="flex flex-wrap justify-between items-start gap-2 mb-3">

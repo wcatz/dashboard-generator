@@ -1,0 +1,37 @@
+{{define "content"}}
+<h1 class="text-xl font-bold mb-1">import panel</h1>
+<p class="text-sm text-base-content/50 mb-6">import a Grafana panel JSON and convert it to config YAML</p>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <!-- Left: Input -->
+  <div class="card bg-base-100 border border-base-content/10">
+    <div class="card-body p-5">
+      <h3 class="card-title text-sm mb-2">paste panel JSON</h3>
+      <p class="text-xs text-base-content/50 mb-2">in Grafana: panel menu > Inspect > Panel JSON > copy</p>
+      <textarea id="import-json" rows="18" placeholder='{"type": "timeseries", "title": "...", ...}' class="textarea textarea-bordered w-full font-mono text-xs"></textarea>
+      <div class="flex gap-2 mt-2">
+        <button class="btn btn-sm btn-primary"
+                hx-post="/api/import/parse"
+                hx-target="#import-result"
+                hx-swap="innerHTML"
+                hx-include="#import-json"
+                hx-vals='js:{panel_json: document.getElementById("import-json").value}'>
+          parse & convert
+        </button>
+        <button class="btn btn-sm btn-ghost" onclick="document.getElementById('import-json').value='';document.getElementById('import-result').innerHTML=''">clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Result -->
+  <div class="space-y-4">
+    <div id="import-result">
+      <div class="card bg-base-100 border border-base-content/10">
+        <div class="card-body p-5 text-center text-base-content/50">
+          <p>paste panel JSON and click "parse & convert"</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

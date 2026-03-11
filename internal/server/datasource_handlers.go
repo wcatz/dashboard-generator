@@ -19,12 +19,14 @@ func (s *Server) handleDatasources(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.renderPage(w, "datasources.html", map[string]interface{}{
-		"Title":       "datasources",
-		"Active":      "datasources",
-		"ConfigPath":  s.ConfigPath(),
-		"GrafanaURL":  s.GrafanaURL(),
-		"Datasources": cfg.Datasources,
-		"DsWithURL":   dsWithURL,
+		"Title":        "datasources",
+		"Active":       "datasources",
+		"ConfigPath":   s.ConfigPath(),
+		"ActiveConfig": s.ActiveConfigName(),
+		"ConfigDir":    s.ConfigDir(),
+		"GrafanaURL":   s.GrafanaURL(),
+		"Datasources":  cfg.Datasources,
+		"DsWithURL":    dsWithURL,
 	})
 }
 

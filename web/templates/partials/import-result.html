@@ -1,0 +1,55 @@
+{{if .Error}}
+<div class="card bg-base-100 border border-base-content/10">
+  <div class="card-body p-5">
+    <div class="alert alert-error text-sm">{{.Error}}</div>
+  </div>
+</div>
+{{else}}
+<!-- Parsed panel summary -->
+<div class="card bg-base-100 border border-base-content/10 mb-4">
+  <div class="card-body p-5">
+    <h3 class="card-title text-sm mb-2">parsed panel</h3>
+    <div class="flex flex-wrap gap-2 text-sm">
+      <span class="badge badge-primary">{{.Panel.Type}}</span>
+      <span class="font-semibold">{{.Panel.Title}}</span>
+      {{if .Panel.Unit}}<span class="badge badge-ghost">{{.Panel.Unit}}</span>{{end}}
+      {{if .Panel.W}}<span class="badge badge-ghost">{{.Panel.W}}x{{.Panel.H}}</span>{{end}}
+    </div>
+    {{if .Panel.Datasource}}
+    <div class="text-xs text-base-content/50 mt-1">datasource: <code>{{.Panel.Datasource}}</code></div>
+    {{end}}
+    {{if .Panel.Queries}}
+    <div class="mt-2 space-y-1">
+      {{range .Panel.Queries}}
+      <div class="text-xs font-mono bg-base-200 rounded px-2 py-1">{{.Expr}}</div>
+      {{end}}
+    </div>
+    {{end}}
+    {{if .Panel.Description}}
+    <div class="text-xs text-base-content/50 mt-2 italic">{{.Panel.Description}}</div>
+    {{end}}
+  </div>
+</div>
+
+<!-- Generated YAML -->
+<div class="card bg-base-100 border border-base-content/10">
+  <div class="card-body p-5">
+    <div class="flex justify-between items-center mb-2">
+      <h3 class="card-title text-sm">config YAML</h3>
+      <button class="btn btn-xs btn-ghost" onclick="copyImportYAML()">copy</button>
+    </div>
+    <pre class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[400px]"><code id="import-yaml-output">{{.YAML}}</code></pre>
+    <div class="text-xs text-base-content/50 mt-2">paste into a section's panels array in the <a href="/editor" class="link link-primary">config editor</a>, or use the <a href="/panel-builder" class="link link-primary">panel builder</a> to refine</div>
+  </div>
+</div>
+
+<script>
+function copyImportYAML() {
+  var el = document.getElementById('import-yaml-output');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(function() {
+    showToast('YAML copied', 'success');
+  });
+}
+</script>
+{{end}}

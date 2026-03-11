@@ -135,16 +135,23 @@ function applyK8sFilter() {
 
 document.addEventListener('DOMContentLoaded', function() {
   const toggle = document.getElementById('hide-k8s-toggle');
-  if (!toggle) return;
-  
-  toggle.addEventListener('change', function() {
-    const hiddenCount = applyK8sFilter();
-    
-    // Show toast notification
-    if (toggle.checked && hiddenCount > 0) {
-      showToast(`Hidden ${hiddenCount} Kubernetes metrics`, 'info');
-    }
-  });
+  if (toggle) {
+    toggle.addEventListener('change', function() {
+      const hiddenCount = applyK8sFilter();
+      if (toggle.checked && hiddenCount > 0) {
+        showToast(`Hidden ${hiddenCount} Kubernetes metrics`, 'info');
+      }
+    });
+  }
+
+  // Auto-browse when datasource changes
+  const dsSelect = document.getElementById('ds-select');
+  if (dsSelect) {
+    dsSelect.addEventListener('change', function() {
+      const form = document.getElementById('browse-form');
+      if (form) htmx.trigger(form, 'submit');
+    });
+  }
 });
 
 // Helper to show toast notifications

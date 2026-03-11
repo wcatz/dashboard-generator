@@ -47,10 +47,12 @@ func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": fmt.Sprintf("AI suggestion failed: %v", err)})
 		return
 	}
+	dashboards, _ := cfg.GetDashboardOrder("")
 	s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{
 		"YAML":       suggestion.YAML,
 		"Notes":      suggestion.Notes,
 		"MetricName": metricName,
+		"Dashboards": dashboards,
 	})
 }
 
@@ -117,11 +119,13 @@ func (s *Server) handleAISuggestBulk(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render success response with section YAML
+	dashboards, _ := cfg.GetDashboardOrder("")
 	s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{
 		"YAML":        suggestion.YAML,
 		"Notes":       suggestion.Notes,
 		"IsBulk":      true,
 		"MetricCount": len(metrics),
 		"MetricNames": strings.Join(metricNames, ", "),
+		"Dashboards":  dashboards,
 	})
 }

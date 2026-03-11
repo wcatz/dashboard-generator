@@ -21,6 +21,8 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		"Title":          "metrics",
 		"Active":         "metrics",
 		"ConfigPath":     s.ConfigPath(),
+		"ActiveConfig":   s.ActiveConfigName(),
+		"ConfigDir":      s.ConfigDir(),
 		"GrafanaURL":     s.GrafanaURL(),
 		"Datasources":    cfg.Datasources,
 		"HasDatasources": hasDatasources,
@@ -217,10 +219,12 @@ func (s *Server) handleMetricsSnippet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	snippet, hints := generator.FormatSnippetYAML(suggestions, "discovered metrics", dsName)
+	dashboards, _ := cfg.GetDashboardOrder("")
 	s.renderPartial(w, "snippet-result.html", map[string]interface{}{
-		"Snippet": snippet,
-		"Count":   len(selected),
-		"Hints":   hints,
+		"Snippet":    snippet,
+		"Count":      len(selected),
+		"Hints":      hints,
+		"Dashboards": dashboards,
 	})
 }
 
@@ -272,9 +276,11 @@ func (s *Server) handleComparisonSnippet(w http.ResponseWriter, r *http.Request)
 	}
 
 	snippet, hints := generator.FormatComparisonSnippetYAML(selected, metricInfos, dsList, opts)
+	dashboards, _ := cfg.GetDashboardOrder("")
 	s.renderPartial(w, "snippet-result.html", map[string]interface{}{
-		"Snippet": snippet,
-		"Count":   len(selected),
-		"Hints":   hints,
+		"Snippet":    snippet,
+		"Count":      len(selected),
+		"Hints":      hints,
+		"Dashboards": dashboards,
 	})
 }

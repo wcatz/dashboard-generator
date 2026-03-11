@@ -42,7 +42,20 @@
   {{end}}
 
   <!-- Action buttons -->
-  <div class="flex gap-2 justify-end">
+  <div class="flex flex-wrap gap-2 justify-end items-center">
+    {{if .Dashboards}}
+    <div class="flex gap-1 items-center mr-auto">
+      <select id="ai-insert-dashboard" class="select select-bordered select-xs">
+        <option value="">insert into...</option>
+        {{range .Dashboards}}<option value="{{.}}">{{.}}</option>{{end}}
+      </select>
+      <button class="btn btn-xs btn-success gap-1" onclick="insertAISuggestion()">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+        Insert
+      </button>
+      <span id="ai-insert-status" class="text-xs"></span>
+    </div>
+    {{end}}
     <button class="btn btn-sm btn-ghost" onclick="ai_suggestion_modal.close()">Close</button>
     <button class="btn btn-sm btn-primary gap-1" onclick="copyAISuggestion()">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
@@ -56,6 +69,18 @@
   if (typeof hljs !== 'undefined') {
     document.querySelectorAll('pre code').forEach((el) => {
       hljs.highlightElement(el);
+    });
+  }
+  function insertAISuggestion() {
+    var db = document.getElementById('ai-insert-dashboard');
+    if (!db || !db.value) { showToast('select a dashboard first', 'warning'); return; }
+    var yaml = document.getElementById('ai-yaml-output');
+    if (!yaml) return;
+    var statusEl = document.getElementById('ai-insert-status');
+    htmx.ajax('POST', '/api/config/insert-section', {
+      target: '#ai-insert-status',
+      swap: 'innerHTML',
+      values: { dashboard: db.value, yaml_snippet: yaml.textContent }
     });
   }
 </script>

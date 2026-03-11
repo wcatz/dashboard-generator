@@ -1,0 +1,325 @@
+{{define "content"}}
+<h1 class="text-xl font-bold mb-1">panel builder</h1>
+<p class="text-sm text-base-content/50 mb-6">build panels with smart defaults — no AI required</p>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <!-- Left: Panel configuration form -->
+  <div class="space-y-4">
+    <div class="card bg-base-100 border border-base-content/10">
+      <div class="card-body p-5">
+        <h3 class="card-title text-sm mb-2">panel configuration</h3>
+        <form id="panel-form" hx-post="/api/panel/preview-yaml" hx-target="#yaml-preview" hx-trigger="change delay:300ms, keyup changed delay:500ms from:find input, keyup changed delay:500ms from:find textarea, change from:find select">
+
+          <!-- Metric + auto-fill -->
+          <label class="form-control mb-3">
+            <div class="label"><span class="label-text text-xs">metric name</span></div>
+            <div class="flex gap-2">
+              <input type="text" name="metric" id="pb-metric" placeholder="node_cpu_seconds_total" class="input input-bordered input-sm flex-1" value="{{if .Prefill}}{{index .Prefill "metric"}}{{end}}">
+              <button type="button" class="btn btn-xs btn-ghost" onclick="autoFillFromMetric()">auto-fill</button>
+            </div>
+          </label>
+
+          <!-- Panel type -->
+          <label class="form-control mb-3">
+            <div class="label"><span class="label-text text-xs">panel type</span></div>
+            <select name="type" id="pb-type" class="select select-bordered select-sm w-full">
+              <optgroup label="visualization">
+                <option value="timeseries" {{if .Prefill}}{{if eq (index .Prefill "type") "timeseries"}}selected{{end}}{{end}}>timeseries</option>
+                <option value="stat" {{if .Prefill}}{{if eq (index .Prefill "type") "stat"}}selected{{end}}{{end}}>stat</option>
+                <option value="gauge" {{if .Prefill}}{{if eq (index .Prefill "type") "gauge"}}selected{{end}}{{end}}>gauge</option>
+                <option value="bargauge" {{if .Prefill}}{{if eq (index .Prefill "type") "bargauge"}}selected{{end}}{{end}}>bargauge</option>
+                <option value="heatmap" {{if .Prefill}}{{if eq (index .Prefill "type") "heatmap"}}selected{{end}}{{end}}>heatmap</option>
+                <option value="histogram" {{if .Prefill}}{{if eq (index .Prefill "type") "histogram"}}selected{{end}}{{end}}>histogram</option>
+                <option value="piechart" {{if .Prefill}}{{if eq (index .Prefill "type") "piechart"}}selected{{end}}{{end}}>piechart</option>
+                <option value="state-timeline" {{if .Prefill}}{{if eq (index .Prefill "type") "state-timeline"}}selected{{end}}{{end}}>state-timeline</option>
+                <option value="status-history" {{if .Prefill}}{{if eq (index .Prefill "type") "status-history"}}selected{{end}}{{end}}>status-history</option>
+              </optgroup>
+              <optgroup label="data">
+                <option value="table" {{if .Prefill}}{{if eq (index .Prefill "type") "table"}}selected{{end}}{{end}}>table</option>
+                <option value="logs" {{if .Prefill}}{{if eq (index .Prefill "type") "logs"}}selected{{end}}{{end}}>logs</option>
+              </optgroup>
+              <optgroup label="layout">
+                <option value="text" {{if .Prefill}}{{if eq (index .Prefill "type") "text"}}selected{{end}}{{end}}>text</option>
+                <option value="alertlist" {{if .Prefill}}{{if eq (index .Prefill "type") "alertlist"}}selected{{end}}{{end}}>alertlist</option>
+                <option value="dashlist" {{if .Prefill}}{{if eq (index .Prefill "type") "dashlist"}}selected{{end}}{{end}}>dashlist</option>
+              </optgroup>
+              <optgroup label="special">
+                <option value="comparison" {{if .Prefill}}{{if eq (index .Prefill "type") "comparison"}}selected{{end}}{{end}}>comparison</option>
+              </optgroup>
+            </select>
+          </label>
+
+          <!-- Title -->
+          <label class="form-control mb-3">
+            <div class="label"><span class="label-text text-xs">title</span></div>
+            <input type="text" name="title" id="pb-title" placeholder="panel title" class="input input-bordered input-sm w-full" value="{{if .Prefill}}{{index .Prefill "title"}}{{end}}">
+          </label>
+
+          <!-- Datasource -->
+          <label class="form-control mb-3">
+            <div class="label"><span class="label-text text-xs">datasource</span></div>
+            <select name="datasource" class="select select-bordered select-sm w-full">
+              <option value="">default</option>
+              {{range .Datasources}}<option value="{{.}}" {{if $.Prefill}}{{if eq (index $.Prefill "datasource") .}}selected{{end}}{{end}}>{{.}}</option>{{end}}
+            </select>
+          </label>
+
+          <!-- Query -->
+          <label class="form-control mb-3">
+            <div class="label"><span class="label-text text-xs">query (PromQL)</span></div>
+            <textarea name="query" id="pb-query" rows="2" placeholder="rate(metric_total[5m])" class="textarea textarea-bordered textarea-sm w-full font-mono text-xs">{{if .Prefill}}{{index .Prefill "query"}}{{end}}</textarea>
+          </label>
+
+          <!-- Legend -->
+          <label class="form-control mb-3">
+            <div class="label"><span class="label-text text-xs">legend</span></div>
+            <input type="text" name="legend" id="pb-legend" placeholder="{{`{{instance}}`}}" class="input input-bordered input-sm w-full font-mono text-xs" value="{{if .Prefill}}{{index .Prefill "legend"}}{{end}}">
+          </label>
+
+          <!-- Additional queries -->
+          <div class="mb-3">
+            <div class="label"><span class="label-text text-xs">additional queries</span></div>
+            <div id="additional-queries"></div>
+            <button type="button" class="btn btn-xs btn-ghost mt-1" onclick="addQueryTarget()">+ add query</button>
+          </div>
+
+          <!-- Unit -->
+          <label class="form-control mb-3">
+            <div class="label"><span class="label-text text-xs">unit</span></div>
+            <select name="unit" id="pb-unit" class="select select-bordered select-sm w-full">
+              <option value="short">short (default)</option>
+              <optgroup label="time">
+                <option value="s" {{if .Prefill}}{{if eq (index .Prefill "unit") "s"}}selected{{end}}{{end}}>seconds</option>
+                <option value="ms">milliseconds</option>
+                <option value="ns">nanoseconds</option>
+              </optgroup>
+              <optgroup label="data">
+                <option value="bytes" {{if .Prefill}}{{if eq (index .Prefill "unit") "bytes"}}selected{{end}}{{end}}>bytes</option>
+                <option value="decbytes">decimal bytes</option>
+              </optgroup>
+              <optgroup label="data rate">
+                <option value="Bps" {{if .Prefill}}{{if eq (index .Prefill "unit") "Bps"}}selected{{end}}{{end}}>bytes/sec</option>
+                <option value="binBps">bytes/sec (IEC)</option>
+              </optgroup>
+              <optgroup label="percent">
+                <option value="percent" {{if .Prefill}}{{if eq (index .Prefill "unit") "percent"}}selected{{end}}{{end}}>percent (0-100)</option>
+                <option value="percentunit" {{if .Prefill}}{{if eq (index .Prefill "unit") "percentunit"}}selected{{end}}{{end}}>percent (0.0-1.0)</option>
+              </optgroup>
+              <optgroup label="throughput">
+                <option value="ops">ops/sec</option>
+                <option value="reqps">requests/sec</option>
+                <option value="rps">reads/sec</option>
+                <option value="wps">writes/sec</option>
+              </optgroup>
+            </select>
+          </label>
+
+          <!-- Thresholds -->
+          <label class="form-control mb-3">
+            <div class="label"><span class="label-text text-xs">thresholds</span></div>
+            <select name="thresholds" class="select select-bordered select-sm w-full">
+              <option value="">none</option>
+              {{range .ThresholdNames}}<option value="{{.}}" {{if $.Prefill}}{{if eq (index $.Prefill "thresholds") .}}selected{{end}}{{end}}>{{.}}</option>{{end}}
+            </select>
+          </label>
+
+          <!-- Size -->
+          <div class="flex gap-3 mb-3">
+            <label class="form-control flex-1">
+              <div class="label"><span class="label-text text-xs">width (1-24)</span></div>
+              <input type="number" name="width" min="1" max="24" value="{{if .Prefill}}{{index .Prefill "width"}}{{else}}12{{end}}" class="input input-bordered input-sm w-full">
+            </label>
+            <label class="form-control flex-1">
+              <div class="label"><span class="label-text text-xs">height</span></div>
+              <input type="number" name="height" min="1" max="30" value="{{if .Prefill}}{{index .Prefill "height"}}{{else}}7{{end}}" class="input input-bordered input-sm w-full">
+            </label>
+          </div>
+
+          <!-- Description -->
+          <label class="form-control mb-3">
+            <div class="label"><span class="label-text text-xs">description</span></div>
+            <input type="text" name="description" placeholder="optional panel description" class="input input-bordered input-sm w-full" value="{{if .Prefill}}{{index .Prefill "description"}}{{end}}">
+          </label>
+
+          <!-- Type-specific options (collapsible) -->
+          <div class="collapse collapse-arrow bg-base-200/30 rounded-lg mb-3">
+            <input type="checkbox">
+            <div class="collapse-title text-xs font-semibold py-2 min-h-0">type-specific options</div>
+            <div class="collapse-content">
+              <div class="grid grid-cols-2 gap-2">
+                <!-- Stat/Gauge options -->
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">color mode</span></div>
+                  <select name="color_mode" class="select select-bordered select-xs w-full">
+                    <option value="">default</option>
+                    <option value="background" {{if .Prefill}}{{if eq (index .Prefill "color_mode") "background"}}selected{{end}}{{end}}>background</option>
+                    <option value="value">value</option>
+                    <option value="fixed">fixed</option>
+                  </select>
+                </label>
+                <!-- Timeseries options -->
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">draw style</span></div>
+                  <select name="draw_style" class="select select-bordered select-xs w-full">
+                    <option value="">default (line)</option>
+                    <option value="line">line</option>
+                    <option value="bars">bars</option>
+                    <option value="points">points</option>
+                  </select>
+                </label>
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">fill opacity</span></div>
+                  <input type="number" name="fill_opacity" min="0" max="100" placeholder="0" class="input input-bordered input-xs w-full">
+                </label>
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">line interpolation</span></div>
+                  <select name="line_interpolation" class="select select-bordered select-xs w-full">
+                    <option value="">default</option>
+                    <option value="linear">linear</option>
+                    <option value="smooth">smooth</option>
+                    <option value="stepBefore">step before</option>
+                    <option value="stepAfter">step after</option>
+                  </select>
+                </label>
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">stack</span></div>
+                  <select name="stack" class="select select-bordered select-xs w-full">
+                    <option value="">none</option>
+                    <option value="normal">normal</option>
+                  </select>
+                </label>
+                <!-- Gauge/bargauge -->
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">min</span></div>
+                  <input type="text" name="min" placeholder="auto" class="input input-bordered input-xs w-full" value="{{if .Prefill}}{{index .Prefill "min"}}{{end}}">
+                </label>
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">max</span></div>
+                  <input type="text" name="max" placeholder="auto" class="input input-bordered input-xs w-full" value="{{if .Prefill}}{{index .Prefill "max"}}{{end}}">
+                </label>
+                <!-- Piechart -->
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">pie type</span></div>
+                  <select name="pie_type" class="select select-bordered select-xs w-full">
+                    <option value="">default</option>
+                    <option value="donut">donut</option>
+                    <option value="pie">pie</option>
+                  </select>
+                </label>
+                <!-- Legend -->
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">legend mode</span></div>
+                  <select name="legend_mode" class="select select-bordered select-xs w-full">
+                    <option value="">default</option>
+                    <option value="list">list</option>
+                    <option value="table">table</option>
+                    <option value="hidden">hidden</option>
+                  </select>
+                </label>
+                <label class="form-control">
+                  <div class="label"><span class="label-text text-xs">legend placement</span></div>
+                  <select name="legend_placement" class="select select-bordered select-xs w-full">
+                    <option value="">default</option>
+                    <option value="bottom">bottom</option>
+                    <option value="right">right</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Live YAML preview + actions -->
+  <div class="space-y-4">
+    <div class="card bg-base-100 border border-base-content/10">
+      <div class="card-body p-5">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="card-title text-sm">YAML preview</h3>
+          <button class="btn btn-xs btn-ghost" onclick="copyPanelYAML()">copy</button>
+        </div>
+        <div id="yaml-preview">
+          <pre class="bg-base-200 border border-base-content/10 rounded-md p-4 font-mono text-xs leading-relaxed whitespace-pre overflow-auto max-h-[500px]"><code class="language-yaml" id="panel-yaml-output">- type: timeseries
+  title: "untitled"</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Insert into dashboard -->
+    <div class="card bg-base-100 border border-base-content/10">
+      <div class="card-body p-5">
+        <h3 class="card-title text-sm mb-2">insert into dashboard</h3>
+        {{if .Sections}}
+        <div class="flex flex-wrap gap-2 items-end">
+          <label class="form-control flex-1 min-w-[200px]">
+            <div class="label"><span class="label-text text-xs">section</span></div>
+            <select id="insert-section" class="select select-bordered select-sm w-full">
+              {{range .Sections}}
+              <option value="{{.Dashboard}}|{{.Index}}">{{.Dashboard}} / {{.Title}}</option>
+              {{end}}
+            </select>
+          </label>
+          <button class="btn btn-sm btn-success" onclick="insertPanel()">insert</button>
+        </div>
+        <div id="insert-panel-result" class="mt-2"></div>
+        {{else}}
+        <p class="text-sm text-base-content/50">no dashboards with sections configured</p>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function autoFillFromMetric() {
+  var metric = document.getElementById('pb-metric').value.trim();
+  if (!metric) { showToast('enter a metric name first', 'warning'); return; }
+  window.location.href = '/panel-builder?metric=' + encodeURIComponent(metric);
+}
+
+function addQueryTarget() {
+  var container = document.getElementById('additional-queries');
+  var div = document.createElement('div');
+  div.className = 'flex gap-2 items-end mb-1';
+  div.innerHTML =
+    '<input type="text" name="additional_query" placeholder="query" class="input input-bordered input-xs flex-1 font-mono">' +
+    '<input type="text" name="additional_legend" placeholder="legend" class="input input-bordered input-xs w-24 font-mono">' +
+    '<button type="button" class="btn btn-xs btn-ghost text-error" onclick="this.parentElement.remove()">x</button>';
+  container.appendChild(div);
+}
+
+function copyPanelYAML() {
+  var el = document.getElementById('panel-yaml-output');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(function() {
+    showToast('YAML copied', 'success');
+  });
+}
+
+function insertPanel() {
+  var sectionSelect = document.getElementById('insert-section');
+  if (!sectionSelect || !sectionSelect.value) return;
+  var parts = sectionSelect.value.split('|');
+  var yaml = document.getElementById('panel-yaml-output');
+  if (!yaml) return;
+
+  htmx.ajax('POST', '/api/config/insert-panel', {
+    target: '#insert-panel-result',
+    swap: 'innerHTML',
+    values: {
+      dashboard: parts[0],
+      section_index: parts[1],
+      panel_yaml: yaml.textContent
+    }
+  });
+}
+
+// Trigger initial preview
+document.addEventListener('DOMContentLoaded', function() {
+  var form = document.getElementById('panel-form');
+  if (form) htmx.trigger(form, 'change');
+});
+</script>
+{{end}}

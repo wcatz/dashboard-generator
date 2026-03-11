@@ -9,16 +9,16 @@ func TestHandleTemplatesPage(t *testing.T) {
 	srv, _ := newTestServer(t)
 	w := doGet(t, srv, "/templates")
 	assertStatus(t, w, http.StatusOK)
-	assertContains(t, w, "templates")
+	assertContains(t, w, "starters")
 	// Sidebar active link should be present
 	assertContains(t, w, "active")
 	// At least one built-in template should appear
-	assertContains(t, w, "Minimal")
+	assertContains(t, w, "Blank")
 }
 
 func TestHandleTemplatePreview(t *testing.T) {
 	srv, _ := newTestServer(t)
-	w := doGet(t, srv, "/api/template/preview?name=Minimal")
+	w := doGet(t, srv, "/api/template/preview?name=Blank")
 	assertStatus(t, w, http.StatusOK)
 	// Template content must contain valid YAML anchors
 	assertContains(t, w, "datasources")
@@ -45,7 +45,7 @@ func TestHandleTemplateLoad_ValidTemplate(t *testing.T) {
 		t.Fatalf("server config path mismatch: got %s, want %s", srv.ConfigPath(), cfgPath)
 	}
 
-	w := doPost(t, srv, "/api/template/load", "template=Minimal")
+	w := doPost(t, srv, "/api/template/load", "template=Blank")
 	// Should succeed (200 with HX-Redirect or redirect body) — not 400/500
 	if w.Code >= 400 {
 		t.Errorf("expected success status, got %d\nbody: %s", w.Code, w.Body.String())
@@ -73,7 +73,7 @@ func TestHandleTemplateCreate_Success(t *testing.T) {
 	// Write to a temp path inside the test's temp dir
 	outPath := t.TempDir() + "/created.yaml"
 	w := doPost(t, srv, "/api/template/create",
-		"template=Minimal&path="+outPath)
+		"template=Blank&path="+outPath)
 	assertStatus(t, w, http.StatusOK)
 	assertContains(t, w, "successfully")
 }
@@ -81,7 +81,7 @@ func TestHandleTemplateCreate_Success(t *testing.T) {
 func TestHandleTemplateCreate_PathTraversal(t *testing.T) {
 	srv, _ := newTestServer(t)
 	w := doPost(t, srv, "/api/template/create",
-		"template=Minimal&path=../../etc/passwd")
+		"template=Blank&path=../../etc/passwd")
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
@@ -93,7 +93,7 @@ func TestHandleTemplateCreate_MissingTemplate(t *testing.T) {
 
 func TestHandleTemplateCreate_MissingPath(t *testing.T) {
 	srv, _ := newTestServer(t)
-	w := doPost(t, srv, "/api/template/create", "template=Minimal")
+	w := doPost(t, srv, "/api/template/create", "template=Blank")
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
@@ -102,10 +102,10 @@ func TestHandleTemplateCreate_NoOverwrite(t *testing.T) {
 	outPath := t.TempDir() + "/exists.yaml"
 
 	// Create it once
-	doPost(t, srv, "/api/template/create", "template=Minimal&path="+outPath)
+	doPost(t, srv, "/api/template/create", "template=Blank&path="+outPath)
 
 	// Second attempt without overwrite should conflict
-	w := doPost(t, srv, "/api/template/create", "template=Minimal&path="+outPath)
+	w := doPost(t, srv, "/api/template/create", "template=Blank&path="+outPath)
 	assertStatus(t, w, http.StatusConflict)
 }
 
@@ -113,9 +113,9 @@ func TestHandleTemplateCreate_WithOverwrite(t *testing.T) {
 	srv, _ := newTestServer(t)
 	outPath := t.TempDir() + "/overwrite.yaml"
 
-	doPost(t, srv, "/api/template/create", "template=Minimal&path="+outPath)
+	doPost(t, srv, "/api/template/create", "template=Blank&path="+outPath)
 
-	w := doPost(t, srv, "/api/template/create", "template=Minimal&path="+outPath+"&overwrite=true")
+	w := doPost(t, srv, "/api/template/create", "template=Blank&path="+outPath+"&overwrite=true")
 	assertStatus(t, w, http.StatusOK)
 	assertContains(t, w, "successfully")
 }

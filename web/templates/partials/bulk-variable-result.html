@@ -1,0 +1,16 @@
+{{if .Results}}
+<div class="space-y-1">
+  {{range .Results}}
+  <div class="flex items-center gap-2 text-sm">
+    {{if .Success}}
+    <span class="badge badge-xs badge-success">ok</span>
+    <span class="font-mono">{{.Name}}</span>
+    {{else}}
+    <span class="badge badge-xs badge-error">fail</span>
+    <span class="font-mono">{{.Name}}</span>
+    <span class="text-error text-xs">{{.Error}}</span>
+    {{end}}
+  </div>
+  {{end}}
+</div>
+{{end}}

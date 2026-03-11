@@ -99,6 +99,8 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		"Title":           "dashboards",
 		"Active":          "index",
 		"ConfigPath":      s.ConfigPath(),
+		"ActiveConfig":    s.ActiveConfigName(),
+		"ConfigDir":       s.ConfigDir(),
 		"Dashboards":      dashList,
 		"DashboardCount":  len(dashboards),
 		"DatasourceCount": len(cfg.Datasources),
@@ -117,12 +119,16 @@ func (s *Server) handleEditor(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		content = fmt.Sprintf("# error reading config: %v", err)
 	}
+	cfg := s.Config()
 	s.renderPage(w, "editor.html", map[string]interface{}{
-		"Title":      "editor",
-		"Active":     "editor",
-		"ConfigPath": s.ConfigPath(),
-		"GrafanaURL": s.GrafanaURL(),
-		"Content":    content,
+		"Title":        "editor",
+		"Active":       "editor",
+		"ConfigPath":   s.ConfigPath(),
+		"ActiveConfig": s.ActiveConfigName(),
+		"ConfigDir":    s.ConfigDir(),
+		"GrafanaURL":   s.GrafanaURL(),
+		"Content":      content,
+		"Warnings":     cfg.Warnings,
 	})
 }
 
@@ -147,13 +153,15 @@ func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
 	selectedUID := r.URL.Query().Get("uid")
 
 	s.renderPage(w, "preview.html", map[string]interface{}{
-		"Title":       "preview",
-		"Active":      "preview",
-		"FullWidth":   true,
-		"ConfigPath":  s.ConfigPath(),
-		"GrafanaURL":  s.GrafanaURL(),
-		"Dashboards":  opts,
-		"SelectedUID": selectedUID,
+		"Title":        "preview",
+		"Active":       "preview",
+		"FullWidth":    true,
+		"ConfigPath":   s.ConfigPath(),
+		"ActiveConfig": s.ActiveConfigName(),
+		"ConfigDir":    s.ConfigDir(),
+		"GrafanaURL":   s.GrafanaURL(),
+		"Dashboards":   opts,
+		"SelectedUID":  selectedUID,
 	})
 }
 
@@ -197,12 +205,14 @@ func (s *Server) handleReferences(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderPage(w, "references.html", map[string]interface{}{
-		"Title":      "references",
-		"Active":     "references",
-		"ConfigPath": s.ConfigPath(),
-		"GrafanaURL": s.GrafanaURL(),
-		"Constants":  constants,
-		"Selectors":  selectors,
+		"Title":        "references",
+		"Active":       "references",
+		"ConfigPath":   s.ConfigPath(),
+		"ActiveConfig": s.ActiveConfigName(),
+		"ConfigDir":    s.ConfigDir(),
+		"GrafanaURL":   s.GrafanaURL(),
+		"Constants":    constants,
+		"Selectors":    selectors,
 	})
 }
 
@@ -229,11 +239,13 @@ func (s *Server) handleProfiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderPage(w, "profiles.html", map[string]interface{}{
-		"Title":      "profiles",
-		"Active":     "profiles",
-		"ConfigPath": s.ConfigPath(),
-		"GrafanaURL": s.GrafanaURL(),
-		"Profiles":   profiles,
+		"Title":        "profiles",
+		"Active":       "profiles",
+		"ConfigPath":   s.ConfigPath(),
+		"ActiveConfig": s.ActiveConfigName(),
+		"ConfigDir":    s.ConfigDir(),
+		"GrafanaURL":   s.GrafanaURL(),
+		"Profiles":     profiles,
 	})
 }
 
@@ -262,6 +274,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"Title":            "settings",
 		"Active":           "settings",
 		"ConfigPath":       s.ConfigPath(),
+		"ActiveConfig":     s.ActiveConfigName(),
+		"ConfigDir":        s.ConfigDir(),
 		"GrafanaURL":       s.GrafanaURL(),
 		"SchemaVersion":    gen.SchemaVersion,
 		"OutputDir":        gen.OutputDir,

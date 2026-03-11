@@ -95,7 +95,7 @@ func (s *Server) handlePush(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		if err := generator.PushToGrafana(dashboard, grafanaURL, "", "", ""); err != nil {
+		if err := generator.PushToGrafana(dashboard, grafanaURL, "", "", s.GrafanaToken()); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", dbCfg.Title, err))
 			continue
 		}

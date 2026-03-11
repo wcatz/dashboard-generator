@@ -20,7 +20,7 @@ generator:
   time_range:
     from: "now-6h"
     to: "now"
-  output_dir: "output"
+  output_dir: "dashboards"
   editable: true
   graph_tooltip: 1
   timezone: "utc"
@@ -115,8 +115,8 @@ func newTestServer(t *testing.T) (*Server, string) {
 		t.Fatalf("writing test config: %v", err)
 	}
 
-	// Create output dir so generate handler can write files
-	outDir := filepath.Join(dir, "output")
+	// Create dashboards dir so generate handler can write files
+	outDir := filepath.Join(dir, "dashboards")
 	_ = os.MkdirAll(outDir, 0755)
 
 	webFS, err := fs.Sub(web.EmbeddedFS, ".")
@@ -124,7 +124,7 @@ func newTestServer(t *testing.T) (*Server, string) {
 		t.Fatalf("creating web FS: %v", err)
 	}
 
-	srv, err := New(webFS, cfgPath, "")
+	srv, err := New(webFS, cfgPath, "", "", "")
 	if err != nil {
 		t.Fatalf("creating test server: %v", err)
 	}

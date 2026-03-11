@@ -435,6 +435,169 @@ func (e *YAMLEditor) AddVariable(name string, v VariableDef) error {
 	return e.save(doc)
 }
 
+// AddDashboard adds a new dashboard entry to the config from YAML bytes.
+// The dashboardYAML should contain the dashboard fields (uid, title, sections, etc.).
+func (e *YAMLEditor) AddDashboard(name string, dashboardYAML []byte) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	dashNode := findMappingKey(root, "dashboards")
+	if dashNode == nil {
+		root.Content = append(root.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "dashboards"},
+			&yaml.Node{Kind: yaml.MappingNode},
+		)
+		dashNode = root.Content[len(root.Content)-1]
+	}
+
+	if findMappingKey(dashNode, name) != nil {
+		return fmt.Errorf("dashboard '%s' already exists", name)
+	}
+
+	// Parse the dashboard YAML into a node
+	wrapped := fmt.Sprintf("%s:\n", name)
+	wrapped += string(dashboardYAML)
+	var tmpDoc yaml.Node
+	if err := yaml.Unmarshal([]byte(wrapped), &tmpDoc); err != nil {
+		return fmt.Errorf("parsing dashboard YAML: %w", err)
+	}
+
+	if tmpDoc.Kind != yaml.DocumentNode || len(tmpDoc.Content) == 0 {
+		return fmt.Errorf("invalid dashboard YAML structure")
+	}
+	tmpRoot := tmpDoc.Content[0]
+	if tmpRoot.Kind != yaml.MappingNode || len(tmpRoot.Content) < 2 {
+		return fmt.Errorf("dashboard YAML produced no content")
+	}
+
+	// Append the key-value pair
+	dashNode.Content = append(dashNode.Content, tmpRoot.Content[0], tmpRoot.Content[1])
+
+	return e.save(doc)
+}
+
+// AppendSection appends a section (parsed from YAML bytes) to a dashboard's sections array.
+// The sectionYAML should be a valid section entry (title + panels).
+func (e *YAMLEditor) AppendSection(dashboard string, sectionYAML []byte) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	dashNode := findMappingKey(root, "dashboards")
+	if dashNode == nil {
+		return fmt.Errorf("no dashboards section in config")
+	}
+
+	dbNode := findMappingKey(dashNode, dashboard)
+	if dbNode == nil {
+		return fmt.Errorf("dashboard '%s' not found", dashboard)
+	}
+
+	sectionsNode := findMappingKey(dbNode, "sections")
+	if sectionsNode == nil {
+		// Create sections sequence if missing
+		dbNode.Content = append(dbNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "sections"},
+			&yaml.Node{Kind: yaml.SequenceNode},
+		)
+		sectionsNode = dbNode.Content[len(dbNode.Content)-1]
+	}
+	if sectionsNode.Kind != yaml.SequenceNode {
+		return fmt.Errorf("'sections' is not a sequence in dashboard '%s'", dashboard)
+	}
+
+	// Parse the section YAML into a node
+	// Wrap in a sequence so yaml.v3 can parse it as a list item
+	wrapped := append([]byte("sections:\n"), sectionYAML...)
+	var tmpDoc yaml.Node
+	if err := yaml.Unmarshal(wrapped, &tmpDoc); err != nil {
+		return fmt.Errorf("parsing section YAML: %w", err)
+	}
+
+	// Navigate: Document → Mapping → "sections" value → Sequence items
+	if tmpDoc.Kind != yaml.DocumentNode || len(tmpDoc.Content) == 0 {
+		return fmt.Errorf("invalid section YAML structure")
+	}
+	tmpRoot := tmpDoc.Content[0]
+	tmpSections := findMappingKey(tmpRoot, "sections")
+	if tmpSections == nil || tmpSections.Kind != yaml.SequenceNode || len(tmpSections.Content) == 0 {
+		return fmt.Errorf("section YAML produced no sections")
+	}
+
+	// Append all parsed sections
+	sectionsNode.Content = append(sectionsNode.Content, tmpSections.Content...)
+
+	return e.save(doc)
+}
+
+// AppendPanel appends a panel (parsed from YAML bytes) to a specific section's panels array.
+// sectionIndex is 0-based.
+func (e *YAMLEditor) AppendPanel(dashboard string, sectionIndex int, panelYAML []byte) error {
+	doc, root, err := e.load()
+	if err != nil {
+		return err
+	}
+
+	dashNode := findMappingKey(root, "dashboards")
+	if dashNode == nil {
+		return fmt.Errorf("no dashboards section in config")
+	}
+
+	dbNode := findMappingKey(dashNode, dashboard)
+	if dbNode == nil {
+		return fmt.Errorf("dashboard '%s' not found", dashboard)
+	}
+
+	sectionsNode := findMappingKey(dbNode, "sections")
+	if sectionsNode == nil || sectionsNode.Kind != yaml.SequenceNode {
+		return fmt.Errorf("no sections in dashboard '%s'", dashboard)
+	}
+
+	if sectionIndex < 0 || sectionIndex >= len(sectionsNode.Content) {
+		return fmt.Errorf("section index %d out of range (0-%d)", sectionIndex, len(sectionsNode.Content)-1)
+	}
+
+	sectionNode := sectionsNode.Content[sectionIndex]
+	if sectionNode.Kind != yaml.MappingNode {
+		return fmt.Errorf("section %d is not a mapping", sectionIndex)
+	}
+
+	panelsNode := findMappingKey(sectionNode, "panels")
+	if panelsNode == nil {
+		sectionNode.Content = append(sectionNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: "panels"},
+			&yaml.Node{Kind: yaml.SequenceNode},
+		)
+		panelsNode = sectionNode.Content[len(sectionNode.Content)-1]
+	}
+	if panelsNode.Kind != yaml.SequenceNode {
+		return fmt.Errorf("'panels' is not a sequence in section %d", sectionIndex)
+	}
+
+	// Parse panel YAML — wrap as sequence item
+	wrapped := append([]byte("panels:\n"), panelYAML...)
+	var tmpDoc yaml.Node
+	if err := yaml.Unmarshal(wrapped, &tmpDoc); err != nil {
+		return fmt.Errorf("parsing panel YAML: %w", err)
+	}
+
+	if tmpDoc.Kind != yaml.DocumentNode || len(tmpDoc.Content) == 0 {
+		return fmt.Errorf("invalid panel YAML structure")
+	}
+	tmpRoot := tmpDoc.Content[0]
+	tmpPanels := findMappingKey(tmpRoot, "panels")
+	if tmpPanels == nil || tmpPanels.Kind != yaml.SequenceNode || len(tmpPanels.Content) == 0 {
+		return fmt.Errorf("panel YAML produced no panels")
+	}
+
+	panelsNode.Content = append(panelsNode.Content, tmpPanels.Content...)
+
+	return e.save(doc)
+}
+
 // DeleteVariable removes a variable entry from the config file.
 func (e *YAMLEditor) DeleteVariable(name string) error {
 	doc, root, err := e.load()
