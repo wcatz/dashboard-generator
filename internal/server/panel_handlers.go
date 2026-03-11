@@ -87,6 +87,8 @@ func (s *Server) handlePanelBuilderPage(w http.ResponseWriter, r *http.Request) 
 		"Title":          "panel builder",
 		"Active":         "panel-builder",
 		"ConfigPath":     s.ConfigPath(),
+		"ActiveConfig":   s.ActiveConfigName(),
+		"ConfigDir":      s.ConfigDir(),
 		"GrafanaURL":     s.GrafanaURL(),
 		"Prefill":        prefill,
 		"Datasources":    dsNames,

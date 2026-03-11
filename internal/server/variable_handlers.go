@@ -81,6 +81,8 @@ func (s *Server) handleVariables(w http.ResponseWriter, r *http.Request) {
 		"Title":           "variables",
 		"Active":          "variables",
 		"ConfigPath":      s.ConfigPath(),
+		"ActiveConfig":    s.ActiveConfigName(),
+		"ConfigDir":       s.ConfigDir(),
 		"GrafanaURL":      s.GrafanaURL(),
 		"Variables":       vars,
 		"UsedBy":          usedBy,

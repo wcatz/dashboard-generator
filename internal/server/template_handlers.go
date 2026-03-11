@@ -24,11 +24,13 @@ func (s *Server) handleTemplatesPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]interface{}{
-		"Title":      "templates",
-		"Active":     "templates",
-		"Templates":  templates,
-		"Categories": categories,
-		"ConfigPath": s.ConfigPath(),
+		"Title":        "starters",
+		"Active":       "templates",
+		"Templates":    templates,
+		"Categories":   categories,
+		"ConfigPath":   s.ConfigPath(),
+		"ActiveConfig": s.ActiveConfigName(),
+		"ConfigDir":    s.ConfigDir(),
 	}
 
 	s.renderPage(w, "templates.html", data)

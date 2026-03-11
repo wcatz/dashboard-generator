@@ -2,10 +2,12 @@
 /dashboard-generator
 dist/
 
-# Generated dashboard JSON
-output/
+# Generated dashboard output
+dashboards/
+!dashboards/.gitkeep
 *.gen.json
 gen-*.json
+gen-*.grafana.yaml
 
 # Test coverage
 coverage.out

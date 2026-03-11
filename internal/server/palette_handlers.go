@@ -16,6 +16,8 @@ func (s *Server) handlePalettes(w http.ResponseWriter, r *http.Request) {
 		"Title":         "palettes",
 		"Active":        "palettes",
 		"ConfigPath":    s.ConfigPath(),
+		"ActiveConfig":  s.ActiveConfigName(),
+		"ConfigDir":     s.ConfigDir(),
 		"GrafanaURL":    s.GrafanaURL(),
 		"Palettes":      cfg.Palettes,
 		"ActivePalette": cfg.ActivePalette,

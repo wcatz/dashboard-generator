@@ -65,4 +65,11 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/config/insert-panel", s.handleInsertPanel)
 	s.mux.HandleFunc("/api/preview/live", s.handleLivePreview)
 	s.mux.HandleFunc("/api/import/parse", s.handleImportParse)
+
+	// Config switcher (multi-config mode)
+	s.mux.HandleFunc("/api/configs", s.handleConfigList)
+	s.mux.HandleFunc("/api/configs/switch", s.handleConfigSwitch)
+	s.mux.HandleFunc("/api/configs/new", s.handleConfigNew)
+	s.mux.HandleFunc("/api/configs/duplicate", s.handleConfigDuplicate)
+	s.mux.HandleFunc("/api/configs/delete", s.handleConfigDelete)
 }

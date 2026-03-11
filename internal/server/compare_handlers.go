@@ -23,11 +23,13 @@ func (s *Server) handleComparePage(w http.ResponseWriter, r *http.Request) {
 	sort.Strings(dsNames)
 
 	s.renderPage(w, "compare.html", map[string]interface{}{
-		"Title":       "compare",
-		"Active":      "compare",
-		"ConfigPath":  s.ConfigPath(),
-		"GrafanaURL":  s.GrafanaURL(),
-		"Datasources": dsNames,
+		"Title":        "compare",
+		"Active":       "compare",
+		"ConfigPath":   s.ConfigPath(),
+		"ActiveConfig": s.ActiveConfigName(),
+		"ConfigDir":    s.ConfigDir(),
+		"GrafanaURL":   s.GrafanaURL(),
+		"Datasources":  dsNames,
 	})
 }
 

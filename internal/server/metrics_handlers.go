@@ -21,6 +21,8 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		"Title":          "metrics",
 		"Active":         "metrics",
 		"ConfigPath":     s.ConfigPath(),
+		"ActiveConfig":   s.ActiveConfigName(),
+		"ConfigDir":      s.ConfigDir(),
 		"GrafanaURL":     s.GrafanaURL(),
 		"Datasources":    cfg.Datasources,
 		"HasDatasources": hasDatasources,

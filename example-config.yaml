@@ -13,15 +13,16 @@
 generator:
   schema_version: 39
   plugin_version: "11.2.0" # Grafana plugin version (default: 11.2.0)
-  output_dir: "."
+  output_dir: "./dashboards"
   refresh: "30s"
   time_range:
     from: "now-30m"
     to: "now"
   editable: true
-  # Live preview requires a Grafana instance with:
-  #   grafana_url: "http://your-grafana:3000"  # or use --grafana-url flag / GRAFANA_URL env
-  #   grafana_token: "$GRAFANA_TOKEN"           # or use --grafana-token flag / GRAFANA_TOKEN env
+  # Per-config Grafana targeting (overrides --grafana-url / GRAFANA_URL env)
+  # Supports $ENV_VAR references for tokens
+  # grafana_url: "http://your-grafana:3000"
+  # grafana_token: "$GRAFANA_TOKEN"
   # Grafana must have: security.allow_embedding=true, auth.anonymous.enabled=true (org_role: Viewer)
   graph_tooltip: 1 # 0=default, 1=shared crosshair, 2=shared tooltip
   live_now: true

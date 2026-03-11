@@ -135,6 +135,8 @@ type GeneratorSettings struct {
 	Kubernetes      KubernetesSettings `yaml:"kubernetes"`        // K8s output settings
 	AnthropicAPIKey string             `yaml:"anthropic_api_key"` // prefer ANTHROPIC_API_KEY env var
 	AnthropicModel  string             `yaml:"anthropic_model"`
+	GrafanaURL      string             `yaml:"grafana_url"`   // per-config Grafana URL, supports $ENV_VAR
+	GrafanaToken    string             `yaml:"grafana_token"` // per-config Grafana token, supports $ENV_VAR
 }
 
 // KubernetesSettings holds K8s output configuration
@@ -149,12 +151,25 @@ func (g GeneratorSettings) ResolvedAnthropicAPIKey() string {
 	return resolveEnvRef(g.AnthropicAPIKey)
 }
 
+// ResolvedGrafanaURL returns the Grafana URL, resolving $ENV_VAR references.
+func (g GeneratorSettings) ResolvedGrafanaURL() string {
+	return resolveEnvRef(g.GrafanaURL)
+}
+
+// ResolvedGrafanaToken returns the Grafana token, resolving $ENV_VAR references.
+func (g GeneratorSettings) ResolvedGrafanaToken() string {
+	return resolveEnvRef(g.GrafanaToken)
+}
+
 // String returns a safe representation with secrets masked.
 func (g GeneratorSettings) String() string {
 	type noStringer GeneratorSettings
 	masked := noStringer(g)
 	if masked.AnthropicAPIKey != "" {
 		masked.AnthropicAPIKey = "***"
+	}
+	if masked.GrafanaToken != "" {
+		masked.GrafanaToken = "***"
 	}
 	return fmt.Sprintf("%+v", masked)
 }

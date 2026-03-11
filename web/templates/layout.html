@@ -54,10 +54,39 @@
     <div class="drawer-side z-40">
       <label for="sidebar-toggle" aria-label="close sidebar" class="drawer-overlay"></label>
       <nav class="menu bg-base-200 min-h-full w-60 border-r border-base-content/10 flex flex-col text-sm">
-        <!-- brand -->
-        <div class="px-4 py-3 border-b border-base-content/10 flex items-center gap-2 text-primary font-bold shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          <span>dashboard-generator</span>
+        <!-- brand + project switcher -->
+        <div class="px-4 py-3 border-b border-base-content/10 shrink-0">
+          {{if .ConfigDir}}
+          <div class="dropdown w-full">
+            <label tabindex="0" class="btn btn-ghost btn-sm w-full justify-between font-mono text-primary px-1 h-auto min-h-0 py-1.5">
+              <span class="flex items-center gap-2 truncate">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                <span class="truncate text-xs">{{.ActiveConfig}}</span>
+              </span>
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 opacity-50 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </label>
+            <div tabindex="0" class="dropdown-content z-50 bg-base-300 border border-base-content/10 rounded-box shadow-xl w-56 mt-1 p-2">
+              <div class="text-[0.6rem] opacity-50 uppercase tracking-wider px-2 py-1">projects</div>
+              <div id="config-switcher-list" hx-get="/api/configs" hx-trigger="load" hx-swap="innerHTML">
+                <span class="loading loading-spinner loading-xs"></span>
+              </div>
+              <div class="divider my-1"></div>
+              <button class="btn btn-ghost btn-xs w-full justify-start gap-2" onclick="document.getElementById('new-project-modal').showModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                new project
+              </button>
+              <button class="btn btn-ghost btn-xs w-full justify-start gap-2" onclick="document.getElementById('duplicate-modal').showModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                duplicate
+              </button>
+            </div>
+          </div>
+          {{else}}
+          <div class="flex items-center gap-2 text-primary font-bold">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            <span>dashboard-generator</span>
+          </div>
+          {{end}}
         </div>
 
         <div class="flex-1 overflow-y-auto py-2">
@@ -93,7 +122,7 @@
             </a></li>
             <li><a href="/templates" class="{{if eq .Active "templates"}}active{{end}} gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-              templates
+              starters
             </a></li>
           </ul>
 
@@ -147,5 +176,53 @@
       </nav>
     </div>
   </div>
+  <!-- New Project Modal -->
+  {{if .ConfigDir}}
+  <dialog id="new-project-modal" class="modal">
+    <div class="modal-box bg-base-200 max-w-sm">
+      <h3 class="font-bold text-lg mb-4">New Project</h3>
+      <form hx-post="/api/configs/new" hx-swap="none" class="space-y-3">
+        <div class="form-control">
+          <label class="label"><span class="label-text text-xs">Project name</span></label>
+          <input type="text" name="name" placeholder="my-dashboards" class="input input-bordered input-sm w-full font-mono" required pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*">
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text text-xs">Start from</span></label>
+          <select name="starter" class="select select-bordered select-sm w-full">
+            <option value="">Blank</option>
+            <option value="Node Exporter">Node Exporter</option>
+            <option value="Kubernetes Cluster">Kubernetes Cluster</option>
+            <option value="Kubernetes Workloads">Kubernetes Workloads</option>
+            <option value="NGINX Ingress">NGINX Ingress</option>
+            <option value="Generic Application">Generic Application</option>
+          </select>
+        </div>
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="this.closest('dialog').close()">cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">create</button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
+
+  <!-- Duplicate Modal -->
+  <dialog id="duplicate-modal" class="modal">
+    <div class="modal-box bg-base-200 max-w-sm">
+      <h3 class="font-bold text-lg mb-4">Duplicate Project</h3>
+      <form hx-post="/api/configs/duplicate" hx-swap="none" class="space-y-3">
+        <div class="form-control">
+          <label class="label"><span class="label-text text-xs">New name</span></label>
+          <input type="text" name="name" placeholder="{{.ActiveConfig}}-copy" class="input input-bordered input-sm w-full font-mono" required pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*">
+        </div>
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="this.closest('dialog').close()">cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">duplicate</button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
+  {{end}}
 </body>
 </html>

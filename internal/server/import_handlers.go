@@ -21,12 +21,14 @@ func (s *Server) handleImportPage(w http.ResponseWriter, r *http.Request) {
 	dashboards, _ := cfg.GetDashboardOrder("")
 
 	s.renderPage(w, "import.html", map[string]interface{}{
-		"Title":       "import",
-		"Active":      "import",
-		"ConfigPath":  s.ConfigPath(),
-		"GrafanaURL":  s.GrafanaURL(),
-		"Datasources": dsNames,
-		"Dashboards":  dashboards,
+		"Title":        "import",
+		"Active":       "import",
+		"ConfigPath":   s.ConfigPath(),
+		"ActiveConfig": s.ActiveConfigName(),
+		"ConfigDir":    s.ConfigDir(),
+		"GrafanaURL":   s.GrafanaURL(),
+		"Datasources":  dsNames,
+		"Dashboards":   dashboards,
 	})
 }
 

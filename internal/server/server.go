@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ var funcMap = template.FuncMap{
 type Server struct {
 	cfg           *config.Config
 	cfgPath       string
+	configDir     string // directory containing config files (optional)
 	grafanaURL    string
 	grafanaToken  string
 	mu            sync.RWMutex
@@ -35,7 +37,27 @@ type Server struct {
 }
 
 // New creates a new Server with the given embedded filesystem, config path, and optional Grafana URL/token.
-func New(webFS fs.FS, cfgPath string, grafanaURL string, grafanaToken string) (*Server, error) {
+// If configDir is non-empty, multi-config mode is enabled. When cfgPath is empty but configDir is set,
+// the first .yaml file in the directory is used.
+func New(webFS fs.FS, cfgPath string, configDir string, grafanaURL string, grafanaToken string) (*Server, error) {
+	// Multi-config directory setup
+	if configDir != "" {
+		if err := os.MkdirAll(configDir, 0755); err != nil {
+			return nil, fmt.Errorf("creating config directory: %w", err)
+		}
+		if cfgPath == "" {
+			first, err := findFirstYAML(configDir)
+			if err != nil {
+				return nil, err
+			}
+			cfgPath = first
+		}
+	}
+
+	if cfgPath == "" {
+		return nil, fmt.Errorf("no config file specified")
+	}
+
 	cfg, err := config.Load(cfgPath, nil)
 	if err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
@@ -44,6 +66,7 @@ func New(webFS fs.FS, cfgPath string, grafanaURL string, grafanaToken string) (*
 	s := &Server{
 		cfg:           cfg,
 		cfgPath:       cfgPath,
+		configDir:     configDir,
 		grafanaURL:    grafanaURL,
 		grafanaToken:  grafanaToken,
 		webFS:         webFS,
@@ -56,6 +79,108 @@ func New(webFS fs.FS, cfgPath string, grafanaURL string, grafanaToken string) (*
 
 	s.registerRoutes()
 	return s, nil
+}
+
+// findFirstYAML returns the path to the first .yaml or .yml file in dir.
+func findFirstYAML(dir string) (string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", fmt.Errorf("reading config directory: %w", err)
+	}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
+			return filepath.Join(dir, name), nil
+		}
+	}
+	return "", fmt.Errorf("no .yaml files found in config directory %s", dir)
+}
+
+// ConfigDir returns the config directory path (empty if not using multi-config).
+func (s *Server) ConfigDir() string { return s.configDir }
+
+// ListConfigs returns names of all .yaml/.yml files in the config directory.
+// In single-file mode, returns just the current config filename.
+func (s *Server) ListConfigs() ([]string, error) {
+	if s.configDir == "" {
+		return []string{filepath.Base(s.cfgPath)}, nil
+	}
+	entries, err := os.ReadDir(s.configDir)
+	if err != nil {
+		return nil, fmt.Errorf("reading config directory: %w", err)
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// ActiveConfigName returns the display name of the current config (filename without extension).
+func (s *Server) ActiveConfigName() string {
+	name := filepath.Base(s.cfgPath)
+	name = strings.TrimSuffix(name, ".yaml")
+	name = strings.TrimSuffix(name, ".yml")
+	return name
+}
+
+// SwitchConfig switches to a different config file in the config directory.
+func (s *Server) SwitchConfig(name string) error {
+	if s.configDir == "" {
+		return fmt.Errorf("config switching not available in single-file mode")
+	}
+
+	// Validate name: only allow alphanumeric, hyphens, underscores, dots
+	clean := filepath.Base(name)
+	if clean != name || strings.Contains(clean, "..") {
+		return fmt.Errorf("invalid config name")
+	}
+
+	// Ensure it has a yaml extension
+	if !strings.HasSuffix(clean, ".yaml") && !strings.HasSuffix(clean, ".yml") {
+		clean += ".yaml"
+	}
+
+	target := filepath.Join(s.configDir, clean)
+
+	// Verify the file is within configDir (prevent traversal)
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
+	absDir, err := filepath.Abs(s.configDir)
+	if err != nil {
+		return fmt.Errorf("invalid config dir: %w", err)
+	}
+	if !strings.HasPrefix(absTarget, absDir+string(filepath.Separator)) {
+		return fmt.Errorf("invalid config name")
+	}
+
+	if _, err := os.Stat(target); err != nil {
+		return fmt.Errorf("config file not found: %s", clean)
+	}
+
+	cfg, err := config.Load(target, nil)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	s.mu.Lock()
+	s.cfgPath = target
+	s.cfg = cfg
+	s.mu.Unlock()
+	s.variableCache.Clear()
+	return nil
 }
 
 func (s *Server) loadTemplates() error {
@@ -148,13 +273,23 @@ func (s *Server) Config() *config.Config {
 	return s.cfg
 }
 
-// GrafanaURL returns the configured Grafana URL (empty if not set).
+// GrafanaURL returns the Grafana URL. Config-level value takes precedence over CLI/env.
 func (s *Server) GrafanaURL() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if u := s.cfg.Generator.ResolvedGrafanaURL(); u != "" {
+		return u
+	}
 	return s.grafanaURL
 }
 
-// GrafanaToken returns the configured Grafana API token (empty if not set).
+// GrafanaToken returns the Grafana token. Config-level value takes precedence over CLI/env.
 func (s *Server) GrafanaToken() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if t := s.cfg.Generator.ResolvedGrafanaToken(); t != "" {
+		return t
+	}
 	return s.grafanaToken
 }
 

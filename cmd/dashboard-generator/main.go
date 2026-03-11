@@ -22,6 +22,7 @@ var (
 
 	// CLI flags
 	cfgFile         string
+	cfgDir          string
 	profile         string
 	outputDir       string
 	prometheusURL   string
@@ -95,11 +96,11 @@ func main() {
 		Short: "start the web UI server",
 		RunE:  runServe,
 	}
-	serveCmd.Flags().StringVar(&cfgFile, "config", "", "path to YAML config file (required)")
+	serveCmd.Flags().StringVar(&cfgFile, "config", "", "path to YAML config file")
+	serveCmd.Flags().StringVar(&cfgDir, "config-dir", "", "directory of config files for multi-project mode")
 	serveCmd.Flags().IntVar(&servePort, "port", 8080, "HTTP server port")
 	serveCmd.Flags().StringVar(&grafanaURL, "grafana-url", "", "Grafana URL for push (or set GRAFANA_URL env)")
 	serveCmd.Flags().StringVar(&grafanaToken, "grafana-token", "", "Grafana API token (or set GRAFANA_TOKEN env)")
-	_ = serveCmd.MarkFlagRequired("config")
 
 	rootCmd.AddCommand(genCmd, discoverCmd, pushCmd, serveCmd)
 
@@ -174,6 +175,9 @@ func runDiscover(cmd *cobra.Command, args []string) error {
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
+	if cfgFile == "" && cfgDir == "" {
+		return fmt.Errorf("at least one of --config or --config-dir is required")
+	}
 	gURL := grafanaURL
 	if gURL == "" {
 		gURL = os.Getenv("GRAFANA_URL")
@@ -182,7 +186,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	if gToken == "" {
 		gToken = os.Getenv("GRAFANA_TOKEN")
 	}
-	srv, err := server.New(web.EmbeddedFS, cfgFile, gURL, gToken)
+	srv, err := server.New(web.EmbeddedFS, cfgFile, cfgDir, gURL, gToken)
 	if err != nil {
 		return err
 	}

@@ -1,0 +1,14 @@
+{{define "config-list.html"}}
+<div id="config-list">
+  {{range .Configs}}
+  <button
+    class="btn btn-ghost btn-xs justify-start w-full font-mono {{if eq . $.Active}}btn-active{{end}}"
+    hx-post="/api/configs/switch"
+    hx-vals='{"name": "{{.}}"}'
+    hx-confirm="Switch to {{.}}?"
+    {{if eq . $.Active}}disabled{{end}}>
+    {{.}}
+  </button>
+  {{end}}
+</div>
+{{end}}

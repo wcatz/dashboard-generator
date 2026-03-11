@@ -79,7 +79,7 @@ func TestPushWithMockGrafana(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating web FS: %v", err)
 	}
-	srv, err := New(webFS, cfgPath, grafana.URL, "")
+	srv, err := New(webFS, cfgPath, "", grafana.URL, "")
 	if err != nil {
 		t.Fatalf("creating server: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestPushSingleDashboard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating web FS: %v", err)
 	}
-	srv, err := New(webFS, cfgPath, grafana.URL, "")
+	srv, err := New(webFS, cfgPath, "", grafana.URL, "")
 	if err != nil {
 		t.Fatalf("creating server: %v", err)
 	}
