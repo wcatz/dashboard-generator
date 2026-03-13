@@ -157,7 +157,7 @@ func (s *Server) handleConfigFormat(w http.ResponseWriter, r *http.Request) {
 	enc.Close()
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write(buf.Bytes())
+	_, _ = w.Write(buf.Bytes())
 }
 
 func (s *Server) handleDashboardSections(w http.ResponseWriter, r *http.Request) {

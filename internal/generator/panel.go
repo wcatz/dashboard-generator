@@ -1199,8 +1199,7 @@ func (pf *PanelFactory) XYChart(cfg map[string]interface{}, x, y int) map[string
 	pointSize := getInt(cfg, "point_size", 5)
 
 	showMode := getString(cfg, "show", "points")
-	drawStyle := "line"
-	showPoints := "always"
+	var drawStyle, showPoints string
 	switch showMode {
 	case "lines":
 		drawStyle = "line"
