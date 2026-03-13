@@ -1,0 +1,755 @@
+generator:
+  schema_version: 39
+  refresh: 30s
+  time_range: 1h
+  output_dir: /dashboards
+  editable: true
+datasources:
+  blink: {type: prometheus, uid: blink, url: 'https://blinklabsio.grafana.net/api/datasources/proxy/uid/grafanacloud-prom', token: $BLINKLABS_GRAFANA_SA_TOKEN}
+  k3s: {type: prometheus, uid: prometheus, url: 'http://k3s-grafana/api/datasources/proxy/uid/prometheus', token: $GRAFANA_TOKEN}
+palettes:
+  default:
+    blue: "#5794F2"
+    green: "#73BF69"
+    yellow: "#F2CC0C"
+    red: "#F2495C"
+    purple: "#B877D9"
+    orange: "#FF9830"
+    cyan: "#6ED0E0"
+    teal: "#00A8A8"
+active_palette: default
+variables: {}
+query_macros:
+  by_inst: '{instance=~"$instance"}'
+dashboards:
+  app_overview:
+    uid: dingo
+    title: dingo overview
+    filename: dingo.json
+    tags: [application, dingo, generated]
+    variables: [instance]
+    sections:
+      - title: node status & forging
+        panels:
+          - type: stat
+            title: forging enabled
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_forging_enabled${by_inst}
+                legend: forging status
+            unit: none
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $green
+                  value: 1
+            value_mappings:
+              - type: value
+                options:
+                  "1": enabled
+                  "0": disabled
+            transparent: true
+            description: forging capability status on this node
+          - type: stat
+            title: blocks forged
+            datasource: k3s
+            targets:
+              - expr: increase(cardano_node_metrics_blocksForgedNum_int${by_inst}[24h])
+                legend: blocks forged (24h)
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $blue
+                  value: null
+            transparent: true
+            description: total blocks forged in the last 24 hours
+          - type: stat
+            title: current block
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_blockNum_int${by_inst}
+                legend: current block
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $teal
+                  value: null
+            transparent: true
+            description: current block height on chain
+          - type: stat
+            title: blocks in mempool
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_txsInMempool_int${by_inst}
+                legend: txs in mempool
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $orange
+                  value: 500
+                - color: $red
+                  value: 2000
+            transparent: true
+            description: transaction count pending in mempool
+          - type: stat
+            title: mempool size
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_mempoolBytes_int${by_inst} / 1024 / 1024
+                legend: mempool mb
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $orange
+                  value: 50
+                - color: $red
+                  value: 100
+            transparent: true
+            description: mempool size in megabytes
+          - type: stat
+            title: slot in epoch
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_slotInEpoch_int${by_inst}
+                legend: slot in epoch
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $cyan
+                  value: null
+            transparent: true
+            description: current slot position within the epoch
+          - type: gauge
+            title: chain density
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_density_real${by_inst} * 100
+                legend: density
+            unit: percent
+            min: 0
+            max: 100
+            show_threshold_labels: true
+            show_threshold_markers: true
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $orange
+                  value: 50
+                - color: $green
+                  value: 80
+            transparent: true
+            description: blockchain density percentage
+          - type: stat
+            title: chain forks
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_forks_int${by_inst}
+                legend: forks detected
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $orange
+                  value: 1
+                - color: $red
+                  value: 5
+            transparent: true
+            description: number of chain forks detected
+  dingo_ops:
+    uid: dingo-ops
+    title: dingo operational monitoring
+    filename: dingo-ops.json
+    tags: [cardano, stake-pool, dingo, k3s, generated]
+    variables: [instance]
+    sections:
+      - title: forging & chain health
+        panels:
+          - type: stat
+            title: forging enabled
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_forging_enabled${by_inst}
+                legend: forging status
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $green
+                  value: 1
+            value_mappings:
+              - type: value
+                options:
+                  "1": enabled
+                  "0": disabled
+            transparent: true
+            description: stake pool forging status — red means not producing blocks
+          - type: stat
+            title: kes key expiry warning
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_remainingKESPeriods_int${by_inst}
+                legend: remaining periods
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $orange
+                  value: 2
+                - color: $yellow
+                  value: 5
+                - color: $green
+                  value: 10
+            transparent: true
+            description: remaining KES periods before operational cert expires — red/orange require immediate renewal
+          - type: stat
+            title: blocks forged this epoch
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_blocksForgedNum_int${by_inst}
+                legend: blocks forged
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $yellow
+                  value: 1
+                - color: $green
+                  value: 5
+            transparent: true
+            description: blocks forged in current epoch — zero or low values indicate pool not in stake
+          - type: stat
+            title: chain density
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_density_real${by_inst} * 100
+                legend: density %
+            unit: percent
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $yellow
+                  value: 75
+                - color: $green
+                  value: 90
+            transparent: true
+            description: block production density — below 90% indicates network issues
+      - title: peer connectivity
+        panels:
+          - type: stat
+            title: hot peers (active)
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_peerSelection_hot${by_inst}
+                legend: hot peers
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $orange
+                  value: 1
+                - color: $yellow
+                  value: 2
+                - color: $green
+                  value: 4
+            transparent: true
+            description: active peer connections — below 2 indicates isolation risk
+          - type: stat
+            title: warm peers
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_peerSelection_warm${by_inst}
+                legend: warm peers
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $yellow
+                  value: null
+                - color: $green
+                  value: 2
+            transparent: true
+            description: candidate peers ready for promotion — feeds hot peer pool
+          - type: stat
+            title: cold peers
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_peerSelection_cold${by_inst}
+                legend: cold peers
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $yellow
+                  value: null
+                - color: $green
+                  value: 5
+            transparent: true
+            description: discovered peers not yet connected — maintains network diversity
+          - type: stat
+            title: duplex connections
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_connectionManagerState_duplexState_int${by_inst}
+                legend: duplex
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $yellow
+                  value: 1
+                - color: $green
+                  value: 2
+            transparent: true
+            description: bidirectional connections — required for block propagation
+          - type: timeseries
+            title: peer connectivity trend
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_peerSelection_hot${by_inst}
+                legend: hot
+              - expr: cardano_node_metrics_peerSelection_warm${by_inst}
+                legend: warm
+              - expr: cardano_node_metrics_peerSelection_cold${by_inst}
+                legend: cold
+            unit: short
+            fill_opacity: 20
+            line_interpolation: smooth
+            legend_calcs: [mean, max]
+            legend_mode: list
+            legend_placement: bottom
+            transparent: true
+            description: peer pool composition over time — sudden drops indicate network instability
+      - title: mempool & congestion
+        panels:
+          - type: stat
+            title: mempool tx count
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_txsInMempool_int${by_inst}
+                legend: txs in mempool
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 500
+                - color: $orange
+                  value: 1000
+                - color: $red
+                  value: 2000
+            transparent: true
+            description: pending transactions in mempool — high values indicate network congestion
+          - type: stat
+            title: mempool size
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_mempoolBytes_int${by_inst}
+                legend: mempool bytes
+            unit: bytes
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 67108864
+                - color: $orange
+                  value: 134217728
+                - color: $red
+                  value: 268435456
+            transparent: true
+            description: mempool size in bytes — exceeding max causes transaction drops
+          - type: timeseries
+            title: mempool trend
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_txsInMempool_int${by_inst}
+                legend: tx count
+              - expr: cardano_node_metrics_mempoolBytes_int${by_inst}
+                legend: bytes
+            unit: short
+            fill_opacity: 15
+            line_interpolation: smooth
+            transparent: true
+            description: mempool buildup pattern — steady rise precedes blocks, sharp drops are block events
+      - title: kes operational certificate
+        panels:
+          - type: gauge
+            title: kes periods remaining %
+            datasource: k3s
+            targets:
+              - expr: (cardano_node_metrics_remainingKESPeriods_int${by_inst} / 62) * 100
+                legend: kes remaining
+            unit: percent
+            min: 0
+            max: 100
+            show_threshold_labels: true
+            show_threshold_markers: true
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $orange
+                  value: 10
+                - color: $yellow
+                  value: 25
+                - color: $green
+                  value: 50
+            transparent: true
+            description: KES key lifecycle — 62 periods per key, renewal required at zero
+          - type: stat
+            title: current kes period
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_currentKESPeriod_int${by_inst}
+                legend: current period
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $cyan
+                  value: null
+            transparent: true
+            description: absolute KES period counter
+          - type: stat
+            title: operational cert expiry period
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_operationalCertificateExpiryKESPeriod_int${by_inst}
+                legend: expiry period
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $cyan
+                  value: null
+            transparent: true
+            description: KES period when current operational certificate expires
+      - title: memory & gc pressure
+        panels:
+          - type: stat
+            title: resident memory (mb)
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_Mem_resident_int${by_inst} / 1024 / 1024
+                legend: resident mb
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 4096
+                - color: $orange
+                  value: 7168
+                - color: $red
+                  value: 8192
+            transparent: true
+            description: resident memory used by cardano-node — high values cause GC thrashing
+          - type: stat
+            title: major gc count (5m)
+            datasource: k3s
+            targets:
+              - expr: rate(cardano_node_metrics_RTS_gcMajorNum_int${by_inst}[5m]) * 300
+                legend: major gc
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 1
+                - color: $orange
+                  value: 3
+                - color: $red
+                  value: 5
+            transparent: true
+            description: major GC events per 5min — high indicates memory pressure or heap undersized
+          - type: stat
+            title: minor gc rate (/sec)
+            datasource: k3s
+            targets:
+              - expr: rate(cardano_node_metrics_RTS_gcMinorNum_int${by_inst}[1m])
+                legend: minor gc/s
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 5
+                - color: $orange
+                  value: 15
+                - color: $red
+                  value: 30
+            transparent: true
+            description: minor GC rate — sustained increase indicates allocation pressure
+          - type: stat
+            title: served blocks (1h)
+            datasource: k3s
+            targets:
+              - expr: increase(cardano_node_metrics_served_block_count_int${by_inst}[1h])
+                legend: served blocks
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $yellow
+                  value: 5
+                - color: $green
+                  value: 20
+            transparent: true
+            description: blocks served to peers (1h) — low/zero indicates network isolation or sync lag
+          - type: timeseries
+            title: memory & gc trend
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_Mem_resident_int${by_inst} / 1024 / 1024
+                legend: resident memory (mb)
+              - expr: rate(cardano_node_metrics_RTS_gcMajorNum_int${by_inst}[5m]) * 300
+                legend: major gc (per 5m)
+            unit: short
+            fill_opacity: 20
+            line_interpolation: smooth
+            transparent: true
+            description: memory allocation and GC activity — trending up indicates process needs restart
+      - title: network & forks
+        panels:
+          - type: stat
+            title: fork events (1h)
+            datasource: k3s
+            targets:
+              - expr: increase(cardano_node_metrics_forks_int${by_inst}[1h])
+                legend: forks
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 1
+                - color: $red
+                  value: 2
+            transparent: true
+            description: fork detection in past hour — indicates consensus instability if non-zero
+          - type: stat
+            title: inbound idle connections
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_connectionManagerState_inboundIdleState_int${by_inst}
+                legend: idle inbound
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $yellow
+                  value: null
+                - color: $green
+                  value: 2
+            transparent: true
+            description: inbound connections awaiting promotion — supports consensus
+          - type: stat
+            title: hot big ledger peers
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_peerSelection_hotBigLedgerPeers${by_inst}
+                legend: hot blp
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $yellow
+                  value: null
+                - color: $green
+                  value: 1
+            transparent: true
+            description: active big ledger peer connections — critical for SPOs to maintain consensus
+          - type: stat
+            title: warm big ledger peers
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_peerSelection_warmBigLedgerPeers${by_inst}
+                legend: warm blp
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $yellow
+                  value: null
+                - color: $green
+                  value: 1
+            transparent: true
+            description: candidate big ledger peers — backup for hot connection failures
+          - type: timeseries
+            title: big ledger peer availability
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_peerSelection_hotBigLedgerPeers${by_inst}
+                legend: hot
+              - expr: cardano_node_metrics_peerSelection_warmBigLedgerPeers${by_inst}
+                legend: warm
+              - expr: cardano_node_metrics_peerSelection_coldBigLedgerPeers${by_inst}
+                legend: cold
+            unit: short
+            fill_opacity: 15
+            line_interpolation: smooth
+            transparent: true
+            description: big ledger peer connectivity — loss of hot connection risks block propagation delays
+      - title: slot & epoch progress
+        panels:
+          - type: gauge
+            title: epoch progress
+            datasource: k3s
+            targets:
+              - expr: (cardano_node_metrics_slotInEpoch_int${by_inst} / 432000) * 100
+                legend: epoch %
+            unit: percent
+            min: 0
+            max: 100
+            show_threshold_labels: false
+            show_threshold_markers: false
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $blue
+                  value: null
+            transparent: true
+            description: completion percentage of current epoch
+          - type: stat
+            title: slot in epoch
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_slotInEpoch_int${by_inst}
+                legend: slot
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $cyan
+                  value: null
+            transparent: true
+            description: current slot within epoch (0-432000 for shelley era)
+          - type: stat
+            title: chain tip (blocks)
+            datasource: k3s
+            targets:
+              - expr: cardano_node_metrics_blockNum_int${by_inst}
+                legend: block height
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $teal
+                  value: null
+            transparent: true
+            description: current chain height — confirms node is synced and advancing
+          - type: stat
+            title: uptime (days)
+            datasource: k3s
+            targets:
+              - expr: (time() - cardano_node_metrics_nodeStartTime_int${by_inst}) / 86400
+                legend: uptime
+            unit: short
+            color_mode: background
+            graph_mode: none
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+            transparent: true
+            description: days since node startup — frequent restarts impact consensus participation
