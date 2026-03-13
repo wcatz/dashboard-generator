@@ -329,3 +329,190 @@ func TestDefaultPanelSizes(t *testing.T) {
 		}
 	}
 }
+
+func TestTransformationsOnTimeseries(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	transforms := []interface{}{
+		map[string]interface{}{
+			"id": "organize",
+			"options": map[string]interface{}{
+				"excludeByName": map[string]interface{}{"Time": true},
+			},
+		},
+	}
+
+	panel := pf.Timeseries(map[string]interface{}{
+		"title":           "with transforms",
+		"query":           "up",
+		"transformations": transforms,
+	}, 0, 0)
+
+	got, ok := panel["transformations"].([]interface{})
+	if !ok {
+		t.Fatal("transformations key missing from timeseries panel")
+	}
+	if len(got) != 1 {
+		t.Errorf("transformations count = %d, want 1", len(got))
+	}
+}
+
+func TestTransformationsOmittedWhenEmpty(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	panel := pf.Timeseries(map[string]interface{}{
+		"title": "no transforms",
+		"query": "up",
+	}, 0, 0)
+
+	if _, ok := panel["transformations"]; ok {
+		t.Error("transformations key should not be present when not configured")
+	}
+}
+
+func TestStatPanelRepeat(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	panel := pf.Stat(map[string]interface{}{
+		"title":            "repeated stat",
+		"query":            "up",
+		"repeat":           "instance",
+		"repeat_direction": "v",
+		"max_per_row":      4,
+	}, 0, 0)
+
+	if panel["repeat"] != "instance" {
+		t.Errorf("repeat = %v, want instance", panel["repeat"])
+	}
+	if panel["repeatDirection"] != "v" {
+		t.Errorf("repeatDirection = %v, want v", panel["repeatDirection"])
+	}
+	if panel["maxPerRow"] != 4 {
+		t.Errorf("maxPerRow = %v, want 4", panel["maxPerRow"])
+	}
+}
+
+func TestRepeatOmittedWhenEmpty(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	panel := pf.Stat(map[string]interface{}{
+		"title": "no repeat",
+		"query": "up",
+	}, 0, 0)
+
+	if _, ok := panel["repeat"]; ok {
+		t.Error("repeat key should not be present when not configured")
+	}
+}
+
+func TestTrendPanel(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	panel := pf.Trend(map[string]interface{}{
+		"title":   "build times",
+		"query":   "build_duration_seconds",
+		"x_field": "build_number",
+		"unit":    "s",
+	}, 0, 0)
+
+	if panel["type"] != "trend" {
+		t.Errorf("type = %v, want trend", panel["type"])
+	}
+	opts := panel["options"].(map[string]interface{})
+	if opts["xField"] != "build_number" {
+		t.Errorf("xField = %v, want build_number", opts["xField"])
+	}
+	fc := panel["fieldConfig"].(map[string]interface{})
+	defaults := fc["defaults"].(map[string]interface{})
+	if defaults["unit"] != "s" {
+		t.Errorf("unit = %v, want s", defaults["unit"])
+	}
+}
+
+func TestCandlestickPanel(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	panel := pf.Candlestick(map[string]interface{}{
+		"title":       "price chart",
+		"query":       "stock_price",
+		"open_field":  "open",
+		"high_field":  "high",
+		"low_field":   "low",
+		"close_field": "close",
+		"up_color":    "#00ff00",
+		"down_color":  "#ff0000",
+	}, 0, 0)
+
+	if panel["type"] != "candlestick" {
+		t.Errorf("type = %v, want candlestick", panel["type"])
+	}
+	opts := panel["options"].(map[string]interface{})
+	fields := opts["fields"].(map[string]interface{})
+	if fields["open"] != "open" {
+		t.Errorf("fields.open = %v, want open", fields["open"])
+	}
+	if fields["close"] != "close" {
+		t.Errorf("fields.close = %v, want close", fields["close"])
+	}
+	colors := opts["colors"].(map[string]interface{})
+	if colors["up"] != "#00ff00" {
+		t.Errorf("colors.up = %v, want #00ff00", colors["up"])
+	}
+}
+
+func TestNewsPanel(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	panel := pf.News(map[string]interface{}{
+		"title":    "feed",
+		"feed_url": "https://example.com/rss",
+	}, 0, 0)
+
+	if panel["type"] != "news" {
+		t.Errorf("type = %v, want news", panel["type"])
+	}
+	opts := panel["options"].(map[string]interface{})
+	if opts["feedUrl"] != "https://example.com/rss" {
+		t.Errorf("feedUrl = %v, want https://example.com/rss", opts["feedUrl"])
+	}
+	if opts["showImage"] != true {
+		t.Errorf("showImage = %v, want true", opts["showImage"])
+	}
+}
+
+func TestFromConfigNewTypes(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	newTypes := []string{"trend", "candlestick", "news"}
+	for _, typ := range newTypes {
+		pcfg := map[string]interface{}{
+			"type":  typ,
+			"title": typ + " test",
+			"query": "up",
+		}
+		panel, err := pf.FromConfig(pcfg, 0, 0)
+		if err != nil {
+			t.Errorf("FromConfig(%s) error: %v", typ, err)
+			continue
+		}
+		if panel["type"] != typ {
+			t.Errorf("FromConfig(%s) type = %v", typ, panel["type"])
+		}
+	}
+}

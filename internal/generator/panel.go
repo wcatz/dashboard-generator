@@ -25,6 +25,9 @@ var DefaultSizes = map[string][2]int{
 	"comparison":     {12, 8},
 	"alertlist":      {12, 5},
 	"dashlist":       {12, 5},
+	"trend":          {12, 7},
+	"candlestick":    {12, 7},
+	"news":           {12, 6},
 }
 
 // PanelFactory creates Grafana panel JSON dicts.
@@ -74,6 +77,12 @@ func (pf *PanelFactory) FromConfig(cfg map[string]interface{}, x, y int) (map[st
 		return pf.Barchart(cfg, x, y), nil
 	case "dashlist":
 		return pf.Dashlist(cfg, x, y), nil
+	case "trend":
+		return pf.Trend(cfg, x, y), nil
+	case "candlestick":
+		return pf.Candlestick(cfg, x, y), nil
+	case "news":
+		return pf.News(cfg, x, y), nil
 	default:
 		return nil, fmt.Errorf("unknown panel type: %s", ptype)
 	}
@@ -182,6 +191,24 @@ func (pf *PanelFactory) dataLinks(cfg map[string]interface{}) []interface{} {
 	return []interface{}{}
 }
 
+// applyTransformations adds Grafana transformations to a panel if configured.
+func (pf *PanelFactory) applyTransformations(panel map[string]interface{}, cfg map[string]interface{}) {
+	if t, ok := cfg["transformations"].([]interface{}); ok {
+		panel["transformations"] = t
+	}
+}
+
+// applyRepeat adds panel-level repeat config for multi-value variables.
+func (pf *PanelFactory) applyRepeat(panel map[string]interface{}, cfg map[string]interface{}) {
+	if r := getString(cfg, "repeat", ""); r != "" {
+		panel["repeat"] = r
+		panel["repeatDirection"] = getString(cfg, "repeat_direction", "h")
+		if mr := getInt(cfg, "max_per_row", 0); mr > 0 {
+			panel["maxPerRow"] = mr
+		}
+	}
+}
+
 // Row creates a row panel.
 func (pf *PanelFactory) Row(title string, y int, collapsed bool, panels []interface{}, repeat string) map[string]interface{} {
 	if panels == nil {
@@ -212,7 +239,7 @@ func (pf *PanelFactory) Stat(cfg map[string]interface{}, x, y int) map[string]in
 	if color != "" && len(steps) == 1 {
 		steps = []interface{}{map[string]interface{}{"color": color, "value": nil}}
 	}
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -247,6 +274,9 @@ func (pf *PanelFactory) Stat(cfg map[string]interface{}, x, y int) map[string]in
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "stat",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Gauge creates a gauge panel.
@@ -254,7 +284,7 @@ func (pf *PanelFactory) Gauge(cfg map[string]interface{}, x, y int) map[string]i
 	dw, dh := DefaultSizes["gauge"][0], DefaultSizes["gauge"][1]
 	w := getInt(cfg, "width", dw)
 	h := getInt(cfg, "height", dh)
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -290,6 +320,9 @@ func (pf *PanelFactory) Gauge(cfg map[string]interface{}, x, y int) map[string]i
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "gauge",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Timeseries creates a timeseries panel.
@@ -302,7 +335,7 @@ func (pf *PanelFactory) Timeseries(cfg map[string]interface{}, x, y int) map[str
 	stack := getString(cfg, "stack", "none")
 	draw := getString(cfg, "draw_style", "line")
 	interpolation := getString(cfg, "line_interpolation", "smooth")
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -354,6 +387,9 @@ func (pf *PanelFactory) Timeseries(cfg map[string]interface{}, x, y int) map[str
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "timeseries",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Bargauge creates a bar gauge panel.
@@ -361,7 +397,7 @@ func (pf *PanelFactory) Bargauge(cfg map[string]interface{}, x, y int) map[strin
 	dw, dh := DefaultSizes["bargauge"][0], DefaultSizes["bargauge"][1]
 	w := getInt(cfg, "width", dw)
 	h := getInt(cfg, "height", dh)
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -400,6 +436,9 @@ func (pf *PanelFactory) Bargauge(cfg map[string]interface{}, x, y int) map[strin
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "bargauge",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Barchart creates a bar chart panel.
@@ -457,7 +496,7 @@ func (pf *PanelFactory) Barchart(cfg map[string]interface{}, x, y int) map[strin
 		opts["colorByField"] = cbf
 	}
 
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -472,13 +511,16 @@ func (pf *PanelFactory) Barchart(cfg map[string]interface{}, x, y int) map[strin
 		},
 		"gridPos":       map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
 		"id":            pf.IDGen.Next(),
-		"options":        opts,
+		"options":       opts,
 		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
 		"targets":       pf.buildTargets(cfg, nil),
 		"title":         getString(cfg, "title", ""),
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "barchart",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Heatmap creates a heatmap panel.
@@ -487,7 +529,7 @@ func (pf *PanelFactory) Heatmap(cfg map[string]interface{}, x, y int) map[string
 	w := getInt(cfg, "width", dw)
 	h := getInt(cfg, "height", dh)
 	scheme := getString(cfg, "color_scheme", "Spectral")
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -537,6 +579,9 @@ func (pf *PanelFactory) Heatmap(cfg map[string]interface{}, x, y int) map[string
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "heatmap",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Histogram creates a histogram panel.
@@ -544,7 +589,7 @@ func (pf *PanelFactory) Histogram(cfg map[string]interface{}, x, y int) map[stri
 	dw, dh := DefaultSizes["histogram"][0], DefaultSizes["histogram"][1]
 	w := getInt(cfg, "width", dw)
 	h := getInt(cfg, "height", dh)
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -578,6 +623,9 @@ func (pf *PanelFactory) Histogram(cfg map[string]interface{}, x, y int) map[stri
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "histogram",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Table creates a table panel.
@@ -590,12 +638,8 @@ func (pf *PanelFactory) Table(cfg map[string]interface{}, x, y int) map[string]i
 	if s, ok := cfg["sort_by"].([]interface{}); ok {
 		sortBy = s
 	}
-	transformations := []interface{}{}
-	if t, ok := cfg["transformations"].([]interface{}); ok {
-		transformations = t
-	}
 
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -628,13 +672,15 @@ func (pf *PanelFactory) Table(cfg map[string]interface{}, x, y int) map[string]i
 			"showHeader": true,
 			"sortBy":     sortBy,
 		},
-		"pluginVersion":   pf.Config.GetGenerator().GetPluginVersion(),
-		"targets":         pf.buildTargets(cfg, nil),
-		"title":           getString(cfg, "title", ""),
-		"transformations": transformations,
-		"transparent":     getBool(cfg, "transparent", true),
-		"type":            "table",
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"targets":       pf.buildTargets(cfg, nil),
+		"title":         getString(cfg, "title", ""),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "table",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Piechart creates a pie chart panel.
@@ -642,7 +688,7 @@ func (pf *PanelFactory) Piechart(cfg map[string]interface{}, x, y int) map[strin
 	dw, dh := DefaultSizes["piechart"][0], DefaultSizes["piechart"][1]
 	w := getInt(cfg, "width", dw)
 	h := getInt(cfg, "height", dh)
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -678,6 +724,9 @@ func (pf *PanelFactory) Piechart(cfg map[string]interface{}, x, y int) map[strin
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "piechart",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // StateTimeline creates a state-timeline panel.
@@ -685,7 +734,7 @@ func (pf *PanelFactory) StateTimeline(cfg map[string]interface{}, x, y int) map[
 	dw, dh := DefaultSizes["state-timeline"][0], DefaultSizes["state-timeline"][1]
 	w := getInt(cfg, "width", dw)
 	h := getInt(cfg, "height", dh)
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -718,6 +767,9 @@ func (pf *PanelFactory) StateTimeline(cfg map[string]interface{}, x, y int) map[
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "state-timeline",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // StatusHistory creates a status-history panel.
@@ -725,7 +777,7 @@ func (pf *PanelFactory) StatusHistory(cfg map[string]interface{}, x, y int) map[
 	dw, dh := DefaultSizes["status-history"][0], DefaultSizes["status-history"][1]
 	w := getInt(cfg, "width", dw)
 	h := getInt(cfg, "height", dh)
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"fieldConfig": map[string]interface{}{
@@ -757,6 +809,9 @@ func (pf *PanelFactory) StatusHistory(cfg map[string]interface{}, x, y int) map[
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "status-history",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Text creates a text panel.
@@ -790,7 +845,7 @@ func (pf *PanelFactory) Logs(cfg map[string]interface{}, x, y int) map[string]in
 	dw, dh := DefaultSizes["logs"][0], DefaultSizes["logs"][1]
 	w := getInt(cfg, "width", dw)
 	h := getInt(cfg, "height", dh)
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"gridPos":     map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
@@ -811,6 +866,9 @@ func (pf *PanelFactory) Logs(cfg map[string]interface{}, x, y int) map[string]in
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "logs",
 	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // Comparison creates a mixed-datasource comparison panel.
@@ -854,7 +912,7 @@ func (pf *PanelFactory) Comparison(cfg map[string]interface{}, x, y int) (map[st
 		})
 	}
 
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  mixedDS,
 		"description": getString(cfg, "description", fmt.Sprintf("comparison: %s", metric)),
 		"fieldConfig": map[string]interface{}{
@@ -899,7 +957,10 @@ func (pf *PanelFactory) Comparison(cfg map[string]interface{}, x, y int) (map[st
 		"title":         getString(cfg, "title", fmt.Sprintf("%s comparison", metric)),
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "timeseries",
-	}, nil
+	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel, nil
 }
 
 // Alertlist creates an alert list panel.
@@ -963,5 +1024,158 @@ func (pf *PanelFactory) Dashlist(cfg map[string]interface{}, x, y int) map[strin
 		"title":         getString(cfg, "title", "dashboards"),
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "dashlist",
+	}
+}
+
+// Trend creates a trend panel (timeseries with sequential numeric x-axis).
+func (pf *PanelFactory) Trend(cfg map[string]interface{}, x, y int) map[string]interface{} {
+	dw, dh := DefaultSizes["trend"][0], DefaultSizes["trend"][1]
+	w := getInt(cfg, "width", dw)
+	h := getInt(cfg, "height", dh)
+	fill := getInt(cfg, "fill_opacity", 8)
+	line := getInt(cfg, "line_width", 1)
+	interpolation := getString(cfg, "line_interpolation", "smooth")
+
+	opts := map[string]interface{}{
+		"legend": map[string]interface{}{
+			"calcs":       getStringSlice(cfg, "legend_calcs", []string{}),
+			"displayMode": getString(cfg, "legend_mode", "list"),
+			"placement":   getString(cfg, "legend_placement", "bottom"),
+			"showLegend":  getBool(cfg, "show_legend", true),
+		},
+		"tooltip": map[string]interface{}{"mode": "multi", "sort": "desc"},
+	}
+	if xf := getString(cfg, "x_field", ""); xf != "" {
+		opts["xField"] = xf
+	}
+
+	panel := map[string]interface{}{
+		"datasource":  pf.ds(cfg),
+		"description": getString(cfg, "description", ""),
+		"fieldConfig": map[string]interface{}{
+			"defaults": map[string]interface{}{
+				"color": map[string]interface{}{"mode": getString(cfg, "color_mode", "palette-classic-by-name")},
+				"custom": map[string]interface{}{
+					"axisBorderShow":    false,
+					"axisCenteredZero":  false,
+					"axisColorMode":     "text",
+					"axisLabel":         getString(cfg, "axis_label", ""),
+					"axisPlacement":     "auto",
+					"drawStyle":         getString(cfg, "draw_style", "line"),
+					"fillOpacity":       fill,
+					"gradientMode":      "scheme",
+					"hideFrom":          map[string]interface{}{"legend": false, "tooltip": false, "viz": false},
+					"lineInterpolation": interpolation,
+					"lineWidth":         line,
+					"pointSize":         5,
+					"scaleDistribution": map[string]interface{}{"type": "linear"},
+					"showPoints":        "never",
+					"spanNulls":         false,
+					"thresholdsStyle":   map[string]interface{}{"mode": "off"},
+				},
+				"mappings":   pf.valueMappings(cfg),
+				"thresholds": map[string]interface{}{"mode": "absolute", "steps": pf.thresholds(cfg, "")},
+				"unit":       getString(cfg, "unit", "short"),
+				"links":      pf.dataLinks(cfg),
+			},
+			"overrides": pf.overrides(cfg),
+		},
+		"gridPos":       map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
+		"id":            pf.IDGen.Next(),
+		"options":       opts,
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"targets":       pf.buildTargets(cfg, nil),
+		"title":         getString(cfg, "title", ""),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "trend",
+	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
+}
+
+// Candlestick creates an OHLC candlestick panel.
+func (pf *PanelFactory) Candlestick(cfg map[string]interface{}, x, y int) map[string]interface{} {
+	dw, dh := DefaultSizes["candlestick"][0], DefaultSizes["candlestick"][1]
+	w := getInt(cfg, "width", dw)
+	h := getInt(cfg, "height", dh)
+
+	fields := map[string]interface{}{}
+	if v := getString(cfg, "open_field", ""); v != "" {
+		fields["open"] = v
+	}
+	if v := getString(cfg, "high_field", ""); v != "" {
+		fields["high"] = v
+	}
+	if v := getString(cfg, "low_field", ""); v != "" {
+		fields["low"] = v
+	}
+	if v := getString(cfg, "close_field", ""); v != "" {
+		fields["close"] = v
+	}
+
+	panel := map[string]interface{}{
+		"datasource":  pf.ds(cfg),
+		"description": getString(cfg, "description", ""),
+		"fieldConfig": map[string]interface{}{
+			"defaults": map[string]interface{}{
+				"color": map[string]interface{}{"mode": getString(cfg, "color_mode", "thresholds")},
+				"custom": map[string]interface{}{
+					"axisPlacement":   "auto",
+					"drawStyle":       "default",
+					"hideFrom":        map[string]interface{}{"legend": false, "tooltip": false, "viz": false},
+					"thresholdsStyle": map[string]interface{}{"mode": "off"},
+				},
+				"mappings":   pf.valueMappings(cfg),
+				"thresholds": map[string]interface{}{"mode": "absolute", "steps": pf.thresholds(cfg, "")},
+				"unit":       getString(cfg, "unit", "short"),
+			},
+			"overrides": pf.overrides(cfg),
+		},
+		"gridPos": map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
+		"id":      pf.IDGen.Next(),
+		"options": map[string]interface{}{
+			"includeAllFields": getBool(cfg, "include_all_fields", false),
+			"mode":             getString(cfg, "mode", "candles"),
+			"candleStyle":      getString(cfg, "candle_style", "candles"),
+			"colorStrategy":    getString(cfg, "color_strategy", "open-close"),
+			"fields":           fields,
+			"colors": map[string]interface{}{
+				"up":   getString(cfg, "up_color", "green"),
+				"down": getString(cfg, "down_color", "red"),
+				"flat": getString(cfg, "flat_color", "gray"),
+			},
+			"legend":  map[string]interface{}{"displayMode": "list", "placement": "bottom", "showLegend": true},
+			"tooltip": map[string]interface{}{"mode": "multi", "sort": "desc"},
+		},
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"targets":       pf.buildTargets(cfg, nil),
+		"title":         getString(cfg, "title", ""),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "candlestick",
+	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
+}
+
+// News creates a news/RSS feed panel.
+func (pf *PanelFactory) News(cfg map[string]interface{}, x, y int) map[string]interface{} {
+	dw, dh := DefaultSizes["news"][0], DefaultSizes["news"][1]
+	w := getInt(cfg, "width", dw)
+	h := getInt(cfg, "height", dh)
+	return map[string]interface{}{
+		"datasource":  pf.ds(cfg),
+		"description": getString(cfg, "description", ""),
+		"gridPos":     map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
+		"id":          pf.IDGen.Next(),
+		"options": map[string]interface{}{
+			"feedUrl":   getString(cfg, "feed_url", ""),
+			"showImage": getBool(cfg, "show_image", true),
+		},
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"title":         getString(cfg, "title", ""),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "news",
 	}
 }

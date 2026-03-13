@@ -229,11 +229,15 @@ CRITICAL: Every panel MUST be inside a section's "panels:" array. NEVER put pane
 | logs | 24x8 | Log streams |
 | row | 24x1 | Section headers / grouping |
 | comparison | 12x8 | Cross-datasource metric overlay |
+| trend | 12x7 | Sequential numeric x-axis trends |
+| candlestick | 12x7 | OHLC financial/resource charts |
+| news | 12x6 | RSS/Atom feed display |
 
 ## Panel Config Keys
 type, title, query, targets (list of {expr, legend, datasource}), width, height,
 datasource, unit, description, color, thresholds, transparent, overrides,
-value_mappings, data_links, repeat, calcs
+value_mappings, data_links, transformations, repeat, repeat_direction (h/v),
+max_per_row, calcs
 
 ### Type-Specific
 - stat: color_mode (background/value), graph_mode (none/area), text_mode
@@ -243,6 +247,9 @@ value_mappings, data_links, repeat, calcs
 - heatmap: color_scheme, color_scale, calculate
 - table: filterable, sort_by, transformations
 - piechart: pie_type (donut/pie), display_labels
+- trend: x_field, fill_opacity, line_width, line_interpolation, draw_style
+- candlestick: mode, candle_style, color_strategy, open_field, high_field, low_field, close_field, up_color, down_color
+- news: feed_url, show_image (no datasource/targets needed)
 
 ## Style Conventions
 - Lowercase titles (no Title Case)
@@ -430,6 +437,7 @@ var panelTypes = map[string]bool{
 	"heatmap": true, "histogram": true, "table": true, "piechart": true,
 	"state-timeline": true, "status-history": true, "text": true, "logs": true,
 	"barchart": true, "comparison": true, "alertlist": true, "dashlist": true,
+	"trend": true, "candlestick": true, "news": true,
 }
 
 // ValidateAISectionYAML checks that YAML has the correct sections→panels nesting.

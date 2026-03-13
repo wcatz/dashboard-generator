@@ -303,19 +303,43 @@ func (db *DashboardBuilder) Build(dbCfg config.DashboardConfig, navLinks []inter
 		navLinks = []interface{}{}
 	}
 
+	annotList := []interface{}{
+		map[string]interface{}{
+			"builtIn":    1,
+			"datasource": map[string]interface{}{"type": "grafana", "uid": "-- Grafana --"},
+			"enable":     true,
+			"hide":       true,
+			"iconColor":  "rgba(0, 211, 255, 1)",
+			"name":       "Annotations & Alerts",
+			"type":       "dashboard",
+		},
+	}
+	for _, ann := range dbCfg.Annotations {
+		ds := db.Config.GetDefaultDatasource()
+		if ann.Datasource != "" {
+			if ref, err := db.Config.GetDatasource(ann.Datasource); err == nil {
+				ds = ref
+			}
+		}
+		enable := true
+		if ann.Enable != nil {
+			enable = *ann.Enable
+		}
+		annotList = append(annotList, map[string]interface{}{
+			"datasource":  map[string]interface{}{"type": ds.Type, "uid": ds.UID},
+			"enable":      enable,
+			"expr":        db.Config.ResolveRef(ann.Expr),
+			"hide":        false,
+			"iconColor":   ann.IconColor,
+			"name":        ann.Name,
+			"titleFormat": ann.TitleFormat,
+			"textFormat":  ann.TextFormat,
+		})
+	}
+
 	return map[string]interface{}{
 		"annotations": map[string]interface{}{
-			"list": []interface{}{
-				map[string]interface{}{
-					"builtIn":    1,
-					"datasource": map[string]interface{}{"type": "grafana", "uid": "-- Grafana --"},
-					"enable":     true,
-					"hide":       true,
-					"iconColor":  "rgba(0, 211, 255, 1)",
-					"name":       "Annotations & Alerts",
-					"type":       "dashboard",
-				},
-			},
+			"list": annotList,
 		},
 		"description":          dbCfg.Description,
 		"editable":             editable,

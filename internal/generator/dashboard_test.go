@@ -275,3 +275,110 @@ func TestBuildDashboard(t *testing.T) {
 		t.Errorf("tag count = %d, want 2", len(tags))
 	}
 }
+
+func TestBuildDashboardWithAnnotations(t *testing.T) {
+	cfgYAML := `
+generator:
+  schema_version: 39
+  refresh: "30s"
+  time_range:
+    from: "now-30m"
+    to: "now"
+datasources:
+  primary:
+    type: prometheus
+    uid: prometheus
+    is_default: true
+palettes:
+  grafana:
+    green: "#73BF69"
+active_palette: grafana
+thresholds: {}
+selectors: {}
+constants: {}
+variables: {}
+dashboards:
+  test:
+    uid: gen-test
+    title: test
+    filename: gen-test.json
+    tags: [test]
+    annotations:
+      - name: deploys
+        datasource: primary
+        expr: 'changes(deploy_timestamp[1m])'
+        icon_color: "purple"
+        title_format: "deploy"
+        text_format: "{{instance}}"
+      - name: alerts
+        expr: 'ALERTS{alertstate="firing"}'
+        icon_color: "red"
+    sections:
+      - title: overview
+        panels:
+          - type: stat
+            title: up
+            query: 'up'
+`
+	dir := t.TempDir()
+	path := dir + "/test.yaml"
+	if err := os.WriteFile(path, []byte(cfgYAML), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+	le := NewLayoutEngine()
+	builder := NewDashboardBuilder(cfg, pf, le)
+
+	dbs, _ := cfg.GetDashboards("")
+	dbCfg := dbs["test"]
+
+	dashboard, err := builder.Build(dbCfg, nil, nil)
+	if err != nil {
+		t.Fatalf("Build error: %v", err)
+	}
+
+	annotations := dashboard["annotations"].(map[string]interface{})
+	annotList := annotations["list"].([]interface{})
+
+	// 1 built-in + 2 user annotations = 3
+	if len(annotList) != 3 {
+		t.Fatalf("annotation count = %d, want 3", len(annotList))
+	}
+
+	// Check built-in is first
+	builtIn := annotList[0].(map[string]interface{})
+	if builtIn["builtIn"] != 1 {
+		t.Error("first annotation should be built-in")
+	}
+
+	// Check first user annotation
+	ann1 := annotList[1].(map[string]interface{})
+	if ann1["name"] != "deploys" {
+		t.Errorf("ann[1] name = %v, want deploys", ann1["name"])
+	}
+	if ann1["iconColor"] != "purple" {
+		t.Errorf("ann[1] iconColor = %v, want purple", ann1["iconColor"])
+	}
+	if ann1["enable"] != true {
+		t.Errorf("ann[1] enable = %v, want true", ann1["enable"])
+	}
+	ds1 := ann1["datasource"].(map[string]interface{})
+	if ds1["uid"] != "prometheus" {
+		t.Errorf("ann[1] datasource uid = %v, want prometheus", ds1["uid"])
+	}
+
+	// Check second user annotation (uses default datasource)
+	ann2 := annotList[2].(map[string]interface{})
+	if ann2["name"] != "alerts" {
+		t.Errorf("ann[2] name = %v, want alerts", ann2["name"])
+	}
+	if ann2["iconColor"] != "red" {
+		t.Errorf("ann[2] iconColor = %v, want red", ann2["iconColor"])
+	}
+}

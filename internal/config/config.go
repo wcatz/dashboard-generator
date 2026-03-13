@@ -196,6 +196,17 @@ type ProfileDef struct {
 	Dashboards []string `yaml:"dashboards"`
 }
 
+// AnnotationDef defines a custom annotation query for a dashboard.
+type AnnotationDef struct {
+	Name        string `yaml:"name"`
+	Datasource  string `yaml:"datasource"`
+	Expr        string `yaml:"expr"`
+	IconColor   string `yaml:"icon_color"`
+	TitleFormat string `yaml:"title_format"`
+	TextFormat  string `yaml:"text_format"`
+	Enable      *bool  `yaml:"enable"`
+}
+
 // SectionConfig is a dashboard section with panels.
 type SectionConfig struct {
 	Title     string                   `yaml:"title"`
@@ -214,6 +225,7 @@ type DashboardConfig struct {
 	Description   string          `yaml:"description"`
 	Variables     []string        `yaml:"variables"`
 	Sections      []SectionConfig `yaml:"sections"`
+	Annotations   []AnnotationDef `yaml:"annotations,omitempty"`
 	K8sNamespace  string          `yaml:"k8s_namespace,omitempty"`  // override default namespace
 	GrafanaFolder string          `yaml:"grafana_folder,omitempty"` // override default folder
 }
