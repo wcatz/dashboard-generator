@@ -1,11 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"log"
 	"net/http"
 	"regexp"
 
 	"github.com/wcatz/dashboard-generator/internal/config"
+	"gopkg.in/yaml.v3"
 )
 
 func (s *Server) handleConfigReload(w http.ResponseWriter, r *http.Request) {
@@ -110,4 +112,39 @@ func (s *Server) handleInsertSection(w http.ResponseWriter, r *http.Request) {
 	s.renderPartial(w, "config-status.html", map[string]interface{}{
 		"Message": "section inserted into '" + dashboard + "'",
 	})
+}
+
+func (s *Server) handleConfigFormat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", 400)
+		return
+	}
+	content := r.FormValue("content")
+	if content == "" {
+		http.Error(w, "empty content", 400)
+		return
+	}
+
+	// Parse then re-encode with consistent 2-space indent
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte(content), &doc); err != nil {
+		http.Error(w, "invalid YAML: "+err.Error(), 400)
+		return
+	}
+
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&doc); err != nil {
+		http.Error(w, "format failed: "+err.Error(), 500)
+		return
+	}
+	enc.Close()
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write(buf.Bytes())
 }

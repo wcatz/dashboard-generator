@@ -1,0 +1,17 @@
+services:
+  dashboard-generator:
+    image: wcatz/dashboard-generator:latest
+    user: "${UID:-1000}:${GID:-1000}"
+    ports:
+      - "8082:8080"
+    env_file:
+      - .env
+    environment:
+      - GRAFANA_URL=${GRAFANA_URL:-https://blinklabsio.grafana.net}
+      - GRAFANA_TOKEN=${GRAFANA_TOKEN:-${BLINKLABS_GRAFANO_SA_TOKEN}}
+    volumes:
+      - ./configs:/configs:rw
+      - ./dashboards:/dashboards
+    command:
+      - serve
+      - --config-dir=/configs

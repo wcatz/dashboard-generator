@@ -92,6 +92,7 @@ thresholds:
     - {color: "$red", value: 1000}
 # ─── Reusable Label Selectors ────────────────────────────────────────────────
 # Reference with ${selector_name} in queries.
+# e.g. postgres: '{job=~"postgres/.*"}'
 selectors:
   by_ns: '{namespace=~"$namespace"}'
   by_inst: '{instance=~"$instance"}'

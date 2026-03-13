@@ -20,6 +20,7 @@ var DefaultSizes = map[string][2]int{
 	"status-history": {12, 5},
 	"text":           {24, 3},
 	"logs":           {24, 8},
+	"barchart":       {8, 6},
 	"row":            {24, 1},
 	"comparison":     {12, 8},
 	"alertlist":      {12, 5},
@@ -69,6 +70,8 @@ func (pf *PanelFactory) FromConfig(cfg map[string]interface{}, x, y int) (map[st
 		return pf.Comparison(cfg, x, y)
 	case "alertlist":
 		return pf.Alertlist(cfg, x, y), nil
+	case "barchart":
+		return pf.Barchart(cfg, x, y), nil
 	case "dashlist":
 		return pf.Dashlist(cfg, x, y), nil
 	default:
@@ -396,6 +399,85 @@ func (pf *PanelFactory) Bargauge(cfg map[string]interface{}, x, y int) map[strin
 		"title":         getString(cfg, "title", ""),
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "bargauge",
+	}
+}
+
+// Barchart creates a bar chart panel.
+// Supports x_field, color_by_field, stacking, bar_width, bar_radius, group_width,
+// axis_soft_max, and per-target overrides for units, axis placement, and thresholds.
+func (pf *PanelFactory) Barchart(cfg map[string]interface{}, x, y int) map[string]interface{} {
+	dw, dh := DefaultSizes["barchart"][0], DefaultSizes["barchart"][1]
+	w := getInt(cfg, "width", dw)
+	h := getInt(cfg, "height", dh)
+
+	custom := map[string]interface{}{
+		"lineWidth":         getInt(cfg, "line_width", 0),
+		"fillOpacity":       getInt(cfg, "fill_opacity", 99),
+		"gradientMode":      getString(cfg, "gradient_mode", "none"),
+		"axisPlacement":     getString(cfg, "axis_placement", "hidden"),
+		"axisLabel":         getString(cfg, "axis_label", ""),
+		"axisColorMode":     getString(cfg, "axis_color_mode", "series"),
+		"axisBorderShow":    getBool(cfg, "axis_border_show", true),
+		"axisCenteredZero":  false,
+		"scaleDistribution": map[string]interface{}{"type": "linear"},
+		"hideFrom":          map[string]interface{}{"tooltip": false, "viz": false, "legend": false},
+		"thresholdsStyle":   map[string]interface{}{"mode": "off"},
+		"axisGridShow":      getBool(cfg, "axis_grid_show", true),
+	}
+
+	if v, ok := cfg["axis_soft_max"]; ok {
+		custom["axisSoftMax"] = v
+	}
+
+	opts := map[string]interface{}{
+		"orientation":        getString(cfg, "orientation", "auto"),
+		"xTickLabelRotation": getInt(cfg, "x_tick_rotation", 0),
+		"xTickLabelSpacing":  getInt(cfg, "x_tick_spacing", 200),
+		"showValue":          getString(cfg, "show_value", "auto"),
+		"stacking":           getString(cfg, "stacking", "normal"),
+		"groupWidth":         getFloat(cfg, "group_width", 0),
+		"barWidth":           getFloat(cfg, "bar_width", 0.83),
+		"barRadius":          getFloat(cfg, "bar_radius", 0),
+		"fullHighlight":      false,
+		"tooltip":            map[string]interface{}{"mode": "multi", "sort": "none", "hideZeros": false},
+		"legend": map[string]interface{}{
+			"showLegend":  getBool(cfg, "show_legend", false),
+			"displayMode": getString(cfg, "legend_mode", "list"),
+			"placement":   getString(cfg, "legend_placement", "bottom"),
+			"calcs":       getStringSlice(cfg, "legend_calcs", []string{"lastNotNull"}),
+		},
+		"text":                map[string]interface{}{"valueSize": 1},
+		"xTickLabelMaxLength": 0,
+	}
+
+	if xf := getString(cfg, "x_field", ""); xf != "" {
+		opts["xField"] = xf
+	}
+	if cbf := getString(cfg, "color_by_field", ""); cbf != "" {
+		opts["colorByField"] = cbf
+	}
+
+	return map[string]interface{}{
+		"datasource":  pf.ds(cfg),
+		"description": getString(cfg, "description", ""),
+		"fieldConfig": map[string]interface{}{
+			"defaults": map[string]interface{}{
+				"color":      map[string]interface{}{"mode": "thresholds", "fixedColor": pf.Config.ResolveColor(getString(cfg, "color", "$blue"))},
+				"mappings":   pf.valueMappings(cfg),
+				"thresholds": map[string]interface{}{"mode": "absolute", "steps": pf.thresholds(cfg, "")},
+				"unit":       getString(cfg, "unit", "none"),
+				"custom":     custom,
+			},
+			"overrides": pf.overrides(cfg),
+		},
+		"gridPos":       map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
+		"id":            pf.IDGen.Next(),
+		"options":        opts,
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"targets":       pf.buildTargets(cfg, nil),
+		"title":         getString(cfg, "title", ""),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "barchart",
 	}
 }
 

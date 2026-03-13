@@ -142,6 +142,7 @@
       <button class="btn btn-sm btn-secondary" id="discover-labels-btn"
               hx-get="/api/labels/discover"
               hx-target="#labels-result"
+              hx-trigger="click, load delay:500ms"
               hx-indicator="#discover-spinner">
         discover labels <span id="discover-spinner" class="htmx-indicator"><span class="spinner"></span></span>
       </button>

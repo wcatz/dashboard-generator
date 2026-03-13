@@ -89,9 +89,12 @@ func (md *MetricDiscovery) get(baseURL, path string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, truncateBody(body, 200))
+	}
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid JSON response from %s: %s", url, truncateBody(body, 200))
 	}
 	if status, ok := result["status"].(string); ok && status != "success" {
 		fmt.Fprintf(os.Stderr, "  warning: non-success response from %s\n", url)
@@ -483,6 +486,14 @@ func (md *MetricDiscovery) CompareAll(dsNames []string) (shared map[string]Metri
 	}
 
 	return shared, exclusive, nil
+}
+
+func truncateBody(body []byte, max int) string {
+	s := strings.TrimSpace(string(body))
+	if len(s) > max {
+		return s[:max] + "..."
+	}
+	return s
 }
 
 func lookupMeta(name string, primary, fallback map[string]MetricInfo) MetricInfo {

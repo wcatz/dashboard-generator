@@ -80,7 +80,12 @@ func (s *Server) handleConfigNew(w http.ResponseWriter, r *http.Request) {
 		}
 		content = tmpl.Content
 	} else {
-		content = blankConfig()
+		content = blankTemplate
+	}
+
+	// If user provided a datasource URL, replace the placeholder
+	if dsURL := strings.TrimSpace(r.FormValue("datasource_url")); dsURL != "" {
+		content = strings.Replace(content, "http://prometheus:9090", dsURL, 1)
 	}
 
 	target := filepath.Join(s.configDir, name+".yaml")
@@ -99,7 +104,7 @@ func (s *Server) handleConfigNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("HX-Redirect", "/")
+	w.Header().Set("HX-Redirect", "/datasources")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -203,22 +208,4 @@ func (s *Server) handleConfigDelete(w http.ResponseWriter, r *http.Request) {
 
 	// Return updated config list
 	s.handleConfigList(w, r)
-}
-
-// blankConfig returns a minimal starter config.
-func blankConfig() string {
-	return `generator:
-  schema_version: 39
-  refresh: "30s"
-  time_range:
-    from: "now-6h"
-    to: "now"
-  output_dir: "dashboards"
-
-datasources: {}
-
-variables: {}
-
-dashboards: {}
-`
 }
