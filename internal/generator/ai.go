@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/wcatz/dashboard-generator/internal/config"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -69,11 +71,13 @@ type MetricContext struct {
 
 // ConfigContext holds config context to inform AI suggestions.
 type ConfigContext struct {
-	Selectors  map[string]string `json:"selectors"`
-	Constants  map[string]string `json:"constants"`
-	Thresholds []string          `json:"thresholds"`
-	Palettes   []string          `json:"palettes"`
-	Variables  []string          `json:"variables"`
+	Selectors        map[string]string `json:"selectors"`
+	Constants        map[string]string `json:"constants"`
+	Thresholds       []string          `json:"thresholds"`
+	Palettes         []string          `json:"palettes"`
+	Variables        []string          `json:"variables"`
+	DatasourceName   string            `json:"datasource_name,omitempty"`
+	ExistingSections []string          `json:"existing_sections,omitempty"`
 }
 
 // AISuggestionResponse holds the AI's response.
@@ -90,6 +94,60 @@ func (c *AIClient) Suggest(metrics []MetricContext, configCtx ConfigContext) (*A
 
 	systemPrompt := buildSystemPrompt(configCtx)
 	userPrompt := buildUserPrompt(metrics)
+
+	body := map[string]interface{}{
+		"model":      c.Model,
+		"max_tokens": maxTokens,
+		"system":     systemPrompt,
+		"messages": []map[string]interface{}{
+			{"role": "user", "content": userPrompt},
+		},
+	}
+
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	baseURL := c.BaseURL
+	if baseURL == "" {
+		baseURL = anthropicAPIURL
+	}
+	req, err := http.NewRequest(http.MethodPost, baseURL, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", c.APIKey)
+	req.Header.Set("anthropic-version", anthropicAPIVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("API request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return parseAIResponse(respBody)
+}
+
+// SuggestDashboard calls the Anthropic API to generate a complete dashboard config
+// from a natural language description.
+func (c *AIClient) SuggestDashboard(description string, configCtx ConfigContext) (*AISuggestionResponse, error) {
+	if !c.Available() {
+		return nil, fmt.Errorf("anthropic API key not configured")
+	}
+
+	systemPrompt := buildDashboardSystemPrompt(configCtx)
+	userPrompt := fmt.Sprintf("Create a complete dashboard config for: %s\n\nInclude appropriate sections, panel types, variables, and queries. Make it production-ready.", description)
 
 	body := map[string]interface{}{
 		"model":      c.Model,
@@ -156,6 +214,20 @@ func BuildConfigContext(cfg *config.Config) ConfigContext {
 		ctx.Variables = append(ctx.Variables, name)
 	}
 
+	// Populate default datasource name (prefer is_default, then first by sorted name)
+	var dsNames []string
+	for name := range cfg.Datasources {
+		dsNames = append(dsNames, name)
+	}
+	sort.Strings(dsNames)
+	for _, name := range dsNames {
+		ds := cfg.Datasources[name]
+		if ds.URL != "" {
+			ctx.DatasourceName = name
+			break
+		}
+	}
+
 	return ctx
 }
 
@@ -165,9 +237,41 @@ func buildSystemPrompt(ctx ConfigContext) string {
 	sb.WriteString(`You are a Grafana dashboard expert. Generate YAML panel configurations for a config-driven dashboard generator.
 
 ## Output Rules
-- Return ONLY valid YAML for a dashboard section, starting with "      - title:"
+- Return ONLY valid YAML sections. Each section MUST have a "title:" and a "panels:" array.
+- Panels are NESTED inside sections — never as top-level section items.
 - No markdown fences, no explanations outside the YAML
 - After the YAML, you may add a line starting with "# Notes:" followed by brief notes about your choices
+
+## Required YAML Structure
+Each section is a list item with a title and a panels array. Example:
+
+- title: "overview"
+  panels:
+    - type: stat
+      title: "metric value"
+      query: 'prometheus_metric'
+      datasource: prometheus
+      unit: short
+      color_mode: background
+      thresholds:
+        mode: absolute
+        steps:
+          - color: $green
+            value: null
+          - color: $red
+            value: 90
+      transparent: true
+      description: "what this panel shows"
+    - type: timeseries
+      title: "rate over time"
+      query: 'rate(metric_total[5m])'
+      unit: reqps
+      fill_opacity: 10
+      line_interpolation: smooth
+      transparent: true
+      description: "request rate trend"
+
+CRITICAL: Every panel MUST be inside a section's "panels:" array. NEVER put panels as top-level items.
 
 ## Panel Types Available
 | Type | Default Size | Use For |
@@ -186,11 +290,18 @@ func buildSystemPrompt(ctx ConfigContext) string {
 | logs | 24x8 | Log streams |
 | row | 24x1 | Section headers / grouping |
 | comparison | 12x8 | Cross-datasource metric overlay |
+| trend | 12x7 | Sequential numeric x-axis trends |
+| candlestick | 12x7 | OHLC financial/resource charts |
+| news | 12x6 | RSS/Atom feed display |
+| xychart | 12x7 | Scatter/correlation plots (CPU vs memory) |
+| geomap | 12x10 | Geographic marker maps (multi-region) |
+| nodeGraph | 24x10 | Topology/dependency graphs |
 
 ## Panel Config Keys
 type, title, query, targets (list of {expr, legend, datasource}), width, height,
 datasource, unit, description, color, thresholds, transparent, overrides,
-value_mappings, data_links, repeat, calcs
+value_mappings, data_links, transformations, repeat, repeat_direction (h/v),
+max_per_row, calcs
 
 ### Type-Specific
 - stat: color_mode (background/value), graph_mode (none/area), text_mode
@@ -200,6 +311,12 @@ value_mappings, data_links, repeat, calcs
 - heatmap: color_scheme, color_scale, calculate
 - table: filterable, sort_by, transformations
 - piechart: pie_type (donut/pie), display_labels
+- trend: x_field, fill_opacity, line_width, line_interpolation, draw_style
+- candlestick: mode, candle_style, color_strategy, open_field, high_field, low_field, close_field, up_color, down_color
+- news: feed_url, show_image (no datasource/targets needed)
+- xychart: x_field, series_mapping (auto), show (points/lines/both), point_size, fill_opacity
+- geomap: basemap, lat, lon, zoom, location_mode (coords), lat_field, lon_field, size_field, color_field
+- nodeGraph: node_query, edge_query, main_stat_unit, secondary_stat_unit
 
 ## Style Conventions
 - Lowercase titles (no Title Case)
@@ -210,7 +327,8 @@ value_mappings, data_links, repeat, calcs
 - Use descriptive panel descriptions
 
 ## Grafana Units
-bytes, Bps, s, ms, percent, percentunit, short, none, reqps, ops, pps, iops
+bytes, Bps, s, ms, percent, percentunit, short, none, reqps, ops, pps, iops,
+celsius, fahrenheit, volt, watt, hertz, amp
 
 ## Query Patterns
 - Counter: rate(metric[${rate_interval}]) or rate(metric[5m])
@@ -218,6 +336,8 @@ bytes, Bps, s, ms, percent, percentunit, short, none, reqps, ops, pps, iops
 - Percentage: (used / total) * 100
 - Top-K: topk(10, metric)
 - Aggregation: sum by (label)(metric), avg by (label)(metric)
+- Label selectors: metric{label=~"$variable"} when a matching template variable exists
+- Group-by: sum by (label)(metric) when labels are available and meaningful
 `)
 
 	// Add config context
@@ -252,6 +372,94 @@ bytes, Bps, s, ms, percent, percentunit, short, none, reqps, ops, pps, iops
 	if len(ctx.Variables) > 0 {
 		sb.WriteString("\n## Available Template Variables (use as $variable in queries)\n")
 		for _, name := range ctx.Variables {
+			sb.WriteString(fmt.Sprintf("- $%s\n", name))
+		}
+	}
+
+	if ctx.DatasourceName != "" {
+		sb.WriteString(fmt.Sprintf("\n## Target Datasource\nUse \"datasource: %s\" for all panels.\n", ctx.DatasourceName))
+	}
+
+	if len(ctx.ExistingSections) > 0 {
+		sb.WriteString("\n## Existing Dashboard Sections (avoid duplicating these titles)\n")
+		for _, title := range ctx.ExistingSections {
+			sb.WriteString(fmt.Sprintf("- %s\n", title))
+		}
+	}
+
+	return sb.String()
+}
+
+func buildDashboardSystemPrompt(ctx ConfigContext) string {
+	var sb strings.Builder
+
+	sb.WriteString(`You are a Grafana dashboard expert. Generate a complete YAML dashboard configuration for a config-driven dashboard generator.
+
+## Output Rules
+- Return ONLY valid YAML for a single dashboard definition
+- No markdown fences, no explanations outside the YAML
+- After the YAML, you may add a line starting with "# Notes:" followed by brief notes
+
+## Required YAML Structure
+The output must be a dashboard config with sections and panels:
+
+uid: my-dashboard
+title: my dashboard
+filename: my-dashboard.json
+tags: [generated]
+variables: [namespace, instance]
+sections:
+  - title: "overview"
+    panels:
+      - type: stat
+        title: "metric value"
+        query: 'prometheus_metric'
+        unit: short
+  - title: "details"
+    panels:
+      - type: timeseries
+        title: "rate over time"
+        query: 'rate(metric_total[5m])'
+        unit: reqps
+
+## Available Panel Types
+stat, gauge, timeseries, bargauge, heatmap, histogram, table, piechart,
+state-timeline, status-history, text, logs, comparison, alertlist, dashlist,
+trend, candlestick, news, xychart, geomap, nodeGraph
+
+## Variable Definition Format
+Variables referenced in the "variables:" list should use existing config variables.
+You may suggest new variables as comments.
+
+## Style Conventions
+- Lowercase titles
+- transparent: true on all panels
+- smooth line interpolation on timeseries
+- Include descriptions on panels
+- Use rate() for counters, histogram_quantile() for histograms
+`)
+
+	if len(ctx.Variables) > 0 {
+		sb.WriteString("\n## Available Template Variables\n")
+		for _, name := range ctx.Variables {
+			sb.WriteString(fmt.Sprintf("- $%s\n", name))
+		}
+	}
+
+	if ctx.DatasourceName != "" {
+		sb.WriteString(fmt.Sprintf("\n## Target Datasource\nUse \"datasource: %s\" for all panels.\n", ctx.DatasourceName))
+	}
+
+	if len(ctx.Thresholds) > 0 {
+		sb.WriteString("\n## Available Thresholds\n")
+		for _, name := range ctx.Thresholds {
+			sb.WriteString(fmt.Sprintf("- $%s\n", name))
+		}
+	}
+
+	if len(ctx.Palettes) > 0 {
+		sb.WriteString("\n## Available Palette Colors\n")
+		for _, name := range ctx.Palettes {
 			sb.WriteString(fmt.Sprintf("- $%s\n", name))
 		}
 	}
@@ -366,4 +574,168 @@ func extractYAMLAndNotes(text string) (string, []string) {
 	}
 
 	return strings.TrimSpace(strings.Join(yamlLines, "\n")), notes
+}
+
+// panelTypes is the set of valid panel type names (excluding "row" which is a section marker).
+var panelTypes = map[string]bool{
+	"stat": true, "gauge": true, "timeseries": true, "bargauge": true,
+	"heatmap": true, "histogram": true, "table": true, "piechart": true,
+	"state-timeline": true, "status-history": true, "text": true, "logs": true,
+	"barchart": true, "comparison": true, "alertlist": true, "dashlist": true,
+	"trend": true, "candlestick": true, "news": true, "xychart": true,
+	"geomap": true, "nodeGraph": true, "node-graph": true,
+}
+
+// ValidateAISectionYAML checks that YAML has the correct sections→panels nesting.
+// Returns nil if valid, or an error describing the structural problem.
+func ValidateAISectionYAML(yamlStr string) error {
+	yamlStr = strings.TrimSpace(yamlStr)
+	if yamlStr == "" {
+		return fmt.Errorf("empty YAML")
+	}
+
+	// Wrap in a sections key so we can unmarshal as a config fragment
+	wrapped := "sections:\n" + yamlStr
+	var doc struct {
+		Sections []config.SectionConfig `yaml:"sections"`
+	}
+	if err := yaml.Unmarshal([]byte(wrapped), &doc); err != nil {
+		return fmt.Errorf("invalid YAML: %w", err)
+	}
+
+	if len(doc.Sections) == 0 {
+		return fmt.Errorf("no sections found in YAML")
+	}
+
+	// Check that at least one section has panels
+	hasPanels := false
+	for _, sec := range doc.Sections {
+		if len(sec.Panels) > 0 {
+			hasPanels = true
+			break
+		}
+	}
+
+	if !hasPanels {
+		return fmt.Errorf("no section has panels — panels must be nested under a section's 'panels:' key, not as top-level items")
+	}
+
+	return nil
+}
+
+// RepairFlatSectionYAML detects flat panel YAML (panels as top-level section items
+// instead of nested under panels:) and restructures it into correct section→panels nesting.
+// Returns the repaired YAML and true if repair was applied, or the original and false if already valid.
+func RepairFlatSectionYAML(yamlStr string) (string, bool) {
+	yamlStr = strings.TrimSpace(yamlStr)
+	if yamlStr == "" {
+		return yamlStr, false
+	}
+
+	// Already valid? No repair needed.
+	if ValidateAISectionYAML(yamlStr) == nil {
+		return yamlStr, false
+	}
+
+	// Parse as a list of generic maps
+	wrapped := "items:\n" + yamlStr
+	var doc struct {
+		Items []map[string]interface{} `yaml:"items"`
+	}
+	if err := yaml.Unmarshal([]byte(wrapped), &doc); err != nil {
+		return yamlStr, false
+	}
+
+	if len(doc.Items) == 0 {
+		return yamlStr, false
+	}
+
+	// Separate section headers from panel items
+	type sectionGroup struct {
+		title  string
+		panels []map[string]interface{}
+	}
+
+	var groups []sectionGroup
+	var currentGroup *sectionGroup
+
+	for _, item := range doc.Items {
+		itemType, _ := item["type"].(string)
+
+		// Is this a panel (has a recognized panel type)?
+		if panelTypes[itemType] {
+			if currentGroup == nil {
+				// No section header yet — create a default one
+				groups = append(groups, sectionGroup{title: "generated panels"})
+				currentGroup = &groups[len(groups)-1]
+			}
+			currentGroup.panels = append(currentGroup.panels, item)
+			continue
+		}
+
+		// Is this a section header? (has title, no panel type, or is type "row")
+		title, _ := item["title"].(string)
+		if title != "" && (itemType == "" || itemType == "row") {
+			// Check if it already has panels key (already a proper section)
+			if _, hasPanels := item["panels"]; hasPanels {
+				// Already nested — marshal as-is
+				groups = append(groups, sectionGroup{title: title})
+				currentGroup = &groups[len(groups)-1]
+				if panelList, ok := item["panels"].([]interface{}); ok {
+					for _, p := range panelList {
+						if pm, ok := p.(map[string]interface{}); ok {
+							currentGroup.panels = append(currentGroup.panels, pm)
+						}
+					}
+				}
+			} else {
+				groups = append(groups, sectionGroup{title: title})
+				currentGroup = &groups[len(groups)-1]
+			}
+			continue
+		}
+
+		// Unknown item — treat as panel if it has a title
+		if title != "" {
+			if currentGroup == nil {
+				groups = append(groups, sectionGroup{title: "generated panels"})
+				currentGroup = &groups[len(groups)-1]
+			}
+			currentGroup.panels = append(currentGroup.panels, item)
+		}
+	}
+
+	// If no groups had panels, repair failed
+	hasPanels := false
+	for _, g := range groups {
+		if len(g.panels) > 0 {
+			hasPanels = true
+			break
+		}
+	}
+	if !hasPanels {
+		return yamlStr, false
+	}
+
+	// Build repaired YAML
+	type repairedSection struct {
+		Title  string                   `yaml:"title"`
+		Panels []map[string]interface{} `yaml:"panels"`
+	}
+	var sections []repairedSection
+	for _, g := range groups {
+		if len(g.panels) > 0 {
+			sections = append(sections, repairedSection{
+				Title:  g.title,
+				Panels: g.panels,
+			})
+		}
+	}
+
+	out, err := yaml.Marshal(sections)
+	if err != nil {
+		return yamlStr, false
+	}
+
+	return string(out), true
 }

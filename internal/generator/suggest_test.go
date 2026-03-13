@@ -29,8 +29,11 @@ func TestInferUnit(t *testing.T) {
 		{"node_filesystem_avail_ratio", "percentunit"},
 		{"cpu_usage_percent", "percent"},
 
+		// Request counters (reqps)
+		{"http_requests_total", "reqps"},
+		{"grpc_server_handled_requests_total", "reqps"},
+
 		// Generic counters
-		{"http_requests_total", "short"},
 		{"node_context_switches_total", "short"},
 
 		// Info metrics
@@ -42,6 +45,15 @@ func TestInferUnit(t *testing.T) {
 
 		// Bytes created (edge case)
 		{"some_bytes_created", "bytes"},
+
+		// Temperature, electrical, connections
+		{"node_hwmon_temperature_celsius", "celsius"},
+		{"node_hwmon_temperature_fahrenheit", "fahrenheit"},
+		{"node_hwmon_volts", "volt"},
+		{"node_hwmon_watts", "watt"},
+		{"node_cpu_hertz", "hertz"},
+		{"node_hwmon_amperes", "amp"},
+		{"node_netstat_tcp_connections", "short"},
 
 		// Default
 		{"prometheus_tsdb_head_series", "short"},
@@ -189,8 +201,8 @@ func TestSuggestPanel_Counter(t *testing.T) {
 	if s.Query != "rate(http_requests_total[${rate_interval}])" {
 		t.Errorf("Query = %q, want rate with rate_interval", s.Query)
 	}
-	if s.Unit != "short" {
-		t.Errorf("Unit = %q, want short", s.Unit)
+	if s.Unit != "reqps" {
+		t.Errorf("Unit = %q, want reqps", s.Unit)
 	}
 	if s.Title != "http requests" {
 		t.Errorf("Title = %q, want 'http requests'", s.Title)
@@ -445,6 +457,66 @@ func TestFormatSnippetYAML(t *testing.T) {
 
 	if len(hints) == 0 {
 		t.Error("expected at least one hint")
+	}
+}
+
+func TestSuggestVariablesFromLabels(t *testing.T) {
+	tests := []struct {
+		name         string
+		labels       []string
+		existingVars []string
+		want         []string
+	}{
+		{
+			name:         "filters internal labels",
+			labels:       []string{"__name__", "instance", "job", "le", "quantile"},
+			existingVars: nil,
+			want:         []string{"instance", "job"},
+		},
+		{
+			name:         "filters existing variables",
+			labels:       []string{"instance", "job", "namespace", "pod"},
+			existingVars: []string{"namespace"},
+			want:         []string{"instance", "job", "pod"},
+		},
+		{
+			name:         "filters all skip labels",
+			labels:       []string{"__name__", "le", "quantile", "alertname", "alertstate", "prometheus", "prometheus_replica"},
+			existingVars: nil,
+			want:         nil,
+		},
+		{
+			name:         "filters double-underscore prefixed labels",
+			labels:       []string{"__meta_kubernetes_pod_name", "instance"},
+			existingVars: nil,
+			want:         []string{"instance"},
+		},
+		{
+			name:         "empty input",
+			labels:       nil,
+			existingVars: nil,
+			want:         nil,
+		},
+		{
+			name:         "all labels already exist as variables",
+			labels:       []string{"instance", "job"},
+			existingVars: []string{"instance", "job"},
+			want:         nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SuggestVariablesFromLabels(tt.labels, tt.existingVars)
+			if len(got) != len(tt.want) {
+				t.Fatalf("SuggestVariablesFromLabels() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("SuggestVariablesFromLabels()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
 	}
 }
 

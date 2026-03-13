@@ -1,10 +1,13 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/wcatz/dashboard-generator/internal/config"
 	"github.com/wcatz/dashboard-generator/internal/generator"
@@ -481,4 +484,68 @@ func (s *Server) handleLabelValues(w http.ResponseWriter, r *http.Request) {
 		"Values": values,
 		"Total":  len(values),
 	})
+}
+
+// handleGrafanaDatasources queries the connected Grafana instance for its configured datasources.
+func (s *Server) handleGrafanaDatasources(w http.ResponseWriter, r *http.Request) {
+	grafanaURL := s.GrafanaURL()
+	grafanaToken := s.GrafanaToken()
+	if grafanaURL == "" || grafanaToken == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":"grafana not configured"}`))
+		return
+	}
+
+	url := strings.TrimRight(grafanaURL, "/") + "/api/datasources"
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		http.Error(w, "failed to create request", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+grafanaToken)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = fmt.Fprintf(w, `{"error":"grafana request failed: %s"}`, err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "failed to read grafana response", http.StatusInternalServerError)
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		_, _ = fmt.Fprintf(w, `{"error":"grafana returned %d"}`, resp.StatusCode)
+		return
+	}
+
+	// Parse and reshape — only expose safe fields
+	var grafanaDSList []struct {
+		Name      string `json:"name"`
+		Type      string `json:"type"`
+		UID       string `json:"uid"`
+		URL       string `json:"url"`
+		IsDefault bool   `json:"isDefault"`
+	}
+	if err := json.Unmarshal(body, &grafanaDSList); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = fmt.Fprintf(w, `{"error":"invalid grafana response"}`)
+		return
+	}
+
+	out, _ := json.Marshal(grafanaDSList)
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(out)
 }

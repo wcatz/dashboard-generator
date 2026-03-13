@@ -89,9 +89,12 @@ func (md *MetricDiscovery) get(baseURL, path string) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, truncateBody(body, 200))
+	}
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid JSON response from %s: %s", url, truncateBody(body, 200))
 	}
 	if status, ok := result["status"].(string); ok && status != "success" {
 		fmt.Fprintf(os.Stderr, "  warning: non-success response from %s\n", url)
@@ -227,6 +230,47 @@ func (md *MetricDiscovery) FetchLabelValues(dsName, label string) ([]string, err
 		}
 	}
 	return values, nil
+}
+
+// FetchMetricLabels returns the label names associated with a specific metric.
+// Uses /api/v1/series?match[]={metricName}&limit=1, extracts label keys (excluding __name__).
+// Results are cached per dsName+metricName.
+func (md *MetricDiscovery) FetchMetricLabels(dsName, metricName string) ([]string, error) {
+	baseURL := md.Config.GetDatasourceURL(dsName)
+	if baseURL == "" {
+		return nil, fmt.Errorf("no URL configured for datasource '%s'", dsName)
+	}
+	key := "metric-labels:" + dsName + ":" + metricName
+	if cached, ok := md.cache[key]; ok {
+		return cached.([]string), nil
+	}
+
+	path := fmt.Sprintf("/api/v1/series?match[]=%s&limit=1", neturl.QueryEscape(metricName))
+	data, err := md.get(baseURL, path)
+	if err != nil {
+		return nil, err
+	}
+
+	labelSet := make(map[string]bool)
+	if list, ok := data.([]interface{}); ok {
+		for _, item := range list {
+			if series, ok := item.(map[string]interface{}); ok {
+				for k := range series {
+					if k != "__name__" {
+						labelSet[k] = true
+					}
+				}
+			}
+		}
+	}
+
+	labels := make([]string, 0, len(labelSet))
+	for l := range labelSet {
+		labels = append(labels, l)
+	}
+	sort.Strings(labels)
+	md.cache[key] = labels
+	return labels, nil
 }
 
 // FetchSeriesMetrics returns metric names that have a specific label=value pair.
@@ -483,6 +527,14 @@ func (md *MetricDiscovery) CompareAll(dsNames []string) (shared map[string]Metri
 	}
 
 	return shared, exclusive, nil
+}
+
+func truncateBody(body []byte, max int) string {
+	s := strings.TrimSpace(string(body))
+	if len(s) > max {
+		return s[:max] + "..."
+	}
+	return s
 }
 
 func lookupMeta(name string, primary, fallback map[string]MetricInfo) MetricInfo {

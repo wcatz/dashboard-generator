@@ -18,6 +18,7 @@
       <h3 class="card-title text-sm min-w-0 break-all">{{.ConfigPath}}</h3>
       <div class="flex gap-2 shrink-0">
         <button class="btn btn-xs btn-outline" id="reload-btn" hx-post="/api/config/reload" hx-target="#editor-status" hx-disabled-elt="this">reload</button>
+        <button class="btn btn-xs btn-outline" id="format-btn" onclick="formatYAML()" title="normalize indentation (removes comments)">format</button>
         <button class="btn btn-xs btn-primary" id="save-btn" hx-post="/api/config/save" hx-target="#editor-status" hx-disabled-elt="this">save</button>
       </div>
     </div>
@@ -71,6 +72,20 @@
         });
     }
   });
+
+  // Format YAML via server
+  window.formatYAML = function() {
+    var form = new FormData();
+    form.append('content', cm.getValue());
+    fetch('/api/config/format', { method: 'POST', body: form })
+      .then(function(r) {
+        if (!r.ok) return r.text().then(function(t) { showToast(t, 'error'); });
+        return r.text().then(function(text) {
+          cm.setValue(text);
+          showToast('formatted (comments removed)', 'info');
+        });
+      });
+  };
 
   // Handle error line highlighting from save/validate responses
   document.body.addEventListener('htmx:afterSwap', function(evt) {

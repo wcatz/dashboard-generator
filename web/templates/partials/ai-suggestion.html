@@ -44,10 +44,15 @@
   <!-- Action buttons -->
   <div class="flex flex-wrap gap-2 justify-end items-center">
     {{if .Dashboards}}
-    <div class="flex gap-1 items-center mr-auto">
-      <select id="ai-insert-dashboard" class="select select-bordered select-xs">
+    <div class="flex flex-wrap gap-1 items-center mr-auto">
+      <select id="ai-insert-dashboard" class="select select-bordered select-xs"
+              hx-get="/api/config/dashboard-sections" hx-target="#ai-insert-section"
+              hx-trigger="change" hx-include="this" name="dashboard">
         <option value="">insert into...</option>
         {{range .Dashboards}}<option value="{{.}}">{{.}}</option>{{end}}
+      </select>
+      <select id="ai-insert-section" class="select select-bordered select-xs">
+        <option value="">new section</option>
       </select>
       <button class="btn btn-xs btn-success gap-1" onclick="insertAISuggestion()">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
@@ -76,12 +81,23 @@
     if (!db || !db.value) { showToast('select a dashboard first', 'warning'); return; }
     var yaml = document.getElementById('ai-yaml-output');
     if (!yaml) return;
-    var statusEl = document.getElementById('ai-insert-status');
-    htmx.ajax('POST', '/api/config/insert-section', {
-      target: '#ai-insert-status',
-      swap: 'innerHTML',
-      values: { dashboard: db.value, yaml_snippet: yaml.textContent }
-    });
+    var sec = document.getElementById('ai-insert-section');
+
+    if (sec && sec.value !== '') {
+      // Insert panels into existing section
+      htmx.ajax('POST', '/api/config/insert-panel', {
+        target: '#ai-insert-status',
+        swap: 'innerHTML',
+        values: { dashboard: db.value, section_index: sec.value, panel_yaml: yaml.textContent }
+      });
+    } else {
+      // Insert as new section
+      htmx.ajax('POST', '/api/config/insert-section', {
+        target: '#ai-insert-status',
+        swap: 'innerHTML',
+        values: { dashboard: db.value, yaml_snippet: yaml.textContent }
+      });
+    }
   }
 </script>
 {{else}}

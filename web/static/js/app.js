@@ -40,11 +40,24 @@ function paletteSetColorFromPicker(input) {
 function paletteAddColor(palette) {
   var name = prompt('color name:');
   if (!name || !name.trim()) return;
-  htmx.ajax('POST', '/api/palette/color/set', {
-    target: '#palette-cards',
-    swap: 'innerHTML',
-    values: { palette: palette, color: name.trim(), hex: '#6366f1' }
+  name = name.trim();
+  var picker = document.createElement('input');
+  picker.type = 'color';
+  picker.value = '#6366f1';
+  picker.style.position = 'fixed';
+  picker.style.opacity = '0';
+  document.body.appendChild(picker);
+  picker.addEventListener('input', function() {
+    htmx.ajax('POST', '/api/palette/color/set', {
+      target: '#palette-cards',
+      swap: 'innerHTML',
+      values: { palette: palette, color: name, hex: picker.value }
+    });
   });
+  picker.addEventListener('change', function() {
+    document.body.removeChild(picker);
+  });
+  picker.click();
 }
 
 function paletteRenameColorFromEl(el) {

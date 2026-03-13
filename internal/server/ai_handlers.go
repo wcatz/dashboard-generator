@@ -23,6 +23,31 @@ func (s *Server) initAIClient(cfg *config.Config) (client *generator.AIClient, c
 	return aiClient, generator.BuildConfigContext(cfg), ""
 }
 
+// validateAndRepairAI checks AI-generated YAML for correct section→panels nesting.
+// If the output is flat (panels as top-level items), it auto-repairs and appends a note.
+func validateAndRepairAI(suggestion *generator.AISuggestionResponse) {
+	if err := generator.ValidateAISectionYAML(suggestion.YAML); err != nil {
+		repaired, ok := generator.RepairFlatSectionYAML(suggestion.YAML)
+		if ok {
+			suggestion.YAML = repaired
+			suggestion.Notes = append(suggestion.Notes, "auto-repaired: panels were restructured into correct section nesting")
+		}
+	}
+}
+
+// enrichExistingSections populates ConfigContext.ExistingSections from the first dashboard.
+func enrichExistingSections(cfg *config.Config, ctx *generator.ConfigContext) {
+	order, _ := cfg.GetDashboardOrder("")
+	dashboards, _ := cfg.GetDashboards("")
+	if len(order) > 0 {
+		if db, ok := dashboards[order[0]]; ok {
+			for _, sec := range db.Sections {
+				ctx.ExistingSections = append(ctx.ExistingSections, sec.Title)
+			}
+		}
+	}
+}
+
 // handleAISuggest generates a panel YAML suggestion for a single metric using AI.
 func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 	cfg := s.Config()
@@ -35,6 +60,10 @@ func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 	metricName := strings.TrimSpace(r.FormValue("metric"))
 	metricType := r.FormValue("type")
 	metricHelp := r.FormValue("help")
+	if dsName := r.FormValue("datasource"); dsName != "" {
+		configCtx.DatasourceName = dsName
+	}
+	enrichExistingSections(cfg, &configCtx)
 
 	if metricName == "" {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": "Metric name is required"})
@@ -42,11 +71,16 @@ func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	metrics := []generator.MetricContext{{Name: metricName, Type: metricType, Help: metricHelp}}
+
+	// Enrich with per-metric labels if datasource has a URL
+	enrichMetricLabels(cfg, configCtx.DatasourceName, metrics, 1)
+
 	suggestion, err := aiClient.Suggest(metrics, configCtx)
 	if err != nil {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": fmt.Sprintf("AI suggestion failed: %v", err)})
 		return
 	}
+	validateAndRepairAI(suggestion)
 	dashboards, _ := cfg.GetDashboardOrder("")
 	s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{
 		"YAML":       suggestion.YAML,
@@ -64,6 +98,11 @@ func (s *Server) handleAISuggestBulk(w http.ResponseWriter, r *http.Request) {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": errMsg})
 		return
 	}
+
+	if dsName := r.FormValue("datasource"); dsName != "" {
+		configCtx.DatasourceName = dsName
+	}
+	enrichExistingSections(cfg, &configCtx)
 
 	// Parse metrics from JSON payload
 	metricsJSON := r.FormValue("metrics")
@@ -105,12 +144,16 @@ func (s *Server) handleAISuggestBulk(w http.ResponseWriter, r *http.Request) {
 		metrics = append(metrics, generator.MetricContext{Name: name, Type: m.Type, Help: m.Help})
 	}
 
+	// Enrich with per-metric labels (cap at 10 lookups)
+	enrichMetricLabels(cfg, configCtx.DatasourceName, metrics, 10)
+
 	// Call AI to generate suggestion
 	suggestion, err := aiClient.Suggest(metrics, configCtx)
 	if err != nil {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": fmt.Sprintf("AI suggestion failed: %v", err)})
 		return
 	}
+	validateAndRepairAI(suggestion)
 
 	// Build metric names list for display
 	var metricNames []string
@@ -128,4 +171,65 @@ func (s *Server) handleAISuggestBulk(w http.ResponseWriter, r *http.Request) {
 		"MetricNames": strings.Join(metricNames, ", "),
 		"Dashboards":  dashboards,
 	})
+}
+
+// handleAIDescribeDashboard generates a complete dashboard config from a natural language description.
+func (s *Server) handleAIDescribeDashboard(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	cfg := s.Config()
+	aiClient, configCtx, errMsg := s.initAIClient(cfg)
+	if errMsg != "" {
+		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": errMsg})
+		return
+	}
+
+	description := strings.TrimSpace(r.FormValue("description"))
+	if description == "" {
+		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": "Description is required"})
+		return
+	}
+
+	suggestion, err := aiClient.SuggestDashboard(description, configCtx)
+	if err != nil {
+		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": fmt.Sprintf("AI dashboard generation failed: %v", err)})
+		return
+	}
+
+	dashboards, _ := cfg.GetDashboardOrder("")
+	s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{
+		"YAML":        suggestion.YAML,
+		"Notes":       suggestion.Notes,
+		"IsBulk":      true,
+		"MetricNames": "dashboard: " + description,
+		"Dashboards":  dashboards,
+	})
+}
+
+// enrichMetricLabels fetches per-metric labels from Prometheus and populates MetricContext.Labels.
+// maxLookups caps the number of /api/v1/series queries to avoid slow responses.
+// Each metric gets at most 5 labels to keep the AI prompt concise.
+func enrichMetricLabels(cfg *config.Config, dsName string, metrics []generator.MetricContext, maxLookups int) {
+	if dsName == "" || cfg.GetDatasourceURL(dsName) == "" {
+		return
+	}
+	disc := generator.NewMetricDiscovery(cfg)
+	lookups := 0
+	for i := range metrics {
+		if lookups >= maxLookups {
+			break
+		}
+		lookups++
+		labels, err := disc.FetchMetricLabels(dsName, metrics[i].Name)
+		if err != nil {
+			continue
+		}
+		if len(labels) > 5 {
+			labels = labels[:5]
+		}
+		metrics[i].Labels = labels
+	}
 }
