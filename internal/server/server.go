@@ -322,8 +322,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	csp := "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net"
-	if s.grafanaURL != "" {
-		csp += "; frame-src " + s.grafanaURL
+	if gURL := s.GrafanaURL(); gURL != "" {
+		csp += "; frame-src " + gURL
 	}
 	w.Header().Set("Content-Security-Policy", csp)
 

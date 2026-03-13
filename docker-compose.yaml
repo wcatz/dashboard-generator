@@ -9,7 +9,7 @@ services:
       - .env
     environment:
       - GRAFANA_URL=${GRAFANA_URL:-https://blinklabsio.grafana.net}
-      - GRAFANA_TOKEN=${GRAFANA_TOKEN:-${BLINKLABS_GRAFANO_SA_TOKEN}}
+      - GRAFANA_TOKEN=${GRAFANA_TOKEN:-${BLINKLABS_GRAFANA_SA_TOKEN}}
     volumes:
       - ./configs:/configs:rw
       - ./dashboards:/dashboards

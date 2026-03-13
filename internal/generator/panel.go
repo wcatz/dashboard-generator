@@ -31,6 +31,7 @@ var DefaultSizes = map[string][2]int{
 	"xychart":        {12, 7},
 	"geomap":         {12, 10},
 	"nodeGraph":      {24, 10},
+	"node-graph":     {24, 10},
 }
 
 // PanelFactory creates Grafana panel JSON dicts.
@@ -1173,7 +1174,7 @@ func (pf *PanelFactory) News(cfg map[string]interface{}, x, y int) map[string]in
 	dw, dh := DefaultSizes["news"][0], DefaultSizes["news"][1]
 	w := getInt(cfg, "width", dw)
 	h := getInt(cfg, "height", dh)
-	return map[string]interface{}{
+	panel := map[string]interface{}{
 		"datasource":  pf.ds(cfg),
 		"description": getString(cfg, "description", ""),
 		"gridPos":     map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
@@ -1187,6 +1188,8 @@ func (pf *PanelFactory) News(cfg map[string]interface{}, x, y int) map[string]in
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "news",
 	}
+	pf.applyRepeat(panel, cfg)
+	return panel
 }
 
 // XYChart creates an XY scatter/correlation chart panel.

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -213,8 +214,14 @@ func BuildConfigContext(cfg *config.Config) ConfigContext {
 		ctx.Variables = append(ctx.Variables, name)
 	}
 
-	// Populate default datasource name (first with a URL)
-	for name, ds := range cfg.Datasources {
+	// Populate default datasource name (prefer is_default, then first by sorted name)
+	var dsNames []string
+	for name := range cfg.Datasources {
+		dsNames = append(dsNames, name)
+	}
+	sort.Strings(dsNames)
+	for _, name := range dsNames {
+		ds := cfg.Datasources[name]
 		if ds.URL != "" {
 			ctx.DatasourceName = name
 			break

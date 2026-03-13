@@ -222,11 +222,11 @@ func enrichMetricLabels(cfg *config.Config, dsName string, metrics []generator.M
 		if lookups >= maxLookups {
 			break
 		}
+		lookups++
 		labels, err := disc.FetchMetricLabels(dsName, metrics[i].Name)
 		if err != nil {
 			continue
 		}
-		lookups++
 		if len(labels) > 5 {
 			labels = labels[:5]
 		}
