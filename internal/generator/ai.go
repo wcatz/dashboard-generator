@@ -147,7 +147,7 @@ func (c *AIClient) SuggestDashboard(description string, configCtx ConfigContext)
 	}
 
 	systemPrompt := buildDashboardSystemPrompt(configCtx)
-	userPrompt := fmt.Sprintf("Create a complete dashboard config for: %s\n\nInclude appropriate sections, panel types, variables, and queries. Make it production-ready.", description)
+	userPrompt := fmt.Sprintf("Create a complete dashboard config for: %s\n\nInclude appropriate sections, panel types, variables, and queries. Make it production-ready and actionable — lead with panels that surface problems (errors, saturation, latency) before informational panels. Every stat panel must have meaningful thresholds.", description)
 
 	body := map[string]interface{}{
 		"model":      c.Model,
@@ -338,6 +338,19 @@ celsius, fahrenheit, volt, watt, hertz, amp
 - Aggregation: sum by (label)(metric), avg by (label)(metric)
 - Label selectors: metric{label=~"$variable"} when a matching template variable exists
 - Group-by: sum by (label)(metric) when labels are available and meaningful
+
+## Actionable Panel Philosophy
+- Every panel should answer "so what?" — if this value changes, what does the operator do?
+- Stat panels MUST have thresholds (green→yellow→red) — a number without context is noise
+- Prefer rates and percentages over raw counters for stat/gauge panels
+- Lead with problem-surfacing panels (errors, saturation) over informational ones
+- Skip vanity metrics that don't drive action
+
+## Anti-patterns to AVOID
+- NEVER use nested "custom:" or "fieldConfig:" blocks — all config is flat keys
+- NEVER invent metric names not provided in the input
+- NEVER use invalid unit strings (use only: bytes, Bps, s, ms, percent, percentunit, short, none, reqps, ops, pps, iops, celsius, fahrenheit, volt, watt, hertz, amp)
+- NEVER create stat panels without thresholds
 `)
 
 	// Add config context
@@ -427,9 +440,11 @@ stat, gauge, timeseries, bargauge, heatmap, histogram, table, piechart,
 state-timeline, status-history, text, logs, comparison, alertlist, dashlist,
 trend, candlestick, news, xychart, geomap, nodeGraph
 
-## Variable Definition Format
-Variables referenced in the "variables:" list should use existing config variables.
-You may suggest new variables as comments.
+## Variable Schema
+The "variables:" field is a FLAT LIST of variable names (strings), NOT objects.
+Correct:   variables: [namespace, instance, pod]
+WRONG:     variables: [{name: namespace, type: query, ...}]
+Variables become Grafana template variables. Use them in queries as $namespace, $instance, etc.
 
 ## Style Conventions
 - Lowercase titles
@@ -437,6 +452,55 @@ You may suggest new variables as comments.
 - smooth line interpolation on timeseries
 - Include descriptions on panels
 - Use rate() for counters, histogram_quantile() for histograms
+
+## Actionable Dashboard Philosophy
+- Lead with problem-surfacing panels: error rates, saturation, latency percentiles — things that tell an operator "something is wrong"
+- Every panel should answer "so what?" — if a value goes up or down, what action does the operator take?
+- Skip vanity counters (current block height, uptime tickers, raw totals) unless they have thresholds that indicate trouble
+- Stat panels MUST have meaningful thresholds with color transitions (green→yellow→red) — a stat without thresholds is a number without context
+- Timeseries panels should show rates/percentages that reveal trends, not raw counters
+- Group sections by operational concern: "what's broken?" first, then "what's degrading?", then "capacity/planning"
+- For infrastructure: CPU, memory, disk, network — show utilization percentages with saturation thresholds, not raw byte counts
+- For applications: error rate, request latency p95/p99, throughput — the RED method
+
+## Panel Sizing Reference
+| Type | Default WxH | Notes |
+|------|------------|-------|
+| stat | 3x4 | Use for KPI indicators, 6-8 per row |
+| gauge | 3x4 | Percentages with min/max |
+| timeseries | 12x7 | Half-width trends, use 24 for full-width |
+| bargauge | 6x5 | Ranked comparisons |
+| table | 24x8 | Full-width detail views |
+| piechart | 6x6 | Proportional breakdowns |
+| heatmap | 12x8 | Distribution over time |
+| histogram | 12x7 | Value distribution |
+Do not specify width/height unless overriding defaults. The generator handles sizing.
+
+## Valid Grafana Unit IDs
+bytes, Bps, s, ms, percent, percentunit, short, none, reqps, ops, pps, iops,
+celsius, fahrenheit, volt, watt, hertz, amp
+WRONG: "bytes/sec", "percentage", "requests/s", "milliseconds", "MB"
+
+## Panel Config Keys
+All keys are FLAT (no nesting under "custom:" or "fieldConfig:"):
+type, title, query, targets (list of {expr, legend, datasource}), width, height,
+datasource, unit, description, color, thresholds, transparent, overrides,
+value_mappings, data_links, transformations, repeat, repeat_direction, max_per_row
+
+Type-specific flat keys:
+- stat: color_mode, graph_mode, text_mode
+- gauge: min, max, show_threshold_labels, show_threshold_markers
+- timeseries: fill_opacity, line_width, stack, draw_style, line_interpolation, legend_calcs, legend_mode, legend_placement, color_mode
+- bargauge: display_mode, orientation
+- table: filterable, sort_by, transformations
+
+## Anti-patterns to AVOID
+- NEVER use nested "custom:" or "fieldConfig:" blocks — all config is flat keys
+- NEVER invent metric names — only use metrics the user explicitly provides or that are standard Prometheus/k8s metrics (node_*, container_*, kube_*, kubelet_*)
+- NEVER use unit strings not in the valid list above
+- NEVER create stat panels without thresholds — every stat needs green/yellow/red context
+- NEVER use raw counters in stat panels — use rate() or increase() for counters
+- NEVER generate a "variables:" field as anything other than a flat list of strings
 `)
 
 	if len(ctx.Variables) > 0 {
@@ -483,7 +547,7 @@ func buildUserPrompt(metrics []MetricContext) string {
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("\nGroup related metrics into logical sections. Use appropriate panel types, units, thresholds, and queries. Include descriptions. Make the panels production-ready.")
+	sb.WriteString("\nGroup related metrics into logical sections. Use appropriate panel types, units, thresholds, and queries. Include descriptions. Make the panels production-ready. Prioritize panels that surface problems and drive operator action over vanity counters. Every stat panel must have thresholds.")
 
 	return sb.String()
 }

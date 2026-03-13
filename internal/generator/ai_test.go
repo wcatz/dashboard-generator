@@ -58,6 +58,16 @@ func TestBuildSystemPrompt(t *testing.T) {
 	if !strings.Contains(prompt, "$instance") {
 		t.Error("expected variables in system prompt")
 	}
+
+	// Should contain actionable philosophy
+	if !strings.Contains(prompt, "Actionable Panel Philosophy") {
+		t.Error("expected actionable philosophy section in system prompt")
+	}
+
+	// Should contain anti-patterns
+	if !strings.Contains(prompt, "Anti-patterns to AVOID") {
+		t.Error("expected anti-patterns section in system prompt")
+	}
 }
 
 func TestBuildUserPrompt(t *testing.T) {
@@ -416,6 +426,32 @@ func TestRepairFlatSectionYAML_NoPrecedingSection(t *testing.T) {
 	// Should create a default section title
 	if !strings.Contains(result, "generated panels") {
 		t.Error("expected default section title 'generated panels'")
+	}
+}
+
+func TestBuildDashboardSystemPrompt(t *testing.T) {
+	ctx := ConfigContext{
+		Variables:      []string{"namespace", "instance"},
+		DatasourceName: "k3s",
+		Palettes:       []string{"green", "red"},
+	}
+	prompt := buildDashboardSystemPrompt(ctx)
+
+	checks := []struct{ name, substr string }{
+		{"variable schema", "FLAT LIST of variable names"},
+		{"actionable philosophy", "Actionable Dashboard Philosophy"},
+		{"panel sizing", "Panel Sizing Reference"},
+		{"valid units", "Valid Grafana Unit IDs"},
+		{"config keys", "Panel Config Keys"},
+		{"anti-patterns", "Anti-patterns to AVOID"},
+		{"datasource", "k3s"},
+		{"variables", "$namespace"},
+		{"palette", "$green"},
+	}
+	for _, c := range checks {
+		if !strings.Contains(prompt, c.substr) {
+			t.Errorf("expected %s (%q) in dashboard system prompt", c.name, c.substr)
+		}
 	}
 }
 
