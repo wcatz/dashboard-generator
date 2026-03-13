@@ -45,6 +45,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/config/save", s.handleConfigSave)
 	s.mux.HandleFunc("/api/config/insert-section", s.handleInsertSection)
 	s.mux.HandleFunc("/api/config/format", s.handleConfigFormat)
+	s.mux.HandleFunc("/api/config/dashboard-sections", s.handleDashboardSections)
 	s.mux.HandleFunc("/api/preview", s.handlePreviewAPI)
 	s.mux.HandleFunc("/api/palette/color/set", s.handlePaletteColorSet)
 	s.mux.HandleFunc("/api/palette/color/delete", s.handlePaletteColorDelete)

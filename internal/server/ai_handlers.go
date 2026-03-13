@@ -23,6 +23,31 @@ func (s *Server) initAIClient(cfg *config.Config) (client *generator.AIClient, c
 	return aiClient, generator.BuildConfigContext(cfg), ""
 }
 
+// validateAndRepairAI checks AI-generated YAML for correct section→panels nesting.
+// If the output is flat (panels as top-level items), it auto-repairs and appends a note.
+func validateAndRepairAI(suggestion *generator.AISuggestionResponse) {
+	if err := generator.ValidateAISectionYAML(suggestion.YAML); err != nil {
+		repaired, ok := generator.RepairFlatSectionYAML(suggestion.YAML)
+		if ok {
+			suggestion.YAML = repaired
+			suggestion.Notes = append(suggestion.Notes, "auto-repaired: panels were restructured into correct section nesting")
+		}
+	}
+}
+
+// enrichExistingSections populates ConfigContext.ExistingSections from the first dashboard.
+func enrichExistingSections(cfg *config.Config, ctx *generator.ConfigContext) {
+	order, _ := cfg.GetDashboardOrder("")
+	dashboards, _ := cfg.GetDashboards("")
+	if len(order) > 0 {
+		if db, ok := dashboards[order[0]]; ok {
+			for _, sec := range db.Sections {
+				ctx.ExistingSections = append(ctx.ExistingSections, sec.Title)
+			}
+		}
+	}
+}
+
 // handleAISuggest generates a panel YAML suggestion for a single metric using AI.
 func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 	cfg := s.Config()
@@ -35,6 +60,10 @@ func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 	metricName := strings.TrimSpace(r.FormValue("metric"))
 	metricType := r.FormValue("type")
 	metricHelp := r.FormValue("help")
+	if dsName := r.FormValue("datasource"); dsName != "" {
+		configCtx.DatasourceName = dsName
+	}
+	enrichExistingSections(cfg, &configCtx)
 
 	if metricName == "" {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": "Metric name is required"})
@@ -47,6 +76,7 @@ func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": fmt.Sprintf("AI suggestion failed: %v", err)})
 		return
 	}
+	validateAndRepairAI(suggestion)
 	dashboards, _ := cfg.GetDashboardOrder("")
 	s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{
 		"YAML":       suggestion.YAML,
@@ -64,6 +94,11 @@ func (s *Server) handleAISuggestBulk(w http.ResponseWriter, r *http.Request) {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": errMsg})
 		return
 	}
+
+	if dsName := r.FormValue("datasource"); dsName != "" {
+		configCtx.DatasourceName = dsName
+	}
+	enrichExistingSections(cfg, &configCtx)
 
 	// Parse metrics from JSON payload
 	metricsJSON := r.FormValue("metrics")
@@ -111,6 +146,7 @@ func (s *Server) handleAISuggestBulk(w http.ResponseWriter, r *http.Request) {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": fmt.Sprintf("AI suggestion failed: %v", err)})
 		return
 	}
+	validateAndRepairAI(suggestion)
 
 	// Build metric names list for display
 	var metricNames []string

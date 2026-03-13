@@ -21,6 +21,14 @@ func TestBuildSystemPrompt(t *testing.T) {
 
 	prompt := buildSystemPrompt(ctx)
 
+	// Should contain schema requirement
+	if !strings.Contains(prompt, "panels:") {
+		t.Error("expected panels nesting requirement in system prompt")
+	}
+	if !strings.Contains(prompt, "CRITICAL") {
+		t.Error("expected CRITICAL nesting warning in system prompt")
+	}
+
 	// Should contain panel type reference
 	if !strings.Contains(prompt, "timeseries") {
 		t.Error("expected panel type reference in system prompt")
@@ -310,6 +318,104 @@ func TestAIClient_BaseURL(t *testing.T) {
 
 	if client.BaseURL != anthropicAPIURL {
 		t.Errorf("expected default BaseURL %s, got: %s", anthropicAPIURL, client.BaseURL)
+	}
+}
+
+func TestValidateAISectionYAML_Valid(t *testing.T) {
+	yaml := `- title: "overview"
+  panels:
+    - type: stat
+      title: "uptime"
+      query: 'up'`
+
+	err := ValidateAISectionYAML(yaml)
+	if err != nil {
+		t.Errorf("expected valid YAML, got error: %v", err)
+	}
+}
+
+func TestValidateAISectionYAML_FlatPanels(t *testing.T) {
+	yaml := `- title: "overview"
+  type: row
+- title: "uptime"
+  type: stat
+  query: 'up'`
+
+	err := ValidateAISectionYAML(yaml)
+	if err == nil {
+		t.Error("expected error for flat panels without nesting")
+	}
+}
+
+func TestValidateAISectionYAML_Empty(t *testing.T) {
+	err := ValidateAISectionYAML("")
+	if err == nil {
+		t.Error("expected error for empty YAML")
+	}
+}
+
+func TestRepairFlatSectionYAML_AlreadyValid(t *testing.T) {
+	yaml := `- title: "overview"
+  panels:
+    - type: stat
+      title: "uptime"
+      query: 'up'`
+
+	result, repaired := RepairFlatSectionYAML(yaml)
+	if repaired {
+		t.Error("expected no repair for valid YAML")
+	}
+	if result != yaml {
+		t.Error("expected original YAML returned unchanged")
+	}
+}
+
+func TestRepairFlatSectionYAML_FlatPanels(t *testing.T) {
+	yaml := `- title: "overview"
+  type: row
+- title: "uptime"
+  type: stat
+  query: 'up'
+- title: "memory"
+  type: gauge
+  query: 'node_memory'`
+
+	result, repaired := RepairFlatSectionYAML(yaml)
+	if !repaired {
+		t.Fatal("expected repair to be applied")
+	}
+
+	// Repaired YAML should now be valid
+	if err := ValidateAISectionYAML(result); err != nil {
+		t.Errorf("repaired YAML should be valid, got: %v", err)
+	}
+
+	// Should contain the panel titles
+	if !strings.Contains(result, "uptime") {
+		t.Error("expected panel title 'uptime' preserved")
+	}
+	if !strings.Contains(result, "memory") {
+		t.Error("expected panel title 'memory' preserved")
+	}
+}
+
+func TestRepairFlatSectionYAML_NoPrecedingSection(t *testing.T) {
+	yaml := `- title: "cpu usage"
+  type: timeseries
+  query: 'rate(cpu[5m])'`
+
+	result, repaired := RepairFlatSectionYAML(yaml)
+	if !repaired {
+		t.Fatal("expected repair to be applied")
+	}
+
+	if err := ValidateAISectionYAML(result); err != nil {
+		t.Errorf("repaired YAML should be valid, got: %v", err)
+	}
+
+	// Should create a default section title
+	if !strings.Contains(result, "generated panels") {
+		t.Error("expected default section title 'generated panels'")
 	}
 }
 

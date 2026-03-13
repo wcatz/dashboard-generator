@@ -1,6 +1,7 @@
 services:
   dashboard-generator:
-    image: wcatz/dashboard-generator:latest
+    build: .
+    image: wcatz/dashboard-generator:dev
     user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "8082:8080"
