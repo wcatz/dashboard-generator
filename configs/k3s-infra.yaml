@@ -1,0 +1,269 @@
+generator:
+  schema_version: 39
+  refresh: 30s
+  time_range: 1h
+  output_dir: /dashboards
+  editable: true
+datasources:
+  k3s: {type: prometheus, uid: prometheus, url: 'http://k3s-grafana/api/datasources/proxy/uid/prometheus', token: $GRAFANA_TOKEN}
+palettes:
+  default:
+    blue: "#5794F2"
+    green: "#73BF69"
+    yellow: "#F2CC0C"
+    red: "#F2495C"
+    purple: "#B877D9"
+    orange: "#FF9830"
+    cyan: "#6ED0E0"
+    teal: "#00A8A8"
+active_palette: default
+variables: {}
+query_macros:
+  by_ns: '{namespace=~"$namespace"}'
+dashboards:
+  k3s_infra:
+    uid: k3s-infrastructure
+    title: k3s infrastructure monitoring
+    filename: k3s-infrastructure.json
+    tags: [kubernetes, k3s, infrastructure, generated]
+    variables: [namespace, node]
+    sections:
+      - title: critical alerts
+        panels:
+          - type: stat
+            title: node cpu saturation
+            datasource: k3s
+            targets:
+              - expr: (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100
+                legend: cpu saturation
+            unit: percent
+            color_mode: background
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 75
+                - color: $red
+                  value: 90
+            transparent: true
+            description: highest cpu utilization across cluster — red means throttling risk
+          - type: stat
+            title: node memory pressure
+            datasource: k3s
+            targets:
+              - expr: max(node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100
+                legend: available memory %
+            unit: percent
+            color_mode: background
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $red
+                  value: null
+                - color: $yellow
+                  value: 10
+                - color: $green
+                  value: 20
+            transparent: true
+            description: lowest available memory % on any node — red means eviction risk
+          - type: stat
+            title: disk usage critical
+            datasource: k3s
+            targets:
+              - expr: max((node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat",mountpoint="/"} - node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat",mountpoint="/"}) / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat",mountpoint="/"}) * 100
+                legend: disk utilization
+            unit: percent
+            color_mode: background
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 80
+                - color: $red
+                  value: 90
+            transparent: true
+            description: highest disk utilization % — red means disk full risk
+          - type: stat
+            title: container restart surge
+            datasource: k3s
+            targets:
+              - expr: sum(increase(kube_pod_container_status_restarts_total[5m]))
+                legend: restarts (5m)
+            unit: short
+            color_mode: background
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 2
+                - color: $red
+                  value: 5
+            transparent: true
+            description: container restarts in last 5 min — indicates instability
+      - title: node health
+        panels:
+          - type: timeseries
+            title: node cpu utilization
+            datasource: k3s
+            targets:
+              - expr: (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) * 100
+                legend: '{{instance}}'
+            unit: percent
+            fill_opacity: 10
+            line_interpolation: smooth
+            legend_calcs: [last, max]
+            legend_mode: table
+            legend_placement: right
+            transparent: true
+            description: cpu usage trend per node — watch for sustained >80%
+          - type: timeseries
+            title: node memory utilization
+            datasource: k3s
+            targets:
+              - expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+                legend: '{{instance}}'
+            unit: percent
+            fill_opacity: 10
+            line_interpolation: smooth
+            legend_calcs: [last, max]
+            legend_mode: table
+            legend_placement: right
+            transparent: true
+            description: memory usage trend per node — sustained >85% triggers evictions
+          - type: gauge
+            title: disk usage by node
+            datasource: k3s
+            targets:
+              - expr: ((node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat",mountpoint="/"} - node_filesystem_avail_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat",mountpoint="/"}) / node_filesystem_size_bytes{fstype!~"tmpfs|fuse.lxcfs|squashfs|vfat",mountpoint="/"}) * 100
+                legend: '{{instance}}'
+            unit: percent
+            min: 0
+            max: 100
+            show_threshold_labels: true
+            show_threshold_markers: true
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 75
+                - color: $red
+                  value: 90
+            transparent: true
+            description: disk utilization gauge per node
+      - title: pod status
+        panels:
+          - type: stat
+            title: pods not running
+            datasource: k3s
+            targets:
+              - expr: sum(kube_pod_status_phase{phase!~"Running|Succeeded",namespace=~"$namespace"})
+                legend: not running
+            unit: short
+            color_mode: background
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 1
+                - color: $red
+                  value: 3
+            transparent: true
+            description: pods stuck in pending/failed/unknown — indicates scheduling or image issues
+          - type: stat
+            title: unhealthy pod replicas
+            datasource: k3s
+            targets:
+              - expr: sum(kube_deployment_status_replicas_unavailable{namespace=~"$namespace"})
+                legend: unavailable replicas
+            unit: short
+            color_mode: background
+            thresholds:
+              mode: absolute
+              steps:
+                - color: $green
+                  value: null
+                - color: $yellow
+                  value: 1
+                - color: $red
+                  value: 2
+            transparent: true
+            description: deployment replicas not yet available — check pod events and limits
+          - type: piechart
+            title: pod count by namespace
+            datasource: k3s
+            targets:
+              - expr: sum by (namespace) (kube_pod_info)
+                legend: '{{namespace}}'
+            unit: short
+            transparent: true
+            description: pod distribution across namespaces
+          - type: timeseries
+            title: container restart rate
+            datasource: k3s
+            targets:
+              - expr: rate(kube_pod_container_status_restarts_total{namespace=~"$namespace"}[5m])
+                legend: '{{namespace}}/{{pod}}'
+            unit: ops
+            fill_opacity: 10
+            line_interpolation: smooth
+            legend_mode: table
+            legend_calcs: [last, max]
+            legend_placement: right
+            transparent: true
+            description: container restart frequency — spiking rate indicates CrashLoop
+      - title: network
+        panels:
+          - type: timeseries
+            title: network bytes in
+            datasource: k3s
+            targets:
+              - expr: rate(node_network_receive_bytes_total{device!~"lo|docker0|virbr.*|br-.*"}[5m])
+                legend: 'rx {{device}} {{instance}}'
+            unit: Bps
+            fill_opacity: 10
+            line_interpolation: smooth
+            legend_mode: table
+            legend_calcs: [last, max]
+            legend_placement: right
+            transparent: true
+            description: inbound network traffic per interface — watch for unexpected spikes
+          - type: timeseries
+            title: network bytes out
+            datasource: k3s
+            targets:
+              - expr: rate(node_network_transmit_bytes_total{device!~"lo|docker0|virbr.*|br-.*"}[5m])
+                legend: 'tx {{device}} {{instance}}'
+            unit: Bps
+            fill_opacity: 10
+            line_interpolation: smooth
+            legend_mode: table
+            legend_calcs: [last, max]
+            legend_placement: right
+            transparent: true
+            description: outbound network traffic per interface
+          - type: timeseries
+            title: network errors
+            datasource: k3s
+            targets:
+              - expr: rate(node_network_receive_errs_total{device!~"lo|docker0|virbr.*|br-.*"}[5m])
+                legend: 'rx errors {{device}}'
+              - expr: rate(node_network_transmit_errs_total{device!~"lo|docker0|virbr.*|br-.*"}[5m])
+                legend: 'tx errors {{device}}'
+            unit: ops
+            fill_opacity: 10
+            line_interpolation: smooth
+            legend_mode: table
+            legend_calcs: [last, max]
+            legend_placement: right
+            transparent: true
+            description: network packet errors — may indicate hardware/driver issues

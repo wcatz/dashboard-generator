@@ -20,6 +20,7 @@ const (
 	anthropicAPIVersion = "2023-06-01"
 	defaultModel        = "claude-haiku-4-5-20251001"
 	maxTokens           = 4096
+	maxTokensDashboard  = 8192
 )
 
 // AIClient calls the Anthropic Messages API to generate panel suggestions.
@@ -151,7 +152,7 @@ func (c *AIClient) SuggestDashboard(description string, configCtx ConfigContext)
 
 	body := map[string]interface{}{
 		"model":      c.Model,
-		"max_tokens": maxTokens,
+		"max_tokens": maxTokensDashboard,
 		"system":     systemPrompt,
 		"messages": []map[string]interface{}{
 			{"role": "user", "content": userPrompt},
@@ -175,7 +176,10 @@ func (c *AIClient) SuggestDashboard(description string, configCtx ConfigContext)
 	req.Header.Set("x-api-key", c.APIKey)
 	req.Header.Set("anthropic-version", anthropicAPIVersion)
 
-	resp, err := c.httpClient.Do(req)
+	// Dashboard generation needs a longer timeout than single-metric suggestions
+	dashClient := *c.httpClient
+	dashClient.Timeout = 90 * time.Second
+	resp, err := dashClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("API request failed: %w", err)
 	}
@@ -390,7 +394,7 @@ celsius, fahrenheit, volt, watt, hertz, amp
 	}
 
 	if ctx.DatasourceName != "" {
-		sb.WriteString(fmt.Sprintf("\n## Target Datasource\nUse \"datasource: %s\" for all panels.\n", ctx.DatasourceName))
+		sb.WriteString(fmt.Sprintf("\n## Target Datasource\nCRITICAL: Every panel MUST have \"datasource: %s\". Do NOT use \"prometheus\" or any other name.\n", ctx.DatasourceName))
 	}
 
 	if len(ctx.ExistingSections) > 0 {
@@ -425,15 +429,35 @@ sections:
   - title: "overview"
     panels:
       - type: stat
-        title: "metric value"
-        query: 'prometheus_metric'
+        title: "error rate"
+        query: 'sum(rate(errors_total[5m]))'
+        datasource: prometheus
         unit: short
-  - title: "details"
+        color_mode: background
+        thresholds:
+          mode: absolute
+          steps:
+            - color: green
+              value: null
+            - color: yellow
+              value: 1
+            - color: red
+              value: 10
+        transparent: true
+        description: "total errors per second — investigate if yellow or red"
+  - title: "trends"
     panels:
       - type: timeseries
-        title: "rate over time"
-        query: 'rate(metric_total[5m])'
+        title: "request rate"
+        query: 'rate(requests_total[5m])'
+        datasource: prometheus
         unit: reqps
+        fill_opacity: 10
+        line_interpolation: smooth
+        transparent: true
+        description: "request throughput trend"
+
+CRITICAL: Thresholds MUST use the structured format shown above (mode + steps array with color/value pairs). NEVER use string format like thresholds: "0,1,5" — that will not parse.
 
 ## Available Panel Types
 stat, gauge, timeseries, bargauge, heatmap, histogram, table, piechart,
@@ -501,6 +525,9 @@ Type-specific flat keys:
 - NEVER create stat panels without thresholds — every stat needs green/yellow/red context
 - NEVER use raw counters in stat panels — use rate() or increase() for counters
 - NEVER generate a "variables:" field as anything other than a flat list of strings
+- NEVER use string thresholds like "0,1,5" — use the structured steps format shown in the example
+- NEVER specify width or height on panels — the generator assigns default sizes per panel type
+- NEVER use thresholds_mode or thresholds_colors — use the structured thresholds format only
 `)
 
 	if len(ctx.Variables) > 0 {
@@ -511,7 +538,7 @@ Type-specific flat keys:
 	}
 
 	if ctx.DatasourceName != "" {
-		sb.WriteString(fmt.Sprintf("\n## Target Datasource\nUse \"datasource: %s\" for all panels.\n", ctx.DatasourceName))
+		sb.WriteString(fmt.Sprintf("\n## Target Datasource\nCRITICAL: Every panel MUST have \"datasource: %s\". Do NOT use \"prometheus\" or any other name.\n", ctx.DatasourceName))
 	}
 
 	if len(ctx.Thresholds) > 0 {
