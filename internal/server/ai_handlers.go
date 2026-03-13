@@ -71,6 +71,10 @@ func (s *Server) handleAISuggest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	metrics := []generator.MetricContext{{Name: metricName, Type: metricType, Help: metricHelp}}
+
+	// Enrich with per-metric labels if datasource has a URL
+	enrichMetricLabels(cfg, configCtx.DatasourceName, metrics, 1)
+
 	suggestion, err := aiClient.Suggest(metrics, configCtx)
 	if err != nil {
 		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": fmt.Sprintf("AI suggestion failed: %v", err)})
@@ -140,6 +144,9 @@ func (s *Server) handleAISuggestBulk(w http.ResponseWriter, r *http.Request) {
 		metrics = append(metrics, generator.MetricContext{Name: name, Type: m.Type, Help: m.Help})
 	}
 
+	// Enrich with per-metric labels (cap at 10 lookups)
+	enrichMetricLabels(cfg, configCtx.DatasourceName, metrics, 10)
+
 	// Call AI to generate suggestion
 	suggestion, err := aiClient.Suggest(metrics, configCtx)
 	if err != nil {
@@ -164,4 +171,29 @@ func (s *Server) handleAISuggestBulk(w http.ResponseWriter, r *http.Request) {
 		"MetricNames": strings.Join(metricNames, ", "),
 		"Dashboards":  dashboards,
 	})
+}
+
+// enrichMetricLabels fetches per-metric labels from Prometheus and populates MetricContext.Labels.
+// maxLookups caps the number of /api/v1/series queries to avoid slow responses.
+// Each metric gets at most 5 labels to keep the AI prompt concise.
+func enrichMetricLabels(cfg *config.Config, dsName string, metrics []generator.MetricContext, maxLookups int) {
+	if dsName == "" || cfg.GetDatasourceURL(dsName) == "" {
+		return
+	}
+	disc := generator.NewMetricDiscovery(cfg)
+	lookups := 0
+	for i := range metrics {
+		if lookups >= maxLookups {
+			break
+		}
+		labels, err := disc.FetchMetricLabels(dsName, metrics[i].Name)
+		if err != nil {
+			continue
+		}
+		lookups++
+		if len(labels) > 5 {
+			labels = labels[:5]
+		}
+		metrics[i].Labels = labels
+	}
 }

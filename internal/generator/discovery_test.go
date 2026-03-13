@@ -833,3 +833,68 @@ func TestSortedMetricKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestFetchMetricLabels(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/series" {
+			t.Errorf("unexpected path %q, want /api/v1/series", r.URL.Path)
+		}
+		matchParam := r.URL.Query().Get("match[]")
+		if matchParam != "up" {
+			t.Errorf("match[] = %q, want up", matchParam)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"status": "success",
+			"data": []map[string]string{
+				{"__name__": "up", "job": "node-exporter", "instance": "host1:9100", "env": "prod"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"test": {Type: "prometheus", UID: "test", URL: server.URL},
+		},
+	}
+	disc := NewMetricDiscovery(cfg)
+	labels, err := disc.FetchMetricLabels("test", "up")
+	if err != nil {
+		t.Fatalf("FetchMetricLabels error: %v", err)
+	}
+	// Should return env, instance, job (sorted, __name__ excluded)
+	if len(labels) != 3 {
+		t.Fatalf("labels count = %d, want 3", len(labels))
+	}
+	if labels[0] != "env" {
+		t.Errorf("labels[0] = %q, want env", labels[0])
+	}
+	if labels[1] != "instance" {
+		t.Errorf("labels[1] = %q, want instance", labels[1])
+	}
+	if labels[2] != "job" {
+		t.Errorf("labels[2] = %q, want job", labels[2])
+	}
+
+	// Test caching — second call should not hit server
+	labels2, err := disc.FetchMetricLabels("test", "up")
+	if err != nil {
+		t.Fatalf("cached FetchMetricLabels error: %v", err)
+	}
+	if len(labels2) != 3 {
+		t.Errorf("cached labels count = %d, want 3", len(labels2))
+	}
+}
+
+func TestFetchMetricLabelsNoURL(t *testing.T) {
+	cfg := &config.Config{
+		Datasources: map[string]config.DatasourceDef{
+			"empty": {Type: "prometheus", UID: "empty"},
+		},
+	}
+	disc := NewMetricDiscovery(cfg)
+	_, err := disc.FetchMetricLabels("empty", "up")
+	if err == nil {
+		t.Error("expected error for datasource without URL")
+	}
+}

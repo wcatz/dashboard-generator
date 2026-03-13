@@ -28,6 +28,7 @@ var DefaultSizes = map[string][2]int{
 	"trend":          {12, 7},
 	"candlestick":    {12, 7},
 	"news":           {12, 6},
+	"xychart":        {12, 7},
 }
 
 // PanelFactory creates Grafana panel JSON dicts.
@@ -83,6 +84,8 @@ func (pf *PanelFactory) FromConfig(cfg map[string]interface{}, x, y int) (map[st
 		return pf.Candlestick(cfg, x, y), nil
 	case "news":
 		return pf.News(cfg, x, y), nil
+	case "xychart":
+		return pf.XYChart(cfg, x, y), nil
 	default:
 		return nil, fmt.Errorf("unknown panel type: %s", ptype)
 	}
@@ -1178,4 +1181,84 @@ func (pf *PanelFactory) News(cfg map[string]interface{}, x, y int) map[string]in
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "news",
 	}
+}
+
+// XYChart creates an XY scatter/correlation chart panel.
+func (pf *PanelFactory) XYChart(cfg map[string]interface{}, x, y int) map[string]interface{} {
+	dw, dh := DefaultSizes["xychart"][0], DefaultSizes["xychart"][1]
+	w := getInt(cfg, "width", dw)
+	h := getInt(cfg, "height", dh)
+	fill := getInt(cfg, "fill_opacity", 8)
+	line := getInt(cfg, "line_width", 1)
+	pointSize := getInt(cfg, "point_size", 5)
+
+	showMode := getString(cfg, "show", "points")
+	drawStyle := "line"
+	showPoints := "always"
+	switch showMode {
+	case "lines":
+		drawStyle = "line"
+		showPoints = "never"
+	case "both":
+		drawStyle = "line"
+		showPoints = "always"
+	default: // "points"
+		drawStyle = "points"
+		showPoints = "always"
+	}
+
+	dims := map[string]interface{}{}
+	if xf := getString(cfg, "x_field", ""); xf != "" {
+		dims["x"] = xf
+	}
+	if ex := getStringSlice(cfg, "exclude", nil); len(ex) > 0 {
+		dims["exclude"] = ex
+	}
+
+	seriesMapping := getString(cfg, "series_mapping", "auto")
+
+	panel := map[string]interface{}{
+		"datasource":  pf.ds(cfg),
+		"description": getString(cfg, "description", ""),
+		"fieldConfig": map[string]interface{}{
+			"defaults": map[string]interface{}{
+				"color": map[string]interface{}{"mode": getString(cfg, "color_mode", "palette-classic-by-name")},
+				"custom": map[string]interface{}{
+					"axisBorderShow":    false,
+					"axisCenteredZero":  false,
+					"axisColorMode":     "text",
+					"axisLabel":         getString(cfg, "axis_label", ""),
+					"axisPlacement":     "auto",
+					"drawStyle":         drawStyle,
+					"fillOpacity":       fill,
+					"hideFrom":          map[string]interface{}{"legend": false, "tooltip": false, "viz": false},
+					"lineWidth":         line,
+					"pointSize":         pointSize,
+					"scaleDistribution": map[string]interface{}{"type": "linear"},
+					"showPoints":        showPoints,
+				},
+				"mappings":   pf.valueMappings(cfg),
+				"thresholds": map[string]interface{}{"mode": "absolute", "steps": pf.thresholds(cfg, "")},
+				"unit":       getString(cfg, "unit", "short"),
+				"links":      pf.dataLinks(cfg),
+			},
+			"overrides": pf.overrides(cfg),
+		},
+		"gridPos": map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
+		"id":      pf.IDGen.Next(),
+		"options": map[string]interface{}{
+			"dims":          dims,
+			"seriesMapping": seriesMapping,
+			"legend":        map[string]interface{}{"calcs": getStringSlice(cfg, "legend_calcs", []string{}), "displayMode": getString(cfg, "legend_mode", "list"), "placement": getString(cfg, "legend_placement", "bottom"), "showLegend": getBool(cfg, "show_legend", true)},
+			"tooltip":       map[string]interface{}{"mode": "multi", "sort": "desc"},
+		},
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"targets":       pf.buildTargets(cfg, nil),
+		"title":         getString(cfg, "title", ""),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "xychart",
+	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
 }

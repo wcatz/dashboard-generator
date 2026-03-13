@@ -29,8 +29,11 @@ func TestInferUnit(t *testing.T) {
 		{"node_filesystem_avail_ratio", "percentunit"},
 		{"cpu_usage_percent", "percent"},
 
+		// Request counters (reqps)
+		{"http_requests_total", "reqps"},
+		{"grpc_server_handled_requests_total", "reqps"},
+
 		// Generic counters
-		{"http_requests_total", "short"},
 		{"node_context_switches_total", "short"},
 
 		// Info metrics
@@ -42,6 +45,15 @@ func TestInferUnit(t *testing.T) {
 
 		// Bytes created (edge case)
 		{"some_bytes_created", "bytes"},
+
+		// Temperature, electrical, connections
+		{"node_hwmon_temperature_celsius", "celsius"},
+		{"node_hwmon_temperature_fahrenheit", "fahrenheit"},
+		{"node_hwmon_volts", "volt"},
+		{"node_hwmon_watts", "watt"},
+		{"node_cpu_hertz", "hertz"},
+		{"node_hwmon_amperes", "amp"},
+		{"node_netstat_tcp_connections", "short"},
 
 		// Default
 		{"prometheus_tsdb_head_series", "short"},
@@ -189,8 +201,8 @@ func TestSuggestPanel_Counter(t *testing.T) {
 	if s.Query != "rate(http_requests_total[${rate_interval}])" {
 		t.Errorf("Query = %q, want rate with rate_interval", s.Query)
 	}
-	if s.Unit != "short" {
-		t.Errorf("Unit = %q, want short", s.Unit)
+	if s.Unit != "reqps" {
+		t.Errorf("Unit = %q, want reqps", s.Unit)
 	}
 	if s.Title != "http requests" {
 		t.Errorf("Title = %q, want 'http requests'", s.Title)

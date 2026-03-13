@@ -39,6 +39,8 @@ type SuggestOptions struct {
 func InferUnit(metricName string) string {
 	// Most specific first
 	switch {
+	case strings.HasSuffix(metricName, "_requests_total"):
+		return "reqps"
 	case strings.HasSuffix(metricName, "_bytes_total"):
 		return "Bps"
 	case strings.HasSuffix(metricName, "_bytes_created"):
@@ -57,6 +59,20 @@ func InferUnit(metricName string) string {
 		return "percentunit"
 	case strings.HasSuffix(metricName, "_percent"):
 		return "percent"
+	case strings.HasSuffix(metricName, "_temperature_celsius"):
+		return "celsius"
+	case strings.HasSuffix(metricName, "_temperature_fahrenheit"):
+		return "fahrenheit"
+	case strings.HasSuffix(metricName, "_volts"):
+		return "volt"
+	case strings.HasSuffix(metricName, "_watts"):
+		return "watt"
+	case strings.HasSuffix(metricName, "_hertz"):
+		return "hertz"
+	case strings.HasSuffix(metricName, "_amperes"):
+		return "amp"
+	case strings.HasSuffix(metricName, "_connections"):
+		return "short"
 	case strings.HasSuffix(metricName, "_total"):
 		return "short"
 	case strings.HasSuffix(metricName, "_info"):

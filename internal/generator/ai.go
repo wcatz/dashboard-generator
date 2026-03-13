@@ -232,6 +232,7 @@ CRITICAL: Every panel MUST be inside a section's "panels:" array. NEVER put pane
 | trend | 12x7 | Sequential numeric x-axis trends |
 | candlestick | 12x7 | OHLC financial/resource charts |
 | news | 12x6 | RSS/Atom feed display |
+| xychart | 12x7 | Scatter/correlation plots (CPU vs memory) |
 
 ## Panel Config Keys
 type, title, query, targets (list of {expr, legend, datasource}), width, height,
@@ -250,6 +251,7 @@ max_per_row, calcs
 - trend: x_field, fill_opacity, line_width, line_interpolation, draw_style
 - candlestick: mode, candle_style, color_strategy, open_field, high_field, low_field, close_field, up_color, down_color
 - news: feed_url, show_image (no datasource/targets needed)
+- xychart: x_field, series_mapping (auto), show (points/lines/both), point_size, fill_opacity
 
 ## Style Conventions
 - Lowercase titles (no Title Case)
@@ -260,7 +262,8 @@ max_per_row, calcs
 - Use descriptive panel descriptions
 
 ## Grafana Units
-bytes, Bps, s, ms, percent, percentunit, short, none, reqps, ops, pps, iops
+bytes, Bps, s, ms, percent, percentunit, short, none, reqps, ops, pps, iops,
+celsius, fahrenheit, volt, watt, hertz, amp
 
 ## Query Patterns
 - Counter: rate(metric[${rate_interval}]) or rate(metric[5m])
@@ -437,7 +440,7 @@ var panelTypes = map[string]bool{
 	"heatmap": true, "histogram": true, "table": true, "piechart": true,
 	"state-timeline": true, "status-history": true, "text": true, "logs": true,
 	"barchart": true, "comparison": true, "alertlist": true, "dashlist": true,
-	"trend": true, "candlestick": true, "news": true,
+	"trend": true, "candlestick": true, "news": true, "xychart": true,
 }
 
 // ValidateAISectionYAML checks that YAML has the correct sections→panels nesting.

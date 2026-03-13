@@ -494,12 +494,44 @@ func TestNewsPanel(t *testing.T) {
 	}
 }
 
+func TestXYChartPanel(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	panel := pf.XYChart(map[string]interface{}{
+		"title":   "cpu vs memory",
+		"query":   "up",
+		"x_field": "cpu_usage",
+		"show":    "both",
+		"unit":    "percent",
+	}, 0, 0)
+
+	if panel["type"] != "xychart" {
+		t.Errorf("type = %v, want xychart", panel["type"])
+	}
+	opts := panel["options"].(map[string]interface{})
+	dims := opts["dims"].(map[string]interface{})
+	if dims["x"] != "cpu_usage" {
+		t.Errorf("dims.x = %v, want cpu_usage", dims["x"])
+	}
+	fc := panel["fieldConfig"].(map[string]interface{})
+	defaults := fc["defaults"].(map[string]interface{})
+	custom := defaults["custom"].(map[string]interface{})
+	if custom["showPoints"] != "always" {
+		t.Errorf("showPoints = %v, want always (show=both)", custom["showPoints"])
+	}
+	if custom["drawStyle"] != "line" {
+		t.Errorf("drawStyle = %v, want line (show=both)", custom["drawStyle"])
+	}
+}
+
 func TestFromConfigNewTypes(t *testing.T) {
 	cfg := loadTestConfig(t)
 	idGen := NewIDGenerator()
 	pf := NewPanelFactory(cfg, idGen)
 
-	newTypes := []string{"trend", "candlestick", "news"}
+	newTypes := []string{"trend", "candlestick", "news", "xychart"}
 	for _, typ := range newTypes {
 		pcfg := map[string]interface{}{
 			"type":  typ,
