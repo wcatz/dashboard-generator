@@ -460,6 +460,66 @@ func TestFormatSnippetYAML(t *testing.T) {
 	}
 }
 
+func TestSuggestVariablesFromLabels(t *testing.T) {
+	tests := []struct {
+		name         string
+		labels       []string
+		existingVars []string
+		want         []string
+	}{
+		{
+			name:         "filters internal labels",
+			labels:       []string{"__name__", "instance", "job", "le", "quantile"},
+			existingVars: nil,
+			want:         []string{"instance", "job"},
+		},
+		{
+			name:         "filters existing variables",
+			labels:       []string{"instance", "job", "namespace", "pod"},
+			existingVars: []string{"namespace"},
+			want:         []string{"instance", "job", "pod"},
+		},
+		{
+			name:         "filters all skip labels",
+			labels:       []string{"__name__", "le", "quantile", "alertname", "alertstate", "prometheus", "prometheus_replica"},
+			existingVars: nil,
+			want:         nil,
+		},
+		{
+			name:         "filters double-underscore prefixed labels",
+			labels:       []string{"__meta_kubernetes_pod_name", "instance"},
+			existingVars: nil,
+			want:         []string{"instance"},
+		},
+		{
+			name:         "empty input",
+			labels:       nil,
+			existingVars: nil,
+			want:         nil,
+		},
+		{
+			name:         "all labels already exist as variables",
+			labels:       []string{"instance", "job"},
+			existingVars: []string{"instance", "job"},
+			want:         nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SuggestVariablesFromLabels(tt.labels, tt.existingVars)
+			if len(got) != len(tt.want) {
+				t.Fatalf("SuggestVariablesFromLabels() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("SuggestVariablesFromLabels()[%d] = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestFormatComparisonSnippetYAML(t *testing.T) {
 	infos := map[string]MetricInfo{
 		"up": {Type: "gauge", Help: "Target health."},

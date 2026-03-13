@@ -41,6 +41,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/metrics/snippet", s.handleMetricsSnippet)
 	s.mux.HandleFunc("/api/metrics/ai-suggest", s.handleAISuggest)
 	s.mux.HandleFunc("/api/metrics/ai-suggest-bulk", s.handleAISuggestBulk)
+	s.mux.HandleFunc("/api/ai/describe-dashboard", s.handleAIDescribeDashboard)
 	s.mux.HandleFunc("/api/metrics/comparison-snippet", s.handleComparisonSnippet)
 	s.mux.HandleFunc("/api/config/reload", s.handleConfigReload)
 	s.mux.HandleFunc("/api/config/save", s.handleConfigSave)

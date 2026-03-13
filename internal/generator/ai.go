@@ -138,6 +138,60 @@ func (c *AIClient) Suggest(metrics []MetricContext, configCtx ConfigContext) (*A
 	return parseAIResponse(respBody)
 }
 
+// SuggestDashboard calls the Anthropic API to generate a complete dashboard config
+// from a natural language description.
+func (c *AIClient) SuggestDashboard(description string, configCtx ConfigContext) (*AISuggestionResponse, error) {
+	if !c.Available() {
+		return nil, fmt.Errorf("anthropic API key not configured")
+	}
+
+	systemPrompt := buildDashboardSystemPrompt(configCtx)
+	userPrompt := fmt.Sprintf("Create a complete dashboard config for: %s\n\nInclude appropriate sections, panel types, variables, and queries. Make it production-ready.", description)
+
+	body := map[string]interface{}{
+		"model":      c.Model,
+		"max_tokens": maxTokens,
+		"system":     systemPrompt,
+		"messages": []map[string]interface{}{
+			{"role": "user", "content": userPrompt},
+		},
+	}
+
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	baseURL := c.BaseURL
+	if baseURL == "" {
+		baseURL = anthropicAPIURL
+	}
+	req, err := http.NewRequest(http.MethodPost, baseURL, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", c.APIKey)
+	req.Header.Set("anthropic-version", anthropicAPIVersion)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("API request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	return parseAIResponse(respBody)
+}
+
 // BuildConfigContext creates a ConfigContext from a Config.
 func BuildConfigContext(cfg *config.Config) ConfigContext {
 	ctx := ConfigContext{
@@ -233,6 +287,8 @@ CRITICAL: Every panel MUST be inside a section's "panels:" array. NEVER put pane
 | candlestick | 12x7 | OHLC financial/resource charts |
 | news | 12x6 | RSS/Atom feed display |
 | xychart | 12x7 | Scatter/correlation plots (CPU vs memory) |
+| geomap | 12x10 | Geographic marker maps (multi-region) |
+| nodeGraph | 24x10 | Topology/dependency graphs |
 
 ## Panel Config Keys
 type, title, query, targets (list of {expr, legend, datasource}), width, height,
@@ -252,6 +308,8 @@ max_per_row, calcs
 - candlestick: mode, candle_style, color_strategy, open_field, high_field, low_field, close_field, up_color, down_color
 - news: feed_url, show_image (no datasource/targets needed)
 - xychart: x_field, series_mapping (auto), show (points/lines/both), point_size, fill_opacity
+- geomap: basemap, lat, lon, zoom, location_mode (coords), lat_field, lon_field, size_field, color_field
+- nodeGraph: node_query, edge_query, main_stat_unit, secondary_stat_unit
 
 ## Style Conventions
 - Lowercase titles (no Title Case)
@@ -319,6 +377,83 @@ celsius, fahrenheit, volt, watt, hertz, amp
 		sb.WriteString("\n## Existing Dashboard Sections (avoid duplicating these titles)\n")
 		for _, title := range ctx.ExistingSections {
 			sb.WriteString(fmt.Sprintf("- %s\n", title))
+		}
+	}
+
+	return sb.String()
+}
+
+func buildDashboardSystemPrompt(ctx ConfigContext) string {
+	var sb strings.Builder
+
+	sb.WriteString(`You are a Grafana dashboard expert. Generate a complete YAML dashboard configuration for a config-driven dashboard generator.
+
+## Output Rules
+- Return ONLY valid YAML for a single dashboard definition
+- No markdown fences, no explanations outside the YAML
+- After the YAML, you may add a line starting with "# Notes:" followed by brief notes
+
+## Required YAML Structure
+The output must be a dashboard config with sections and panels:
+
+uid: my-dashboard
+title: my dashboard
+filename: my-dashboard.json
+tags: [generated]
+variables: [namespace, instance]
+sections:
+  - title: "overview"
+    panels:
+      - type: stat
+        title: "metric value"
+        query: 'prometheus_metric'
+        unit: short
+  - title: "details"
+    panels:
+      - type: timeseries
+        title: "rate over time"
+        query: 'rate(metric_total[5m])'
+        unit: reqps
+
+## Available Panel Types
+stat, gauge, timeseries, bargauge, heatmap, histogram, table, piechart,
+state-timeline, status-history, text, logs, comparison, alertlist, dashlist,
+trend, candlestick, news, xychart, geomap, nodeGraph
+
+## Variable Definition Format
+Variables referenced in the "variables:" list should use existing config variables.
+You may suggest new variables as comments.
+
+## Style Conventions
+- Lowercase titles
+- transparent: true on all panels
+- smooth line interpolation on timeseries
+- Include descriptions on panels
+- Use rate() for counters, histogram_quantile() for histograms
+`)
+
+	if len(ctx.Variables) > 0 {
+		sb.WriteString("\n## Available Template Variables\n")
+		for _, name := range ctx.Variables {
+			sb.WriteString(fmt.Sprintf("- $%s\n", name))
+		}
+	}
+
+	if ctx.DatasourceName != "" {
+		sb.WriteString(fmt.Sprintf("\n## Target Datasource\nUse \"datasource: %s\" for all panels.\n", ctx.DatasourceName))
+	}
+
+	if len(ctx.Thresholds) > 0 {
+		sb.WriteString("\n## Available Thresholds\n")
+		for _, name := range ctx.Thresholds {
+			sb.WriteString(fmt.Sprintf("- $%s\n", name))
+		}
+	}
+
+	if len(ctx.Palettes) > 0 {
+		sb.WriteString("\n## Available Palette Colors\n")
+		for _, name := range ctx.Palettes {
+			sb.WriteString(fmt.Sprintf("- $%s\n", name))
 		}
 	}
 
@@ -441,6 +576,7 @@ var panelTypes = map[string]bool{
 	"state-timeline": true, "status-history": true, "text": true, "logs": true,
 	"barchart": true, "comparison": true, "alertlist": true, "dashlist": true,
 	"trend": true, "candlestick": true, "news": true, "xychart": true,
+	"geomap": true, "nodeGraph": true, "node-graph": true,
 }
 
 // ValidateAISectionYAML checks that YAML has the correct sections→panels nesting.

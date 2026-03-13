@@ -173,6 +173,42 @@ func (s *Server) handleAISuggestBulk(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleAIDescribeDashboard generates a complete dashboard config from a natural language description.
+func (s *Server) handleAIDescribeDashboard(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", 405)
+		return
+	}
+
+	cfg := s.Config()
+	aiClient, configCtx, errMsg := s.initAIClient(cfg)
+	if errMsg != "" {
+		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": errMsg})
+		return
+	}
+
+	description := strings.TrimSpace(r.FormValue("description"))
+	if description == "" {
+		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": "Description is required"})
+		return
+	}
+
+	suggestion, err := aiClient.SuggestDashboard(description, configCtx)
+	if err != nil {
+		s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{"Error": fmt.Sprintf("AI dashboard generation failed: %v", err)})
+		return
+	}
+
+	dashboards, _ := cfg.GetDashboardOrder("")
+	s.renderPartial(w, "ai-suggestion.html", map[string]interface{}{
+		"YAML":        suggestion.YAML,
+		"Notes":       suggestion.Notes,
+		"IsBulk":      true,
+		"MetricNames": "dashboard: " + description,
+		"Dashboards":  dashboards,
+	})
+}
+
 // enrichMetricLabels fetches per-metric labels from Prometheus and populates MetricContext.Labels.
 // maxLookups caps the number of /api/v1/series queries to avoid slow responses.
 // Each metric gets at most 5 labels to keep the AI prompt concise.

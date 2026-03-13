@@ -339,6 +339,39 @@ func FormatSnippetYAML(suggestions []PanelSuggestion, sectionTitle, dsName strin
 	return strings.Join(lines, "\n"), hints
 }
 
+// SuggestVariablesFromLabels filters discovered labels to those worth creating as template variables.
+// Excludes internal/low-cardinality labels and labels that already exist as variables.
+func SuggestVariablesFromLabels(labels []string, existingVars []string) []string {
+	existing := make(map[string]bool, len(existingVars))
+	for _, v := range existingVars {
+		existing[v] = true
+	}
+
+	// Labels that are almost never useful as template variables
+	skip := map[string]bool{
+		"__name__":           true,
+		"le":                 true,
+		"quantile":           true,
+		"alertname":          true,
+		"alertstate":         true,
+		"prometheus":         true,
+		"prometheus_replica": true,
+	}
+
+	var suggestions []string
+	for _, label := range labels {
+		if skip[label] || existing[label] {
+			continue
+		}
+		// Skip internal labels (start with __)
+		if strings.HasPrefix(label, "__") {
+			continue
+		}
+		suggestions = append(suggestions, label)
+	}
+	return suggestions
+}
+
 // FormatComparisonSnippetYAML formats comparison panel suggestions as YAML.
 func FormatComparisonSnippetYAML(metricNames []string, metricInfos map[string]MetricInfo, dsList []string, opts *SuggestOptions) (string, []string) {
 	var lines []string

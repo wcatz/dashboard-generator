@@ -531,7 +531,7 @@ func TestFromConfigNewTypes(t *testing.T) {
 	idGen := NewIDGenerator()
 	pf := NewPanelFactory(cfg, idGen)
 
-	newTypes := []string{"trend", "candlestick", "news", "xychart"}
+	newTypes := []string{"trend", "candlestick", "news", "xychart", "geomap", "nodeGraph"}
 	for _, typ := range newTypes {
 		pcfg := map[string]interface{}{
 			"type":  typ,
@@ -546,5 +546,92 @@ func TestFromConfigNewTypes(t *testing.T) {
 		if panel["type"] != typ {
 			t.Errorf("FromConfig(%s) type = %v", typ, panel["type"])
 		}
+	}
+}
+
+func TestGeomapPanel(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	panel := pf.Geomap(map[string]interface{}{
+		"title":     "region map",
+		"query":     "up",
+		"lat":       40.7,
+		"lon":       -74.0,
+		"zoom":      5,
+		"lat_field": "lat",
+		"lon_field": "lng",
+	}, 0, 0)
+
+	if panel["type"] != "geomap" {
+		t.Errorf("type = %v, want geomap", panel["type"])
+	}
+	opts := panel["options"].(map[string]interface{})
+	view := opts["view"].(map[string]interface{})
+	if view["zoom"] != 5 {
+		t.Errorf("zoom = %v, want 5", view["zoom"])
+	}
+	layers := opts["layers"].([]interface{})
+	if len(layers) != 1 {
+		t.Fatalf("layers count = %d, want 1", len(layers))
+	}
+	layer := layers[0].(map[string]interface{})
+	if layer["type"] != "markers" {
+		t.Errorf("layer type = %v, want markers", layer["type"])
+	}
+	loc := layer["location"].(map[string]interface{})
+	if loc["latitude"] != "lat" {
+		t.Errorf("lat_field = %v, want lat", loc["latitude"])
+	}
+	if loc["longitude"] != "lng" {
+		t.Errorf("lon_field = %v, want lng", loc["longitude"])
+	}
+}
+
+func TestNodeGraphPanel(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	panel := pf.NodeGraph(map[string]interface{}{
+		"title":      "service map",
+		"node_query": "service_nodes",
+		"edge_query": "service_edges",
+	}, 0, 0)
+
+	if panel["type"] != "nodeGraph" {
+		t.Errorf("type = %v, want nodeGraph", panel["type"])
+	}
+	targets := panel["targets"].([]interface{})
+	if len(targets) != 2 {
+		t.Fatalf("targets count = %d, want 2", len(targets))
+	}
+	t0 := targets[0].(map[string]interface{})
+	if t0["refId"] != "nodes" {
+		t.Errorf("targets[0] refId = %v, want nodes", t0["refId"])
+	}
+	t1 := targets[1].(map[string]interface{})
+	if t1["refId"] != "edges" {
+		t.Errorf("targets[1] refId = %v, want edges", t1["refId"])
+	}
+}
+
+func TestNodeGraphFromConfigAlias(t *testing.T) {
+	cfg := loadTestConfig(t)
+	idGen := NewIDGenerator()
+	pf := NewPanelFactory(cfg, idGen)
+
+	// "node-graph" alias should also work
+	panel, err := pf.FromConfig(map[string]interface{}{
+		"type":  "node-graph",
+		"title": "alias test",
+		"query": "up",
+	}, 0, 0)
+	if err != nil {
+		t.Fatalf("FromConfig(node-graph) error: %v", err)
+	}
+	if panel["type"] != "nodeGraph" {
+		t.Errorf("type = %v, want nodeGraph", panel["type"])
 	}
 }

@@ -29,6 +29,8 @@ var DefaultSizes = map[string][2]int{
 	"candlestick":    {12, 7},
 	"news":           {12, 6},
 	"xychart":        {12, 7},
+	"geomap":         {12, 10},
+	"nodeGraph":      {24, 10},
 }
 
 // PanelFactory creates Grafana panel JSON dicts.
@@ -86,6 +88,10 @@ func (pf *PanelFactory) FromConfig(cfg map[string]interface{}, x, y int) (map[st
 		return pf.News(cfg, x, y), nil
 	case "xychart":
 		return pf.XYChart(cfg, x, y), nil
+	case "geomap":
+		return pf.Geomap(cfg, x, y), nil
+	case "nodeGraph", "node-graph":
+		return pf.NodeGraph(cfg, x, y), nil
 	default:
 		return nil, fmt.Errorf("unknown panel type: %s", ptype)
 	}
@@ -1257,6 +1263,128 @@ func (pf *PanelFactory) XYChart(cfg map[string]interface{}, x, y int) map[string
 		"title":         getString(cfg, "title", ""),
 		"transparent":   getBool(cfg, "transparent", true),
 		"type":          "xychart",
+	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
+}
+
+// Geomap creates a geographic map panel with marker layers.
+func (pf *PanelFactory) Geomap(cfg map[string]interface{}, x, y int) map[string]interface{} {
+	dw, dh := DefaultSizes["geomap"][0], DefaultSizes["geomap"][1]
+	w := getInt(cfg, "width", dw)
+	h := getInt(cfg, "height", dh)
+
+	viewCfg := map[string]interface{}{
+		"id":      "zero",
+		"lat":     getFloat(cfg, "lat", 0),
+		"lon":     getFloat(cfg, "lon", 0),
+		"zoom":    getInt(cfg, "zoom", 3),
+		"padding": 0,
+	}
+
+	basemap := getString(cfg, "basemap", "default")
+
+	panel := map[string]interface{}{
+		"datasource":  pf.ds(cfg),
+		"description": getString(cfg, "description", ""),
+		"fieldConfig": map[string]interface{}{
+			"defaults": map[string]interface{}{
+				"color":      map[string]interface{}{"mode": getString(cfg, "color_mode", "thresholds")},
+				"mappings":   pf.valueMappings(cfg),
+				"thresholds": map[string]interface{}{"mode": "absolute", "steps": pf.thresholds(cfg, "")},
+				"unit":       getString(cfg, "unit", "short"),
+			},
+			"overrides": pf.overrides(cfg),
+		},
+		"gridPos": map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
+		"id":      pf.IDGen.Next(),
+		"options": map[string]interface{}{
+			"basemap": map[string]interface{}{
+				"name": basemap,
+				"type": basemap,
+			},
+			"layers": []interface{}{
+				map[string]interface{}{
+					"type": "markers",
+					"config": map[string]interface{}{
+						"showLegend": true,
+						"style": map[string]interface{}{
+							"color":   map[string]interface{}{"field": getString(cfg, "color_field", ""), "fixed": "dark-green"},
+							"opacity": 0.6,
+							"size":    map[string]interface{}{"field": getString(cfg, "size_field", ""), "fixed": 5, "max": 15, "min": 2},
+							"symbol":  map[string]interface{}{"fixed": "img/icons/marker/circle.svg", "mode": "fixed"},
+						},
+					},
+					"location": map[string]interface{}{
+						"mode":      getString(cfg, "location_mode", "coords"),
+						"latitude":  getString(cfg, "lat_field", "latitude"),
+						"longitude": getString(cfg, "lon_field", "longitude"),
+					},
+					"name": "markers",
+				},
+			},
+			"tooltip": map[string]interface{}{"mode": "details"},
+			"view":    viewCfg,
+		},
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"targets":       pf.buildTargets(cfg, nil),
+		"title":         getString(cfg, "title", ""),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "geomap",
+	}
+	pf.applyTransformations(panel, cfg)
+	pf.applyRepeat(panel, cfg)
+	return panel
+}
+
+// NodeGraph creates a node graph panel for topology/dependency visualization.
+func (pf *PanelFactory) NodeGraph(cfg map[string]interface{}, x, y int) map[string]interface{} {
+	dw, dh := DefaultSizes["nodeGraph"][0], DefaultSizes["nodeGraph"][1]
+	w := getInt(cfg, "width", dw)
+	h := getInt(cfg, "height", dh)
+
+	var targets []interface{}
+	ds := pf.ds(cfg)
+
+	// Node query
+	if nq := getString(cfg, "node_query", ""); nq != "" {
+		targets = append(targets, pf.target(nq, "", "nodes", ds))
+	}
+	// Edge query
+	if eq := getString(cfg, "edge_query", ""); eq != "" {
+		targets = append(targets, pf.target(eq, "", "edges", ds))
+	}
+	// Fall back to standard targets if no explicit node/edge queries
+	if len(targets) == 0 {
+		targets = pf.buildTargets(cfg, ds)
+	}
+
+	panel := map[string]interface{}{
+		"datasource":  ds,
+		"description": getString(cfg, "description", ""),
+		"fieldConfig": map[string]interface{}{
+			"defaults": map[string]interface{}{
+				"color":      map[string]interface{}{"mode": getString(cfg, "color_mode", "thresholds")},
+				"mappings":   pf.valueMappings(cfg),
+				"thresholds": map[string]interface{}{"mode": "absolute", "steps": pf.thresholds(cfg, "")},
+			},
+			"overrides": pf.overrides(cfg),
+		},
+		"gridPos": map[string]interface{}{"h": h, "w": w, "x": x, "y": y},
+		"id":      pf.IDGen.Next(),
+		"options": map[string]interface{}{
+			"nodes": map[string]interface{}{
+				"mainStatUnit":      getString(cfg, "main_stat_unit", ""),
+				"secondaryStatUnit": getString(cfg, "secondary_stat_unit", ""),
+			},
+			"edges": map[string]interface{}{},
+		},
+		"pluginVersion": pf.Config.GetGenerator().GetPluginVersion(),
+		"targets":       targets,
+		"title":         getString(cfg, "title", ""),
+		"transparent":   getBool(cfg, "transparent", true),
+		"type":          "nodeGraph",
 	}
 	pf.applyTransformations(panel, cfg)
 	pf.applyRepeat(panel, cfg)
