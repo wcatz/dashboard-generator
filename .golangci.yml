@@ -1,0 +1,15 @@
+version: "2"
+linters:
+  settings:
+    staticcheck:
+      # v1 defaults: staticcheck (SA) + gosimple (S1); stylecheck was not enabled.
+      checks:
+        - "SA*"
+        - "S1*"
+  exclusions:
+    # Keep golangci-lint v1's default exclusions (v2 dropped them).
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
